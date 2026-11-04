@@ -5,9 +5,13 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { PNG } from 'pngjs'
+import { buildContourDem, parseDxf } from './contour-dem.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const RAW = path.join(ROOT, 'scripts/raw')
+// 국토지리정보원 1:5,000 수치지형도 DXF 를 두는 곳 (git 제외). 있으면 등고선으로 정밀 지형을 만든다
+const NGII = path.join(RAW, 'ngii')
+const CONTOUR_SPACING = 7.5 // 정밀 지형 격자 간격(m)
 const OUT = path.join(ROOT, 'public/data')
 const UA = 'hiking-metaverse-dev'
 
@@ -102,18 +106,42 @@ async function buildTerrain() {
   const nw = toLocal(py2lat(py0), px2lon(px0))
   const se = toLocal(py2lat(py1), px2lon(px1))
 
+  // 30m 원본(Terrarium) 높이 쌍선형 보간. 정밀 지형이 없는 곳에 쓴다
+  const ext = { minX: nw.x, maxX: se.x, minZ: nw.z, maxZ: se.z }
+  const baseSample = makeSampler(heights, width, height, ext)
+
+  // 국토지리정보원 수치지형도(DXF)가 있으면 등고선으로 정밀 지형을 만든다
+  let grid = { width, height, heights }
+  const dxfFiles = (await fs.readdir(NGII).catch(() => [])).filter((f) => f.toLowerCase().endsWith('.dxf'))
+  if (dxfFiles.length) {
+    const sheets = []
+    for (const f of dxfFiles) sheets.push(parseDxf((await fs.readFile(path.join(NGII, f))).toString('latin1')))
+    const dem = buildContourDem({ sheets, toLocal, extent: ext, spacing: CONTOUR_SPACING, baseSample })
+    grid = dem
+    console.log(
+      `정밀 지형: 도엽 ${dxfFiles.length}개, 등고선 ${dem.contourCount}개, 표고점 ${dem.spotCount}개, ` +
+        `${CONTOUR_SPACING}m 격자 ${dem.width}x${dem.height}, 기준 차이 보정 ${dem.offset.toFixed(1)}m, ` +
+        `보간 ${dem.iterations}회(마지막 변화 ${dem.change.toFixed(3)}m)`,
+    )
+  }
+
   let min = Infinity, max = -Infinity
-  for (const h of heights) { min = Math.min(min, h); max = Math.max(max, h) }
+  for (const h of grid.heights) { min = Math.min(min, h); max = Math.max(max, h) }
 
-  const meta = { width, height, minX: nw.x, maxX: se.x, minZ: nw.z, maxZ: se.z, minHeight: min, maxHeight: max, origin }
-  await fs.writeFile(path.join(OUT, 'terrain.bin'), Buffer.from(heights.buffer))
+  const meta = { width: grid.width, height: grid.height, ...ext, minHeight: min, maxHeight: max, origin }
+  await fs.writeFile(path.join(OUT, 'terrain.bin'), Buffer.from(grid.heights.buffer))
   await fs.writeFile(path.join(OUT, 'terrain.json'), JSON.stringify(meta, null, 2))
-  console.log(`지형 ${width}x${height}, 높이 ${min.toFixed(0)}~${max.toFixed(0)}m, 크기 ${(se.x - nw.x).toFixed(0)}x${(se.z - nw.z).toFixed(0)}m`)
+  console.log(`지형 ${grid.width}x${grid.height}, 높이 ${min.toFixed(0)}~${max.toFixed(0)}m, 크기 ${(se.x - nw.x).toFixed(0)}x${(se.z - nw.z).toFixed(0)}m`)
 
-  // 등산로 높이 샘플링용 (쌍선형 보간)
+  // 등산로 높이 샘플링용
+  return makeSampler(grid.heights, grid.width, grid.height, ext)
+}
+
+/** 격자 높이를 쌍선형 보간하는 함수를 만든다 */
+function makeSampler(heights, width, height, ext) {
   return (x, z) => {
-    const fx = ((x - meta.minX) / (meta.maxX - meta.minX)) * (width - 1)
-    const fz = ((z - meta.minZ) / (meta.maxZ - meta.minZ)) * (height - 1)
+    const fx = ((x - ext.minX) / (ext.maxX - ext.minX)) * (width - 1)
+    const fz = ((z - ext.minZ) / (ext.maxZ - ext.minZ)) * (height - 1)
     const i = Math.max(0, Math.min(width - 2, Math.floor(fx)))
     const j = Math.max(0, Math.min(height - 2, Math.floor(fz)))
     const u = fx - i, v = fz - j
