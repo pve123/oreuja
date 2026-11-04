@@ -26,6 +26,9 @@ type State = {
   reachedCheckpoint: number
   /** 이정표 도착 알림. at 이 바뀌면 알림을 새로 띄운다 */
   arrival: { index: number; at: number } | null
+  /** 길에서 너무 멀어져 등산로로 돌아온 시각 (알림과 화면 깜빡임에 쓴다) */
+  returnedAt: number | null
+  returnToTrail: () => void
   setDistance: (d: number) => void
   setOffset: (m: number) => void
   reachCheckpoint: (index: number) => void
@@ -69,6 +72,8 @@ export const useGame = create<State>((set, get) => ({
   records: loadRecords(),
   reachedCheckpoint: -1,
   arrival: null,
+  returnedAt: null,
+  returnToTrail: () => set({ offset: 0, returnedAt: Date.now() }),
   setDistance: (distance) =>
     set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
   setOffset: (offset) => set({ offset }),
@@ -91,8 +96,19 @@ export const useGame = create<State>((set, get) => ({
       photo: null,
       reachedCheckpoint: -1,
       arrival: null,
+      returnedAt: null,
     }),
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */
-export const input = { forward: false, backward: false, left: false, right: false, run: false, jump: false }
+export const input = {
+  forward: false,
+  backward: false,
+  left: false,
+  right: false,
+  run: false,
+  jump: false,
+  /** Q/E 키 시점 회전 */
+  turnLeft: false,
+  turnRight: false,
+}
