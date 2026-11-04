@@ -136,7 +136,7 @@ export function Hud({ trail }: { trail: Trail }) {
           <span>정상까지 {formatDistance(remaining)}</span>
           <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · Q/E 시점 회전 · 마우스로 둘러보기</div>
+        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · Q/E 시점 회전 · 휠 확대·축소</div>
       </div>
 
       <ArrivalToast trail={trail} />
