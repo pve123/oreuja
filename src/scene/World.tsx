@@ -25,7 +25,7 @@ const STRAFE_RUN_SPEED = 7
 export const ROAM_LIMIT = 30
 const TURN_SPEED = 1.8 // Q/E 시점 회전 속도(rad/s)
 const FOLLOW_RATE = 2.2 // 카메라가 캐릭터 뒤로 돌아가는 빠르기 (클수록 빨리)
-const MANUAL_HOLD_MS = 2000 // 마우스로 돌린 뒤 이 시간 동안은 자동으로 돌지 않는다
+const MANUAL_HOLD_MS = 2000 // Q/E 로 돌린 뒤 이 시간 동안은 자동으로 돌지 않는다
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
@@ -66,8 +66,8 @@ export function World({ terrain, trail }: Props) {
   const jump = useRef({ height: 0, velocity: 0 })
   /** 등산로 진행 방향 기준으로 아바타가 바라보는 각도 (0 = 정면) */
   const facing = useRef(0)
-  /** 마우스로 시점을 돌리는 중인지, 마지막으로 직접 돌린 시각 */
-  const manual = useRef({ dragging: false, at: 0 })
+  /** Q/E 로 마지막으로 시점을 직접 돌린 시각 */
+  const manualTurnAt = useRef(0)
 
   // 정상에서 가장 낮게 트인 방향 (기념사진 배경으로 쓸 풍경 쪽)
   const vista = useMemo(() => summitVista(terrain, trail), [terrain, trail])
@@ -207,7 +207,7 @@ export function World({ terrain, trail }: Props) {
     }
     photoFrames.current = 0
 
-    // 아바타를 따라가되, 마우스로 돌려 본 각도는 유지
+    // 아바타를 따라가되, 지금 보는 각도는 유지
     const target = pos.clone().setY(pos.y + 1.5)
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
@@ -220,8 +220,8 @@ export function World({ terrain, trail }: Props) {
     const now = performance.now()
     if (turn !== 0) {
       azimuth += turn * TURN_SPEED * dt
-      manual.current.at = now
-    } else if (walkingAlong && !manual.current.dragging && now - manual.current.at > MANUAL_HOLD_MS) {
+      manualTurnAt.current = now
+    } else if (walkingAlong && now - manualTurnAt.current > MANUAL_HOLD_MS) {
       const behind = heading + facing.current + Math.PI // 캐릭터가 보는 방향의 반대편
       const diff = Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) // 가까운 쪽으로 돈다
       azimuth += diff * (1 - Math.exp(-FOLLOW_RATE * dt))
@@ -265,11 +265,8 @@ export function World({ terrain, trail }: Props) {
         minDistance={4}
         maxDistance={400}
         maxPolarAngle={Math.PI * 0.49}
-        onStart={() => (manual.current.dragging = true)}
-        onEnd={() => {
-          manual.current.dragging = false
-          manual.current.at = performance.now()
-        }}
+        // 시점은 자동 따라 돌기와 Q/E 로만 바꾼다. 마우스는 휠 확대·축소만
+        enableRotate={false}
       />
     </>
   )
