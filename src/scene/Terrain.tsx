@@ -1,6 +1,8 @@
-import { useMemo } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Terrain as TerrainData } from '../lib/data'
+import { MAPBOX_TOKEN, loadSatelliteTexture } from '../lib/satellite'
 
 const GRASS_LOW = new THREE.Color('#5d7f3a')
 const FOREST = new THREE.Color('#3f6b2e')
@@ -8,6 +10,29 @@ const HIGH = new THREE.Color('#7a7d5a')
 const ROCK = new THREE.Color('#9a958c')
 
 export function Terrain({ terrain }: { terrain: TerrainData }) {
+  const gl = useThree((s) => s.gl)
+  // Mapbox 토큰이 있으면 위성사진을 입히고, 없거나 실패하면 고도·경사 색을 쓴다
+  const [satellite, setSatellite] = useState<THREE.Texture | null>(null)
+
+  useEffect(() => {
+    if (!MAPBOX_TOKEN) return
+    let cancelled = false
+    let loaded: THREE.Texture | null = null
+    loadSatelliteTexture(terrain, MAPBOX_TOKEN)
+      .then((texture) => {
+        loaded = texture
+        // 비스듬히 볼 때 사진이 뭉개지지 않게
+        texture.anisotropy = gl.capabilities.getMaxAnisotropy()
+        if (cancelled) texture.dispose()
+        else setSatellite(texture)
+      })
+      .catch((e) => console.warn('위성사진 없이 그립니다.', e))
+    return () => {
+      cancelled = true
+      loaded?.dispose()
+    }
+  }, [terrain, gl])
+
   const geometry = useMemo(() => {
     const { width, height, heights, minX, maxX, minZ, maxZ, minHeight, maxHeight } = terrain
     const geo = new THREE.PlaneGeometry(maxX - minX, maxZ - minZ, width - 1, height - 1)
@@ -36,7 +61,11 @@ export function Terrain({ terrain }: { terrain: TerrainData }) {
 
   return (
     <mesh geometry={geometry} receiveShadow>
-      <meshStandardMaterial vertexColors roughness={0.95} />
+      {satellite ? (
+        <meshStandardMaterial key="satellite" map={satellite} roughness={1} />
+      ) : (
+        <meshStandardMaterial key="colors" vertexColors roughness={0.95} />
+      )}
     </mesh>
   )
 }
