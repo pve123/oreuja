@@ -16,7 +16,12 @@ type State = {
   finishedAt: number | null
   photo: string | null
   records: ClimbRecord[]
+  /** 지금까지 지난 마지막 이정표 번호 (-1 은 아직 없음) */
+  reachedCheckpoint: number
+  /** 이정표 도착 알림. at 이 바뀌면 알림을 새로 띄운다 */
+  arrival: { index: number; at: number } | null
   setDistance: (d: number) => void
+  reachCheckpoint: (index: number) => void
   reachSummit: (record: ClimbRecord) => void
   takePhoto: () => void
   setPhoto: (url: string) => void
@@ -49,8 +54,11 @@ export const useGame = create<State>((set, get) => ({
   finishedAt: null,
   photo: null,
   records: loadRecords(),
+  reachedCheckpoint: -1,
+  arrival: null,
   setDistance: (distance) =>
     set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
+  reachCheckpoint: (index) => set({ reachedCheckpoint: index, arrival: { index, at: Date.now() } }),
   reachSummit: (record) => {
     const records = [...get().records, record]
     saveRecords(records)
@@ -59,7 +67,16 @@ export const useGame = create<State>((set, get) => ({
   takePhoto: () => set({ mode: 'photo' }),
   setPhoto: (photo) => set({ photo, mode: 'photoResult' }),
   closePhoto: () => set({ mode: 'summit' }),
-  restart: () => set({ distance: 0, mode: 'hiking', startedAt: null, finishedAt: null, photo: null }),
+  restart: () =>
+    set({
+      distance: 0,
+      mode: 'hiking',
+      startedAt: null,
+      finishedAt: null,
+      photo: null,
+      reachedCheckpoint: -1,
+      arrival: null,
+    }),
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */
