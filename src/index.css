@@ -26,3 +26,18 @@ body,
   font-size: 18px;
   color: var(--navy);
 }
+
+canvas {
+  touch-action: none;
+}
+
+.attribution {
+  position: fixed;
+  right: 8px;
+  bottom: 4px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.55);
+}
+.attribution a {
+  color: inherit;
+}
