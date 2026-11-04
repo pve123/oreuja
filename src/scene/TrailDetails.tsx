@@ -6,6 +6,9 @@ const PATH_WIDTH = 1.6 // 흙길 폭(m)
 const PATH_LIFT = 0.06 // 지면과 겹쳐 깜빡이지 않게 살짝 띄운다(m)
 const STEP_EVERY = 1.3 // 계단 간격(m)
 const STEP_SLOPE = 0.3 // 이보다 가파르면(30%) 돌계단을 놓는다
+const STEP_WIDTH = 1.5 // 돌계단 폭(m). 길 폭보다 조금 좁다
+const STEP_DEPTH = 0.42 // 디딤판 깊이(m)
+const STEP_RISE = 0.1 // 디딤판 윗면이 주변 지면보다 올라오는 높이(m)
 const POST_EVERY = 2.5 // 난간 기둥 간격(m)
 const RAIL_SIDE = 1.0 // 난간이 길 가운데서 떨어진 거리(m)
 const RAIL_HEIGHT = 0.95
@@ -89,15 +92,31 @@ function StoneSteps({ terrain, trail }: Props) {
       const slope = Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
       if (slope < STEP_SLOPE) continue
       const p = trail.positionAt(d)
-      p.y = meshHeight(terrain, p.x, p.z)
-      q.setFromAxisAngle(up, trail.headingAt(d))
-      out.push(new THREE.Matrix4().compose(p, q, new THREE.Vector3(1, 1, 1)))
+      const heading = trail.headingAt(d)
+      const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading))
+      const right = rightOf(heading)
+      // 판 네 모서리와 가운데 아래 땅 높이를 잰다. 길이 옆으로 기울어도 판이 땅에 묻히지 않게
+      let low = Infinity
+      let high = -Infinity
+      for (const [s, f] of [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+        const x = p.x + right.x * s * (STEP_WIDTH / 2) + forward.x * f * (STEP_DEPTH / 2)
+        const z = p.z + right.z * s * (STEP_WIDTH / 2) + forward.z * f * (STEP_DEPTH / 2)
+        const h = meshHeight(terrain, x, z) + PATH_LIFT
+        low = Math.min(low, h)
+        high = Math.max(high, h)
+      }
+      // 윗면은 가장 높은 곳보다 살짝 위에 수평으로, 아래는 가장 낮은 곳보다 조금 더 내려 경사면을 깎은 계단처럼
+      const top = high + STEP_RISE
+      const bottom = low - 0.05
+      const center = new THREE.Vector3(p.x, (top + bottom) / 2, p.z)
+      q.setFromAxisAngle(up, heading)
+      out.push(new THREE.Matrix4().compose(center, q, new THREE.Vector3(1, top - bottom, 1)))
     }
     return out
   }, [terrain, trail])
 
-  // 아래쪽 절반은 땅에 묻어 떠 보이지 않게 한다
-  const shape = useMemo(() => new THREE.BoxGeometry(1.5, 0.3, 0.42), [])
+  // 높이 1짜리 판을 그루마다 위아래 길이에 맞춰 늘린다
+  const shape = useMemo(() => new THREE.BoxGeometry(STEP_WIDTH, 1, STEP_DEPTH), [])
 
   useLayoutEffect(() => {
     matrices.forEach((m, i) => ref.current.setMatrixAt(i, m))
