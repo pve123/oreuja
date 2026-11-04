@@ -5,6 +5,7 @@ import { sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
+import { withOcclusionCutout } from '../lib/occlusion'
 
 const COUNT = 30000
 const NEAR_TRAIL_SHARE = 0.45 // 절반 가까이는 등산로 250m 안에 심어 걸으며 보이게 한다
@@ -111,6 +112,15 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     [],
   )
 
+  // 카메라와 아바타 사이에 낀 부분은 비워서 아바타를 가리지 않게 한다
+  const materials = useMemo(
+    () => ({
+      canopy: withOcclusionCutout(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true })),
+      trunk: withOcclusionCutout(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 })),
+    }),
+    [],
+  )
+
   useLayoutEffect(() => {
     let nb = 0
     let np = 0
@@ -134,15 +144,9 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
   return (
     <group>
-      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, undefined, COUNT]} castShadow>
-        <meshStandardMaterial roughness={1} flatShading />
-      </instancedMesh>
-      <instancedMesh ref={pines} args={[shapes.pine, undefined, COUNT]} castShadow>
-        <meshStandardMaterial roughness={1} flatShading />
-      </instancedMesh>
-      <instancedMesh ref={trunks} args={[shapes.trunk, undefined, COUNT]}>
-        <meshStandardMaterial color="#4f3a2a" roughness={1} />
-      </instancedMesh>
+      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, COUNT]} castShadow />
+      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, COUNT]} castShadow />
+      <instancedMesh ref={trunks} args={[shapes.trunk, materials.trunk, COUNT]} />
     </group>
   )
 }

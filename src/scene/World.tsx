@@ -6,13 +6,14 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { sampleHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
-import { TrailPath } from './TrailPath'
+import { SummitFlag } from './SummitFlag'
 import { Forest } from './Forest'
 import { Signposts } from './Signposts'
 import { TrailDetails } from './TrailDetails'
 import { Rocks } from './Rocks'
 import { Hiker, type HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
+import { occlusionUniforms } from '../lib/occlusion'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
@@ -170,6 +171,9 @@ export function World({ terrain, trail }: Props) {
     sun.current.target.position.copy(pos)
     sun.current.target.updateMatrixWorld()
 
+    // 카메라와 아바타 사이에 낀 나무·바위를 비울 기준점 (아바타 가슴 높이)
+    occlusionUniforms.uOccTarget.value.copy(hiker.current.group.position).setY(hiker.current.group.position.y + 1.2)
+
     // 4) 카메라 (점프해도 흔들리지 않게 땅 높이 기준)
     if (game.mode === 'photo') {
       // 카메라는 오르막 쪽, 아바타는 카메라를 바라봄 → 트인 풍경이 배경
@@ -177,6 +181,7 @@ export function World({ terrain, trail }: Props) {
       hiker.current.group.rotation.y = Math.atan2(-d.x, -d.z)
       camera.position.copy(pos).addScaledVector(d, -6).setY(pos.y + 3)
       camera.lookAt(pos.x + d.x * 2, pos.y + 1.2, pos.z + d.z * 2)
+      occlusionUniforms.uOccCamera.value.copy(camera.position)
       // 카메라가 자리 잡고 몇 프레임 그린 뒤 촬영 (방금 그린 프레임을 복사)
       if (++photoFrames.current === 3) {
         useGame.getState().setPhoto(composePhoto(gl.domElement, trail.data))
@@ -192,6 +197,7 @@ export function World({ terrain, trail }: Props) {
     controls.current.target.copy(target)
     lastTarget.current.copy(target)
     controls.current.update()
+    occlusionUniforms.uOccCamera.value.copy(camera.position)
   })
 
   return (
@@ -215,7 +221,7 @@ export function World({ terrain, trail }: Props) {
       <Forest terrain={terrain} trail={trail} />
       <Rocks terrain={terrain} trail={trail} />
       <TrailDetails terrain={terrain} trail={trail} />
-      <TrailPath trail={trail} />
+      <SummitFlag trail={trail} />
       <Signposts trail={trail} />
       <Hiker ref={hiker} />
       <OrbitControls

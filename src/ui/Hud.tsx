@@ -27,10 +27,6 @@ function useKeyboard() {
       else if (e.key === 'Shift') input.run = on
     }
     const down = (e: KeyboardEvent) => {
-      if (e.code === 'KeyG' && !e.repeat) {
-        useGame.getState().toggleGuide()
-        return
-      }
       if (e.code === 'Space') {
         // 페이지 스크롤이나 포커스된 버튼 누름을 막고, 꾹 눌러도 한 번만 뛴다
         e.preventDefault()
@@ -128,7 +124,7 @@ export function Hud({ trail }: { trail: Trail }) {
           <span>정상까지 {formatDistance(remaining)}</span>
           <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · G 안내선 · 마우스로 시점 회전</div>
+        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · 마우스로 시점 회전</div>
       </div>
 
       <ArrivalToast trail={trail} />
