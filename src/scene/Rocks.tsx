@@ -2,6 +2,8 @@ import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
+import { classifyGround, samplePhoto } from '../lib/photo-map'
+import { makeNearTrail, usePhotoLayers } from '../lib/placement'
 
 const COUNT = 5000
 const NEAR_TRAIL_SHARE = 0.5 // 절반은 등산로 150m 안에 둬서 걸으며 보이게 한다
@@ -10,7 +12,7 @@ const SUMMIT_BOULDERS = 14
 const TRAIL_CLEARANCE = 2.5 // 등산로 양옆 2.5m 에는 바위를 두지 않는다
 const HIGH_GROUND = 620 // 이보다 높으면 화강암이 드러난 곳이 많다(m)
 
-/** 가파른 사면과 높은 곳에 흩어진 화강암, 백운대 정상 둘레의 큰 바위 */
+/** 바위가 드러난 곳의 화강암(위성사진이 있으면 사진에서 바위인 곳), 백운대 정상 둘레의 큰 바위 */
 export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   const ref = useRef<THREE.InstancedMesh>(null!)
 
@@ -33,31 +35,27 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     return geo
   }, [])
 
-  const instances = useMemo(() => {
-    const rand = seededRandom(99)
-    const cell = 20
-    const grid = new Map<string, THREE.Vector3[]>()
-    for (const p of trail.points) {
-      const key = `${Math.floor(p.x / cell)},${Math.floor(p.z / cell)}`
-      if (!grid.has(key)) grid.set(key, [])
-      grid.get(key)!.push(p)
-    }
-    const nearTrail = (x: number, z: number, r: number) => {
-      const cx = Math.floor(x / cell)
-      const cz = Math.floor(z / cell)
-      for (let a = -1; a <= 1; a++)
-        for (let b = -1; b <= 1; b++)
-          for (const p of grid.get(`${cx + a},${cz + b}`) ?? []) if ((p.x - x) ** 2 + (p.z - z) ** 2 < r * r) return true
-      return false
-    }
+  const { settled, layers } = usePhotoLayers()
 
-    const out: { matrix: THREE.Matrix4; shade: number }[] = []
+  const instances = useMemo(() => {
+    if (!settled) return []
+    const rand = seededRandom(99)
+    const nearTrail = makeNearTrail(trail)
+    const usePhoto = layers.length > 0
+
+    const out: { matrix: THREE.Matrix4; color: THREE.Color }[] = []
     const add = (x: number, z: number, size: number) => {
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rand() * 0.4, rand() * Math.PI * 2, rand() * 0.4))
       const s = new THREE.Vector3(size * (0.8 + rand() * 0.6), size * (0.6 + rand() * 0.6), size * (0.8 + rand() * 0.6))
       // 바닥을 살짝 묻어 떠 보이지 않게
       const p = new THREE.Vector3(x, meshHeight(terrain, x, z) - size * 0.25, z)
-      out.push({ matrix: new THREE.Matrix4().compose(p, q, s), shade: rand() })
+      // 북한산 화강암: 밝은 회색에 약간 누런 기. 사진이 있으면 그 자리 색과 섞는다
+      const color = new THREE.Color().setHSL(0.09, 0.08 + rand() * 0.06, 0.5 + rand() * 0.12)
+      const rgb = usePhoto ? samplePhoto(layers, x, z) : null
+      if (rgb && classifyGround(rgb) === 'rock') {
+        color.lerp(new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace), 0.7)
+      }
+      out.push({ matrix: new THREE.Matrix4().compose(p, q, s), color })
     }
 
     // 1) 백운대 정상 둘레의 큰 바위 (길 쪽은 비운다)
@@ -73,7 +71,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       placed++
     }
 
-    // 2) 가파르거나 높은 곳에 흩어진 바위
+    // 2) 바위가 드러난 곳에 흩어진 바위. 사진이 있으면 사진에서 바위인 곳에만 둔다
     for (let tries = 0; out.length < COUNT + SUMMIT_BOULDERS && tries < COUNT * 20; tries++) {
       let x: number
       let z: number
@@ -85,27 +83,30 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
         x = THREE.MathUtils.lerp(terrain.minX, terrain.maxX, rand())
         z = THREE.MathUtils.lerp(terrain.minZ, terrain.maxZ, rand())
       }
-      const y = sampleHeight(terrain, x, z)
-      const slope = Math.hypot(sampleHeight(terrain, x + 8, z) - y, sampleHeight(terrain, x, z + 8) - y) / 8
-      const rocky = y > HIGH_GROUND ? 0.5 : slope > 0.7 ? 0.35 : 0.02
-      if (rand() > rocky) continue
       if (nearTrail(x, z, TRAIL_CLEARANCE)) continue
+      if (usePhoto) {
+        const rgb = samplePhoto(layers, x, z)
+        if (!rgb || classifyGround(rgb) !== 'rock') continue
+      } else {
+        const y = sampleHeight(terrain, x, z)
+        const slope = Math.hypot(sampleHeight(terrain, x + 8, z) - y, sampleHeight(terrain, x, z + 8) - y) / 8
+        const rocky = y > HIGH_GROUND ? 0.5 : slope > 0.7 ? 0.35 : 0.02
+        if (rand() > rocky) continue
+      }
       add(x, z, 0.4 + rand() * rand() * 3)
     }
     return out
-  }, [terrain, trail])
+  }, [terrain, trail, settled, layers])
 
   useLayoutEffect(() => {
-    const color = new THREE.Color()
-    instances.forEach(({ matrix, shade }, i) => {
+    instances.forEach(({ matrix, color }, i) => {
       ref.current.setMatrixAt(i, matrix)
-      // 북한산 화강암: 밝은 회색에 약간 누런 기
-      color.setHSL(0.09, 0.08 + shade * 0.06, 0.55 + shade * 0.15)
       ref.current.setColorAt(i, color)
     })
     ref.current.count = instances.length
     ref.current.instanceMatrix.needsUpdate = true
     if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true
+    ref.current.computeBoundingSphere() // 새 바위 위치로 화면 밖 판정 범위를 다시 잰다
   }, [instances])
 
   return (

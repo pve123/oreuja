@@ -6,7 +6,8 @@ import { useGame } from '../lib/store'
 
 /** 등산로 선과 정상 깃발 */
 export function TrailPath({ trail }: { trail: Trail }) {
-  const photoMode = useGame((s) => s.mode === 'photo')
+  // 안내선은 G 키로 켤 때만 보이고, 기념사진에는 찍히지 않는다
+  const showLine = useGame((s) => s.showGuide && s.mode !== 'photo')
   const points = useMemo(() => trail.points.map((p) => p.clone().setY(p.y + 0.6)), [trail])
   // 깃발은 정상 지점에서 진행 방향 오른쪽으로 3m 비켜 세운다 (아바타와 겹치지 않게)
   const flag = useMemo(() => {
@@ -17,8 +18,7 @@ export function TrailPath({ trail }: { trail: Trail }) {
 
   return (
     <group>
-      {/* 기념사진에는 안내선이 찍히지 않게 숨김 */}
-      <Line points={points} color="#f2c14e" lineWidth={3} visible={!photoMode} />
+      <Line points={points} color="#f2c14e" lineWidth={3} visible={showLine} />
       <group position={flag}>
         <mesh position={[0, 4, 0]} castShadow>
           <cylinderGeometry args={[0.08, 0.08, 8]} />
