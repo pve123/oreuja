@@ -211,7 +211,7 @@ export function World({ terrain, trail }: Props) {
         shadow-camera-far={800}
         shadow-bias={-0.0005}
       />
-      <Terrain terrain={terrain} />
+      <Terrain terrain={terrain} trail={trail} />
       <Forest terrain={terrain} trail={trail} />
       <Rocks terrain={terrain} trail={trail} />
       <TrailDetails terrain={terrain} trail={trail} />
