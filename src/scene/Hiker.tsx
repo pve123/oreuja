@@ -7,6 +7,8 @@ export type HikerHandle = {
   /** 걸은 거리만큼 팔다리를 흔든다 */
   stride: (meters: number) => void
   setCheering: (on: boolean) => void
+  /** 공중에 떠 있으면 다리를 접는다 */
+  setAirborne: (on: boolean) => void
 }
 
 /**
@@ -19,7 +21,7 @@ export const Hiker = forwardRef<HikerHandle>(function Hiker(_, ref) {
   const legR = useRef<THREE.Group>(null!)
   const armL = useRef<THREE.Group>(null!)
   const armR = useRef<THREE.Group>(null!)
-  const state = useRef({ phase: 0, swing: 0, cheering: false })
+  const state = useRef({ phase: 0, swing: 0, cheering: false, airborne: false })
 
   useImperativeHandle(ref, () => ({
     group: group.current,
@@ -30,14 +32,23 @@ export const Hiker = forwardRef<HikerHandle>(function Hiker(_, ref) {
     setCheering: (on) => {
       state.current.cheering = on
     },
+    setAirborne: (on) => {
+      state.current.airborne = on
+    },
   }))
 
   useFrame((_, dt) => {
     const s = state.current
     s.swing = Math.max(0, s.swing - dt * 3) // 멈추면 서서히 차렷
     const a = Math.sin(s.phase) * 0.7 * s.swing
-    legL.current.rotation.x = a
-    legR.current.rotation.x = -a
+    if (s.airborne) {
+      // 점프 중: 한쪽 다리는 앞으로 접고 다른 쪽은 뒤로
+      legL.current.rotation.x = -0.9
+      legR.current.rotation.x = 0.4
+    } else {
+      legL.current.rotation.x = a
+      legR.current.rotation.x = -a
+    }
     if (s.cheering) {
       // 만세
       armL.current.rotation.set(0, 0, 2.7)

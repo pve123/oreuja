@@ -13,6 +13,8 @@ import { composePhoto } from '../lib/photo'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
+const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
+const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
 
 type Props = { terrain: TerrainData; trail: Trail }
@@ -36,6 +38,8 @@ export function World({ terrain, trail }: Props) {
   const gl = useThree((s) => s.gl)
   const lastTarget = useRef(new THREE.Vector3())
   const photoFrames = useRef(0)
+  /** 점프: 땅에서 떠 있는 높이(m)와 위쪽 속도(m/s) */
+  const jump = useRef({ height: 0, velocity: 0 })
 
   // 정상에서 가장 낮게 트인 방향 (기념사진 배경으로 쓸 풍경 쪽)
   const vista = useMemo(() => {
@@ -103,19 +107,38 @@ export function World({ terrain, trail }: Props) {
       }
     }
 
-    // 2) 아바타 배치
+    // 2) 점프 (사진 찍는 동안은 땅에 붙여 둔다)
+    const j = jump.current
+    if (input.jump) {
+      input.jump = false
+      if (j.height === 0 && game.mode !== 'photo') j.velocity = JUMP_SPEED
+    }
+    if (game.mode === 'photo') {
+      j.height = 0
+      j.velocity = 0
+    } else if (j.height > 0 || j.velocity > 0) {
+      j.height += j.velocity * dt
+      j.velocity -= GRAVITY * dt
+      if (j.height <= 0) {
+        j.height = 0
+        j.velocity = 0
+      }
+    }
+
+    // 3) 아바타 배치
     const pos = trail.positionAt(distance)
     const heading = trail.headingAt(distance)
-    hiker.current.group.position.copy(pos)
+    hiker.current.group.position.copy(pos).setY(pos.y + j.height)
     hiker.current.group.rotation.y = heading
     hiker.current.setCheering(game.mode !== 'hiking')
+    hiker.current.setAirborne(j.height > 0)
 
     // 그림자가 아바타 주변에서 선명하도록 태양을 따라 옮김
     sun.current.position.copy(pos).addScaledVector(SUN, 300)
     sun.current.target.position.copy(pos)
     sun.current.target.updateMatrixWorld()
 
-    // 3) 카메라
+    // 4) 카메라 (점프해도 흔들리지 않게 땅 높이 기준)
     if (game.mode === 'photo') {
       // 카메라는 오르막 쪽, 아바타는 카메라를 바라봄 → 트인 풍경이 배경
       const d = vista

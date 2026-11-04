@@ -63,4 +63,4 @@ export const useGame = create<State>((set, get) => ({
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */
-export const input = { forward: false, backward: false, run: false }
+export const input = { forward: false, backward: false, run: false, jump: false }

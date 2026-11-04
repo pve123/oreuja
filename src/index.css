@@ -130,6 +130,15 @@ canvas {
   touch-action: none;
   cursor: pointer;
 }
+.hold-button.jump {
+  right: 112px;
+  bottom: 128px;
+  width: 64px;
+  height: 64px;
+  font-size: 15px;
+  background: var(--navy);
+  box-shadow: 0 6px 20px rgba(29, 53, 87, 0.4);
+}
 .hold-button:active {
   transform: scale(0.95);
 }
