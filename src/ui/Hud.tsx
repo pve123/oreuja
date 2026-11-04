@@ -20,9 +20,17 @@ function useKeyboard() {
       else if (e.code === 'KeyS' || e.code === 'ArrowDown') input.backward = on
       else if (e.key === 'Shift') input.run = on
     }
-    const down = (e: KeyboardEvent) => set(e, true)
+    const down = (e: KeyboardEvent) => {
+      if (e.code === 'Space') {
+        // 페이지 스크롤이나 포커스된 버튼 누름을 막고, 꾹 눌러도 한 번만 뛴다
+        e.preventDefault()
+        if (!e.repeat) input.jump = true
+        return
+      }
+      set(e, true)
+    }
     const up = (e: KeyboardEvent) => set(e, false)
-    const blur = () => Object.assign(input, { forward: false, backward: false, run: false })
+    const blur = () => Object.assign(input, { forward: false, backward: false, run: false, jump: false })
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
@@ -81,19 +89,20 @@ export function Hud({ trail }: { trail: Trail }) {
         <div className="bar">
           <div className="bar-fill" style={{ width: `${progress * 100}%` }} />
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · Shift 빨리 · 마우스로 시점 회전</div>
+        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · Shift 빨리 · Space 점프 · 마우스로 시점 회전</div>
       </div>
 
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
+      <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
     </>
   )
 }
 
-/** 터치 화면용: 누르고 있는 동안 앞으로 */
-function HoldButton({ label, onHold }: { label: string; onHold: (on: boolean) => void }) {
+/** 터치 화면용 버튼: 누르면 onHold(true), 떼면 onHold(false) */
+function HoldButton({ label, className, onHold }: { label: string; className?: string; onHold: (on: boolean) => void }) {
   return (
     <button
-      className="hold-button"
+      className={className ? `hold-button ${className}` : 'hold-button'}
       onPointerDown={(e) => {
         e.currentTarget.setPointerCapture(e.pointerId)
         onHold(true)
