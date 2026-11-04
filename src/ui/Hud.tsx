@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { estimateMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
+import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 
 function formatMinutes(min: number) {
   const h = Math.floor(min / 60)
@@ -128,11 +129,37 @@ export function Hud({ trail }: { trail: Trail }) {
       </div>
 
       <ArrivalToast trail={trail} />
+      <AvatarBar />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
       <HoldButton label="◀" className="side left" onHold={(on) => (input.left = on)} />
       <HoldButton label="▶" className="side right" onHold={(on) => (input.right = on)} />
     </>
+  )
+}
+
+/** 위쪽에 늘 보이는 캐릭터 목록. 캐릭터 모습 그림을 누르면 바로 바뀐다 (그림을 만들기 전에는 이름) */
+function AvatarBar() {
+  const avatar = useGame((s) => s.avatar)
+  const setAvatar = useGame((s) => s.setAvatar)
+  const thumbs = useAvatarThumbs((s) => s.thumbs)
+
+  return (
+    <div className="avatar-bar" role="radiogroup" aria-label="캐릭터 고르기">
+      {AVATARS.map((a) => (
+        <button
+          key={a.kind}
+          role="radio"
+          aria-checked={a.kind === avatar}
+          className={a.kind === avatar ? 'avatar-chip selected' : 'avatar-chip'}
+          title={`${a.name} · ${a.desc}`}
+          aria-label={a.name}
+          onClick={() => setAvatar(a.kind)}
+        >
+          {thumbs[a.kind] ? <img src={thumbs[a.kind]} alt="" className="avatar-thumb" /> : a.name}
+        </button>
+      ))}
+    </div>
   )
 }
 

@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { loadAvatar, saveAvatar, type AvatarKind } from './avatars'
 
 export type Mode = 'hiking' | 'summit' | 'photo' | 'photoResult'
 
@@ -13,6 +14,9 @@ type State = {
   distance: number
   /** 등산로에서 옆으로 비킨 거리(m). 오른쪽이 + */
   offset: number
+  /** 고른 아바타 (브라우저에 기억) */
+  avatar: AvatarKind
+  setAvatar: (kind: AvatarKind) => void
   mode: Mode
   startedAt: number | null
   finishedAt: number | null
@@ -53,6 +57,11 @@ function saveRecords(records: ClimbRecord[]) {
 export const useGame = create<State>((set, get) => ({
   distance: 0,
   offset: 0,
+  avatar: loadAvatar(),
+  setAvatar: (avatar) => {
+    saveAvatar(avatar)
+    set({ avatar })
+  },
   mode: 'hiking',
   startedAt: null,
   finishedAt: null,
