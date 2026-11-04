@@ -4,6 +4,7 @@ import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
+import { withOcclusionCutout } from '../lib/occlusion'
 
 const COUNT = 5000
 const NEAR_TRAIL_SHARE = 0.5 // 절반은 등산로 150m 안에 둬서 걸으며 보이게 한다
@@ -36,6 +37,8 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   }, [])
 
   const { settled, layers } = usePhotoLayers()
+  // 카메라와 아바타 사이에 낀 큰 바위는 비워서 아바타를 가리지 않게 한다
+  const material = useMemo(() => withOcclusionCutout(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true })), [])
 
   const instances = useMemo(() => {
     if (!settled) return []
@@ -110,8 +113,6 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   }, [instances])
 
   return (
-    <instancedMesh ref={ref} args={[shape, undefined, COUNT + SUMMIT_BOULDERS]} castShadow receiveShadow>
-      <meshStandardMaterial roughness={0.9} flatShading />
-    </instancedMesh>
+    <instancedMesh ref={ref} args={[shape, material, COUNT + SUMMIT_BOULDERS]} castShadow receiveShadow />
   )
 }
