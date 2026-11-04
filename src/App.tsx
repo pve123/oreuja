@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
 import { World } from './scene/World'
+import { MAPBOX_TOKEN } from './lib/satellite'
 import { Hud, SummitModal } from './ui/Hud'
 
 export default function App() {
@@ -33,6 +34,12 @@ export default function App() {
       <SummitModal trail={data.trail} />
       <div className="attribution">
         지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 AWS Terrain Tiles
+        {MAPBOX_TOKEN && (
+          <>
+            {' · 위성사진 © '}
+            <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.maxar.com/">Maxar</a>
+          </>
+        )}
       </div>
     </>
   )

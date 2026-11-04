@@ -9,6 +9,8 @@ export type TerrainMeta = {
   maxZ: number
   minHeight: number
   maxHeight: number
+  /** 로컬 좌표 (0, 0) 의 위경도 */
+  origin: { lat: number; lon: number }
 }
 
 export type Terrain = TerrainMeta & { heights: Float32Array }

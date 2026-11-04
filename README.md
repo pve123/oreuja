@@ -23,6 +23,16 @@ npm run dev      # http://localhost:5173
 
 개발 모드에서는 주소에 값을 붙여 원하는 지점부터 확인할 수 있다. `?d=1700` 을 붙이면 출발점에서 1700m 떨어진 곳에서 시작하고, `?d=1790&photo` 를 붙이면 정상에 도착하자마자 기념사진까지 자동으로 찍는다.
 
+## 위성사진 (선택)
+
+`.env.example` 을 `.env.local` 로 복사하고 Mapbox 공개 토큰(`pk.` 로 시작)을 넣으면 지형에 위성사진을 입힌다. 토큰이 없거나 타일을 받지 못하면 고도와 경사로 칠한 색을 쓴다. Vite는 서버를 켤 때 이 파일을 읽으니 바꾼 뒤에는 `npm run dev` 를 다시 실행한다.
+
+```bash
+cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
+```
+
+토큰은 빌드 결과에 들어가는 공개 토큰이라, Mapbox 계정 화면에서 쓸 주소(URL)를 제한해 둔다. 위성 타일은 Static Tiles API(`mapbox/satellite-v9` 스타일)로 받는다. 새 계정에서는 v4 Raster Tiles API가 `429` 로 막혀 있었다. 위성사진을 쓰면 화면 오른쪽 아래에 Mapbox와 Maxar 출처를 표시해야 한다.
+
 ## 구성
 
 | 영역 | 사용 기술 |
@@ -65,3 +75,4 @@ npm run data
 |---|---|---|
 | 등산로 | © OpenStreetMap contributors | ODbL 라이선스라 화면 오른쪽 아래에 출처를 꼭 표시해야 한다 |
 | 지형 | AWS Terrain Tiles | SRTM 같은 공개 DEM을 바탕으로 한다 |
+| 위성사진 | © Mapbox, © Maxar | 토큰이 있을 때만 쓰고 화면에 출처를 표시한다 |
