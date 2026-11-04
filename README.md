@@ -1,6 +1,6 @@
 # 북한산 등산 메타버스 (MVP)
 
-브라우저에서 북한산 백운대 코스를 걸어 올라가는 웹 3D 앱이다.
+브라우저에서 북한산 백운대 코스를 걸어 올라가는 웹 3D 앱이다. 정상에 닿으면 인증 배지를 받고 기념사진을 저장할 수 있다.
 
 ## 실행
 
@@ -17,7 +17,27 @@ npm run dev      # http://localhost:5173
 | 마우스 드래그 | 시점 회전 |
 | 화면 오른쪽 아래 「걷기」 버튼 | 터치 화면에서 누르고 있는 동안 걷기 |
 
-개발 모드에서는 주소에 `?d=1700` 을 붙이면 출발점에서 1700m 떨어진 곳에서 시작한다.
+개발 모드에서는 주소에 값을 붙여 원하는 지점부터 확인할 수 있다. `?d=1700` 을 붙이면 출발점에서 1700m 떨어진 곳에서 시작하고, `?d=1790&photo` 를 붙이면 정상에 도착하자마자 기념사진까지 자동으로 찍는다.
+
+## 구성
+
+| 영역 | 사용 기술 |
+|---|---|
+| 3D | Three.js, React Three Fiber, drei |
+| 상태 | zustand (`src/lib/store.ts`) |
+| 지형 | AWS Terrain Tiles(Terrarium, 약 30m 해상도)로 만든 `public/data/terrain.bin` |
+| 등산로 | OpenStreetMap 데이터로 만든 `public/data/trail.json` |
+| 기록 | 지금은 `localStorage` 에 저장하고, 다음 단계에서 Supabase로 옮긴다 |
+
+| 파일 | 하는 일 |
+|---|---|
+| `scripts/prepare-data.mjs` | 지형과 등산로 데이터를 만든다 (`npm run data`) |
+| `src/lib/data.ts` | 데이터를 불러오고, 등산로 위 위치와 실제 소요 시간을 계산한다 |
+| `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다 |
+| `src/scene/Terrain.tsx` | 지형 메시를 고도와 경사에 따라 칠한다 |
+| `src/scene/Forest.tsx` | 나무를 `InstancedMesh` 로 심는다 |
+| `src/scene/Hiker.tsx` | 도형으로 만든 임시 아바타다. GLB 캐릭터로 바꿀 예정이다 |
+| `src/ui/Hud.tsx` | 코스 정보, 진행률, 정상 배지와 사진 창을 그린다 |
 
 ## 지형과 등산로 데이터
 
@@ -25,7 +45,7 @@ npm run dev      # http://localhost:5173
 npm run data
 ```
 
-`scripts/prepare-data.mjs` 가 지형 타일과 등산로를 받아 `public/data/` 에 정적 파일로 만든다. 원본 다운로드는 `scripts/raw/` 에 캐시하고 git에는 올리지 않는다. 이 폴더를 지우고 다시 실행하면 새로 받는다.
+원본 다운로드는 `scripts/raw/` 에 캐시하고 git에는 올리지 않는다. 이 폴더를 지우고 다시 실행하면 새로 받는다.
 
 | 파일 | 내용 |
 |---|---|
@@ -39,5 +59,5 @@ npm run data
 
 | 데이터 | 출처 | 비고 |
 |---|---|---|
-| 등산로 | © OpenStreetMap contributors | ODbL 라이선스라 화면에 출처를 꼭 표시해야 한다 |
+| 등산로 | © OpenStreetMap contributors | ODbL 라이선스라 화면 오른쪽 아래에 출처를 꼭 표시해야 한다 |
 | 지형 | AWS Terrain Tiles | SRTM 같은 공개 DEM을 바탕으로 한다 |

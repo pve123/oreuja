@@ -23,27 +23,16 @@ body,
   background: #c9d6e3;
 }
 
+canvas {
+  touch-action: none;
+}
+
 .loading {
   display: grid;
   place-items: center;
   height: 100%;
   font-size: 18px;
   color: var(--navy);
-}
-
-canvas {
-  touch-action: none;
-}
-
-.attribution {
-  position: fixed;
-  right: 8px;
-  bottom: 4px;
-  font-size: 10px;
-  color: rgba(0, 0, 0, 0.55);
-}
-.attribution a {
-  color: inherit;
 }
 
 .panel {
@@ -148,4 +137,95 @@ canvas {
   .hold-button {
     display: none;
   }
+}
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 16px;
+}
+.modal {
+  position: static;
+  width: min(380px, 100%);
+  text-align: center;
+  padding: 24px 20px 20px;
+}
+.modal h2 {
+  margin: 8px 0 4px;
+  font-size: 24px;
+}
+.modal-sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.badge {
+  width: 120px;
+  height: 120px;
+  animation: pop 0.6s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes pop {
+  from {
+    transform: scale(0.3) rotate(-20deg);
+    opacity: 0;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 16px;
+}
+.btn {
+  flex: 1;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(29, 53, 87, 0.2);
+  background: #fff;
+  color: var(--text);
+  font: inherit;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+.btn.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.photo-modal {
+  width: min(720px, 100%);
+}
+.photo-modal img {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+}
+
+.flash {
+  position: fixed;
+  inset: 0;
+  background: #fff;
+  pointer-events: none;
+  animation: flash 0.5s ease-out forwards;
+}
+@keyframes flash {
+  to {
+    opacity: 0;
+  }
+}
+
+.attribution {
+  position: fixed;
+  right: 8px;
+  bottom: 4px;
+  font-size: 10px;
+  color: rgba(0, 0, 0, 0.55);
+}
+.attribution a {
+  color: inherit;
 }
