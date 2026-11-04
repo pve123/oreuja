@@ -11,6 +11,8 @@ export type ClimbRecord = {
 type State = {
   /** 등산로 위 진행 거리(m) */
   distance: number
+  /** 등산로에서 옆으로 비킨 거리(m). 오른쪽이 + */
+  offset: number
   mode: Mode
   startedAt: number | null
   finishedAt: number | null
@@ -21,6 +23,7 @@ type State = {
   /** 이정표 도착 알림. at 이 바뀌면 알림을 새로 띄운다 */
   arrival: { index: number; at: number } | null
   setDistance: (d: number) => void
+  setOffset: (m: number) => void
   reachCheckpoint: (index: number) => void
   reachSummit: (record: ClimbRecord) => void
   takePhoto: () => void
@@ -49,6 +52,7 @@ function saveRecords(records: ClimbRecord[]) {
 
 export const useGame = create<State>((set, get) => ({
   distance: 0,
+  offset: 0,
   mode: 'hiking',
   startedAt: null,
   finishedAt: null,
@@ -58,6 +62,7 @@ export const useGame = create<State>((set, get) => ({
   arrival: null,
   setDistance: (distance) =>
     set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
+  setOffset: (offset) => set({ offset }),
   reachCheckpoint: (index) => set({ reachedCheckpoint: index, arrival: { index, at: Date.now() } }),
   reachSummit: (record) => {
     const records = [...get().records, record]
@@ -70,6 +75,7 @@ export const useGame = create<State>((set, get) => ({
   restart: () =>
     set({
       distance: 0,
+      offset: 0,
       mode: 'hiking',
       startedAt: null,
       finishedAt: null,
@@ -80,4 +86,4 @@ export const useGame = create<State>((set, get) => ({
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */
-export const input = { forward: false, backward: false, run: false, jump: false }
+export const input = { forward: false, backward: false, left: false, right: false, run: false, jump: false }

@@ -206,6 +206,22 @@ canvas {
   background: var(--navy);
   box-shadow: 0 6px 20px rgba(29, 53, 87, 0.4);
 }
+.hold-button.side {
+  bottom: 128px;
+  width: 56px;
+  height: 56px;
+  font-size: 18px;
+  background: rgba(29, 53, 87, 0.75);
+  box-shadow: 0 4px 14px rgba(29, 53, 87, 0.3);
+}
+.hold-button.side.left {
+  left: 16px;
+  right: auto;
+}
+.hold-button.side.right {
+  left: 80px;
+  right: auto;
+}
 .hold-button:active {
   transform: scale(0.95);
 }

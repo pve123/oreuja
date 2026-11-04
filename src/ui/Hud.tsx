@@ -22,6 +22,8 @@ function useKeyboard() {
     const set = (e: KeyboardEvent, on: boolean) => {
       if (e.code === 'KeyW' || e.code === 'ArrowUp') input.forward = on
       else if (e.code === 'KeyS' || e.code === 'ArrowDown') input.backward = on
+      else if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.left = on
+      else if (e.code === 'KeyD' || e.code === 'ArrowRight') input.right = on
       else if (e.key === 'Shift') input.run = on
     }
     const down = (e: KeyboardEvent) => {
@@ -34,7 +36,8 @@ function useKeyboard() {
       set(e, true)
     }
     const up = (e: KeyboardEvent) => set(e, false)
-    const blur = () => Object.assign(input, { forward: false, backward: false, run: false, jump: false })
+    const blur = () =>
+      Object.assign(input, { forward: false, backward: false, left: false, right: false, run: false, jump: false })
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
@@ -121,12 +124,14 @@ export function Hud({ trail }: { trail: Trail }) {
           <span>정상까지 {formatDistance(remaining)}</span>
           <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · Shift 빨리 · Space 점프 · 마우스로 시점 회전</div>
+        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · 마우스로 시점 회전</div>
       </div>
 
       <ArrivalToast trail={trail} />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
+      <HoldButton label="◀" className="side left" onHold={(on) => (input.left = on)} />
+      <HoldButton label="▶" className="side right" onHold={(on) => (input.right = on)} />
     </>
   )
 }
