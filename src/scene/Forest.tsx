@@ -1,20 +1,12 @@
 import { useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { sampleHeight, type Terrain, type Trail } from '../lib/data'
+import { seededRandom } from '../lib/random'
 
 const COUNT = 40000
 const TRAIL_CLEARANCE = 5 // 등산로 양옆 5m 는 비움
 const START_CLEARANCE = 30 // 출발점 둘레 30m 는 공터로 비워 첫 화면을 가리지 않게 함
 const TREE_LINE = 760 // 이보다 높으면 바위 지대라 나무 없음
-
-/** 같은 시드면 같은 수열을 내는 난수 (매번 같은 숲 배치) */
-function seededRandom(seed: number) {
-  const state = { seed }
-  return () => {
-    state.seed = (state.seed * 16807) % 2147483647
-    return (state.seed - 1) / 2147483646
-  }
-}
 
 /** 지형 위에 소나무를 흩뿌린다 (InstancedMesh 1개라 가볍다) */
 export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {

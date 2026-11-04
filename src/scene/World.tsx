@@ -9,6 +9,8 @@ import { Terrain } from './Terrain'
 import { TrailPath } from './TrailPath'
 import { Forest } from './Forest'
 import { Signposts } from './Signposts'
+import { TrailDetails } from './TrailDetails'
+import { Rocks } from './Rocks'
 import { Hiker, type HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
 
@@ -211,6 +213,8 @@ export function World({ terrain, trail }: Props) {
       />
       <Terrain terrain={terrain} />
       <Forest terrain={terrain} trail={trail} />
+      <Rocks terrain={terrain} trail={trail} />
+      <TrailDetails terrain={terrain} trail={trail} />
       <TrailPath trail={trail} />
       <Signposts trail={trail} />
       <Hiker ref={hiker} />
