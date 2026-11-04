@@ -33,7 +33,7 @@ export default function App() {
       <Hud trail={data.trail} />
       <SummitModal trail={data.trail} />
       <div className="attribution">
-        지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 AWS Terrain Tiles
+        지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 국토지리정보원 수치지형도, AWS Terrain Tiles
         {MAPBOX_TOKEN && (
           <>
             {' · 위성사진 © '}
