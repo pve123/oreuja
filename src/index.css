@@ -42,12 +42,15 @@ canvas {
   border-radius: 14px;
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
   padding: 14px 16px;
+  z-index: 20;
 }
 
 .course {
   top: 16px;
   left: 16px;
   width: min(300px, calc(100vw - 32px));
+  max-height: calc(100vh - 200px);
+  overflow-y: auto;
 }
 .eyebrow {
   font-size: 12px;
@@ -84,6 +87,53 @@ canvas {
   font-size: 14px;
 }
 
+/* 구간별 실제 거리와 예상 시간 */
+.sections {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  font-size: 13px;
+}
+.sections li {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 5px 0 5px 18px;
+  color: var(--muted);
+}
+.sections li::before {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  margin-top: -4px;
+  border-radius: 50%;
+  border: 2px solid rgba(29, 53, 87, 0.3);
+  background: #fff;
+}
+.sections li.done {
+  color: rgba(91, 100, 112, 0.6);
+}
+.sections li.done::before {
+  border-color: var(--navy);
+  background: var(--navy);
+}
+.sections li.now {
+  color: var(--text);
+  font-weight: 700;
+}
+.sections li.now::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.sec-meta {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
 .progress {
   left: 50%;
   bottom: 16px;
@@ -95,8 +145,13 @@ canvas {
   justify-content: space-between;
   font-size: 14px;
 }
+.progress-row.sub {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 6px;
+}
 .bar {
-  margin: 8px 0 6px;
+  position: relative;
   height: 8px;
   border-radius: 99px;
   background: rgba(29, 53, 87, 0.15);
@@ -105,6 +160,18 @@ canvas {
 .bar-fill {
   height: 100%;
   background: linear-gradient(90deg, var(--accent-2), var(--accent));
+}
+/* 이정표 위치 눈금 */
+.tick {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  height: 100%;
+  margin-left: -1px;
+  background: rgba(29, 53, 87, 0.45);
+}
+.tick.passed {
+  background: #fff;
 }
 .hint {
   font-size: 12px;
@@ -151,6 +218,7 @@ canvas {
 .overlay {
   position: fixed;
   inset: 0;
+  z-index: 30;
   display: grid;
   place-items: center;
   background: rgba(0, 0, 0, 0.25);
@@ -237,4 +305,53 @@ canvas {
 }
 .attribution a {
   color: inherit;
+}
+
+/* 이정표 도착 알림 */
+.toast {
+  position: fixed;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 25;
+  width: min(360px, calc(100vw - 32px));
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(29, 53, 87, 0.92);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  animation: toast-in 0.35s ease-out;
+  pointer-events: none;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -12px);
+  }
+}
+.toast-title {
+  font-size: 17px;
+  font-weight: 800;
+}
+.toast-note {
+  margin-top: 2px;
+  font-size: 13px;
+  opacity: 0.9;
+}
+.toast-meta {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--accent-2);
+}
+
+/* 3D 표지판 위 이름 */
+.signpost-label {
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: rgba(107, 74, 47, 0.92);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
 }

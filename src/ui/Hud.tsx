@@ -1,10 +1,14 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { estimateMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 
 function formatMinutes(min: number) {
   const h = Math.floor(min / 60)
   return h ? `${h}시간 ${min % 60}분` : `${min}분`
+}
+
+function formatDistance(m: number) {
+  return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
 }
 
 function formatDuration(sec: number) {
@@ -46,10 +50,15 @@ export function Hud({ trail }: { trail: Trail }) {
   useKeyboard()
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
+  const sections = useMemo(() => trail.sections(), [trail])
   const progress = distance / trail.length
   const elevation = Math.round(trail.positionAt(distance).y)
   const remaining = Math.max(0, trail.length - distance)
   const realMinutes = estimateMinutes(trail.data.length, trail.data.elevationGain)
+  const left = trail.statsBetween(distance, trail.length)
+  const leftMinutes = estimateMinutes(left.length, left.gain)
+  const current = sections.findIndex((s) => distance < s.end)
+  const next = sections[current === -1 ? sections.length - 1 : current]
 
   if (mode !== 'hiking') return null
 
@@ -75,6 +84,17 @@ export function Hud({ trail }: { trail: Trail }) {
             <dd>{formatMinutes(realMinutes)}</dd>
           </div>
         </dl>
+        {/* 실제로 걸을 때 구간별 거리와 예상 시간 (코스 예습) */}
+        <ol className="sections">
+          {sections.map((sec, i) => (
+            <li key={sec.to} className={i < current || current === -1 ? 'done' : i === current ? 'now' : ''}>
+              <span className="sec-name">{sec.to}</span>
+              <span className="sec-meta">
+                {formatDistance(sec.length)} · 약 {formatMinutes(sec.minutes)}
+              </span>
+            </li>
+          ))}
+        </ol>
       </div>
 
       <div className="panel progress">
@@ -83,18 +103,60 @@ export function Hud({ trail }: { trail: Trail }) {
             현재 고도 <b>{elevation}m</b>
           </span>
           <span>
-            정상까지 <b>{remaining >= 1000 ? `${(remaining / 1000).toFixed(2)}km` : `${Math.round(remaining)}m`}</b>
+            다음 <b>{next.to}</b> {formatDistance(Math.max(0, next.end - distance))}
           </span>
         </div>
         <div className="bar">
           <div className="bar-fill" style={{ width: `${progress * 100}%` }} />
+          {trail.data.checkpoints.map((cp) => (
+            <i
+              key={cp.name}
+              className={distance >= cp.distance ? 'tick passed' : 'tick'}
+              style={{ left: `${(cp.distance / trail.length) * 100}%` }}
+              title={cp.name}
+            />
+          ))}
+        </div>
+        <div className="progress-row sub">
+          <span>정상까지 {formatDistance(remaining)}</span>
+          <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
         <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · Shift 빨리 · Space 점프 · 마우스로 시점 회전</div>
       </div>
 
+      <ArrivalToast trail={trail} />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
     </>
+  )
+}
+
+const TOAST_MS = 4500
+
+/** 이정표에 처음 닿으면 몇 초 동안 이름과 설명, 남은 실제 시간을 띄운다 */
+function ArrivalToast({ trail }: { trail: Trail }) {
+  const arrival = useGame((s) => s.arrival)
+  // 시간이 지나 숨긴 알림의 at. 새 도착(at 이 다름)은 바로 보인다
+  const [hiddenAt, setHiddenAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!arrival) return
+    const t = setTimeout(() => setHiddenAt(arrival.at), TOAST_MS)
+    return () => clearTimeout(t)
+  }, [arrival])
+
+  if (!arrival || hiddenAt === arrival.at) return null
+  const cp = trail.data.checkpoints[arrival.index]
+  const left = trail.statsBetween(cp.distance, trail.length)
+  return (
+    <div className="toast" key={arrival.at} role="status">
+      <div className="toast-title">{cp.name} 도착</div>
+      <div className="toast-note">{cp.note}</div>
+      <div className="toast-meta">
+        해발 {Math.round(trail.positionAt(cp.distance).y)}m · 정상까지 {formatDistance(left.length)}, 실제로 약{' '}
+        {formatMinutes(estimateMinutes(left.length, left.gain))}
+      </div>
+    </div>
   )
 }
 

@@ -8,6 +8,7 @@ import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
 import { TrailPath } from './TrailPath'
 import { Forest } from './Forest'
+import { Signposts } from './Signposts'
 import { Hiker, type HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
 
@@ -97,6 +98,11 @@ export function World({ terrain, trail }: Props) {
         distance = next
         game.setDistance(distance)
       }
+      // 앞으로 걸어서 이정표를 처음 지나면 도착 알림
+      const cps = trail.data.checkpoints
+      let reached = game.reachedCheckpoint
+      while (reached + 1 < cps.length && distance >= cps[reached + 1].distance) reached++
+      if (reached > game.reachedCheckpoint) game.reachCheckpoint(reached)
       if (distance >= trail.length - 0.5) {
         const startedAt = game.startedAt ?? Date.now()
         game.reachSummit({
@@ -182,6 +188,7 @@ export function World({ terrain, trail }: Props) {
       <Terrain terrain={terrain} />
       <Forest terrain={terrain} trail={trail} />
       <TrailPath trail={trail} />
+      <Signposts trail={trail} />
       <Hiker ref={hiker} />
       <OrbitControls
         ref={controls}
