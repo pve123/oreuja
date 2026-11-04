@@ -3,7 +3,7 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Sky } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { sampleHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
+import { meshHeight, sampleHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
 import { SummitFlag } from './SummitFlag'
@@ -14,6 +14,8 @@ import { Rocks } from './Rocks'
 import { Hiker, type HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
 import { occlusionUniforms } from '../lib/occlusion'
+import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
+import { AVATARS, type AvatarKind } from '../lib/avatars'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
@@ -26,6 +28,16 @@ const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
 
 type Props = { terrain: TerrainData; trail: Trail }
+
+/** from 에서 to 까지 땅에 가리지 않고 보이는지 (선분 위 몇 점의 지형 높이를 잰다) */
+function clearView(terrain: TerrainData, from: THREE.Vector3, to: THREE.Vector3) {
+  const p = new THREE.Vector3()
+  for (let k = 1; k < 12; k++) {
+    p.lerpVectors(from, to, k / 12)
+    if (meshHeight(terrain, p.x, p.z) > p.y - 0.6) return false // 땅과 시선 사이 0.6m 여유
+  }
+  return true
+}
 
 /** 하늘 상자가 카메라를 따라다니게 해서 높은 곳에서도 하늘이 보이게 한다 */
 function SkyDome() {
@@ -43,6 +55,7 @@ export function World({ terrain, trail }: Props) {
   const controls = useRef<OrbitControlsImpl>(null!)
   const sun = useRef<THREE.DirectionalLight>(null!)
   const camera = useThree((s) => s.camera)
+  const avatar = useGame((s) => s.avatar)
   const gl = useThree((s) => s.gl)
   const lastTarget = useRef(new THREE.Vector3())
   const photoFrames = useRef(0)
@@ -52,28 +65,16 @@ export function World({ terrain, trail }: Props) {
   const facing = useRef(0)
 
   // 정상에서 가장 낮게 트인 방향 (기념사진 배경으로 쓸 풍경 쪽)
-  const vista = useMemo(() => {
-    const top = trail.positionAt(trail.length)
-    let best = new THREE.Vector3(1, 0, 0)
-    let lowest = Infinity
-    for (let k = 0; k < 24; k++) {
-      const a = (k / 24) * Math.PI * 2
-      const dir = new THREE.Vector3(Math.sin(a), 0, Math.cos(a))
-      let sum = 0
-      for (const r of [30, 60, 120]) sum += sampleHeight(terrain, top.x + dir.x * r, top.z + dir.z * r)
-      if (sum < lowest) {
-        lowest = sum
-        best = dir
-      }
-    }
-    return best
-  }, [terrain, trail])
+  const vista = useMemo(() => summitVista(terrain, trail), [terrain, trail])
 
   // 처음 카메라 위치: 출발점 뒤쪽 위
   useEffect(() => {
     // 개발 중에는 ?d=1700 처럼 중간 지점부터 시작해 확인할 수 있다
     const debugStart = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('d')) || 0 : 0
     if (debugStart) useGame.getState().setDistance(Math.min(debugStart, trail.length))
+    // ?avatar=duck 처럼 주면 그 캐릭터로 시작한다
+    const debugAvatar = import.meta.env.DEV ? new URLSearchParams(location.search).get('avatar') : null
+    if (debugAvatar && AVATARS.some((a) => a.kind === debugAvatar)) useGame.getState().setAvatar(debugAvatar as AvatarKind)
     // ?o=12 처럼 주면 등산로에서 옆으로 비킨 곳에서 시작한다
     const debugOffset = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('o')) || 0 : 0
     if (debugOffset) useGame.getState().setOffset(THREE.MathUtils.clamp(debugOffset, -MAX_OFFSET, MAX_OFFSET))
@@ -179,7 +180,11 @@ export function World({ terrain, trail }: Props) {
       // 카메라는 오르막 쪽, 아바타는 카메라를 바라봄 → 트인 풍경이 배경
       const d = vista
       hiker.current.group.rotation.y = Math.atan2(-d.x, -d.z)
-      camera.position.copy(pos).addScaledVector(d, -6).setY(pos.y + 3)
+      // 정상부 바위 둔덕이 아바타 발끝을 가리면 몸 전체가 보일 때까지 카메라를 올린다
+      const feet = new THREE.Vector3(pos.x, pos.y + 0.2, pos.z)
+      const shot = pos.clone().addScaledVector(d, -PHOTO_CAMERA_BACK).setY(pos.y + 3)
+      for (let lift = 0; lift < 20 && !clearView(terrain, shot, feet); lift++) shot.y += 0.5
+      camera.position.copy(shot)
       camera.lookAt(pos.x + d.x * 2, pos.y + 1.2, pos.z + d.z * 2)
       occlusionUniforms.uOccCamera.value.copy(camera.position)
       // 카메라가 자리 잡고 몇 프레임 그린 뒤 촬영 (방금 그린 프레임을 복사)
@@ -221,9 +226,9 @@ export function World({ terrain, trail }: Props) {
       <Forest terrain={terrain} trail={trail} />
       <Rocks terrain={terrain} trail={trail} />
       <TrailDetails terrain={terrain} trail={trail} />
-      <SummitFlag trail={trail} />
+      <SummitFlag terrain={terrain} trail={trail} />
       <Signposts trail={trail} />
-      <Hiker ref={hiker} />
+      <Hiker ref={hiker} kind={avatar} />
       <OrbitControls
         ref={controls}
         makeDefault

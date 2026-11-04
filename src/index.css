@@ -371,3 +371,62 @@ canvas {
   white-space: nowrap;
   pointer-events: none;
 }
+
+/* 캐릭터 고르기: 오른쪽 위에 늘 보이는 칩 줄 */
+.avatar-bar {
+  position: fixed;
+  top: 16px;
+  right: 16px;
+  z-index: 21;
+  display: flex;
+  gap: 6px;
+  padding: 6px;
+  border-radius: 14px;
+  background: var(--panel-bg);
+  backdrop-filter: blur(8px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  max-width: calc(100vw - 32px);
+  overflow-x: auto;
+}
+.avatar-chip {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.avatar-chip:hover {
+  background: rgba(29, 53, 87, 0.06);
+}
+.avatar-chip.selected {
+  color: #fff;
+  background: var(--accent);
+}
+.avatar-chip:has(.avatar-thumb) {
+  padding: 2px;
+  background: rgba(29, 53, 87, 0.05);
+}
+.avatar-chip.selected:has(.avatar-thumb) {
+  background: rgba(230, 57, 70, 0.15);
+  border-color: var(--accent);
+}
+.avatar-thumb {
+  display: block;
+  width: 52px;
+  height: 52px;
+}
+/* 좁은 화면: 칩 줄을 맨 위 전체 폭으로 두고 코스 패널을 그 아래로 내린다 */
+@media (max-width: 760px) {
+  .avatar-bar {
+    left: 16px;
+  }
+  .course {
+    top: 72px;
+  }
+}
