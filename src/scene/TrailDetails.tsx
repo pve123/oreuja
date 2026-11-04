@@ -26,7 +26,7 @@ export function TrailDetails({ terrain, trail }: Props) {
   )
 }
 
-const DIRT = new THREE.Color('#9a8467')
+const DIRT = new THREE.Color('#7f6f5b') // 숲 그늘 아래 흙길 색 (사진 색과 어울리게 채도를 낮춤)
 const GRANITE = new THREE.Color('#a9a49b')
 const SURFACE_BLEND = 30 // 흙길에서 바위 바닥으로 바뀌는 구간 길이(m)
 

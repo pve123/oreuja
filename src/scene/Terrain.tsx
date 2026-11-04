@@ -3,6 +3,7 @@ import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Terrain as TerrainData, Trail } from '../lib/data'
 import { MAPBOX_TOKEN, loadSatelliteTexture, type LocalRect } from '../lib/satellite'
+import { layerFromCanvas, usePhotos } from '../lib/photo-map'
 
 const GRASS_LOW = new THREE.Color('#5d7f3a')
 const FOREST = new THREE.Color('#3f6b2e')
@@ -29,18 +30,27 @@ const PHOTO_LIGHTING = {
   emissiveIntensity: 0.45,
 }
 
-/** 범위만큼 위성사진을 받아 텍스처로 돌려준다. 토큰이 없거나 실패하면 null */
-function useSatellite(rect: LocalRect | null, origin: TerrainData['origin'], zoom: number) {
+/**
+ * 범위만큼 위성사진을 받아 텍스처로 돌려준다. 토큰이 없거나 실패하면 null.
+ * 받은 사진의 픽셀은 숲·바위 배치에 쓰도록 usePhotos 에도 올린다.
+ */
+function useSatellite(rect: LocalRect | null, origin: TerrainData['origin'], zoom: number, key: 'base' | 'detail') {
   const gl = useThree((s) => s.gl)
   const [texture, setTexture] = useState<THREE.Texture | null>(null)
 
   useEffect(() => {
-    if (!MAPBOX_TOKEN || !rect) return
+    const { setLayer } = usePhotos.getState()
+    if (!MAPBOX_TOKEN || !rect) {
+      setLayer(key, 'none')
+      return
+    }
+    setLayer(key, 'loading')
     let cancelled = false
     let loaded: THREE.Texture | null = null
     loadSatelliteTexture(rect, origin, MAPBOX_TOKEN, zoom)
       .then((t) => {
         loaded = t
+        if (!cancelled) setLayer(key, 'ready', layerFromCanvas(t.image as HTMLCanvasElement, rect))
         if (import.meta.env.DEV) {
           const img = t.image as HTMLCanvasElement
           console.info(`위성사진 확대 ${zoom}: ${img.width}x${img.height}px`)
@@ -50,12 +60,15 @@ function useSatellite(rect: LocalRect | null, origin: TerrainData['origin'], zoo
         if (cancelled) t.dispose()
         else setTexture(t)
       })
-      .catch((e) => console.warn(`위성사진(확대 ${zoom}) 없이 그립니다.`, e))
+      .catch((e) => {
+        console.warn(`위성사진(확대 ${zoom}) 없이 그립니다.`, e)
+        if (!cancelled) setLayer(key, 'failed')
+      })
     return () => {
       cancelled = true
       loaded?.dispose()
     }
-  }, [rect, origin, zoom, gl])
+  }, [rect, origin, zoom, gl, key])
 
   return texture
 }
@@ -142,8 +155,8 @@ export function Terrain({ terrain, trail }: Props) {
     () => ({ minX: terrain.minX, maxX: terrain.maxX, minZ: terrain.minZ, maxZ: terrain.maxZ }),
     [terrain],
   )
-  const baseSatellite = useSatellite(wholeRect, terrain.origin, BASE_ZOOM)
-  const detailSatellite = useSatellite(detail.rect, terrain.origin, DETAIL_ZOOM)
+  const baseSatellite = useSatellite(wholeRect, terrain.origin, BASE_ZOOM, 'base')
+  const detailSatellite = useSatellite(detail.rect, terrain.origin, DETAIL_ZOOM, 'detail')
 
   return (
     <group>

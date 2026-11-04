@@ -13,6 +13,9 @@ type State = {
   distance: number
   /** 등산로에서 옆으로 비킨 거리(m). 오른쪽이 + */
   offset: number
+  /** 노란 등산로 안내선을 보일지 */
+  showGuide: boolean
+  toggleGuide: () => void
   mode: Mode
   startedAt: number | null
   finishedAt: number | null
@@ -53,6 +56,8 @@ function saveRecords(records: ClimbRecord[]) {
 export const useGame = create<State>((set, get) => ({
   distance: 0,
   offset: 0,
+  showGuide: false,
+  toggleGuide: () => set((s) => ({ showGuide: !s.showGuide })),
   mode: 'hiking',
   startedAt: null,
   finishedAt: null,
