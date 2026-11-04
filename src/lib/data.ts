@@ -22,7 +22,24 @@ export type TrailData = {
   summitElevation: number
   length: number
   elevationGain: number
+  checkpoints: Checkpoint[]
   points: [number, number, number][]
+}
+
+/** 가는 길의 이정표. distance 는 출발점에서 등산로를 따라 잰 거리(m) */
+export type Checkpoint = { name: string; note: string; distance: number }
+
+/** 출발점부터 정상까지 이정표로 나눈 한 구간 */
+export type Section = {
+  from: string
+  to: string
+  start: number
+  end: number
+  length: number
+  gain: number
+  /** 도착 지점 해발(m) */
+  elevation: number
+  minutes: number
 }
 
 /** 등산로 위의 거리(m)로 위치·방향을 구하는 도우미 */
@@ -59,6 +76,47 @@ export class Trail {
   positionAt(distance: number, target = new THREE.Vector3()) {
     const { i, t } = this.segmentAt(distance)
     return target.lerpVectors(this.points[i], this.points[i + 1] ?? this.points[i], t)
+  }
+
+  /** from~to 구간의 길이와 누적 오르막(m) */
+  statsBetween(from: number, to: number) {
+    const a = THREE.MathUtils.clamp(from, 0, this.length)
+    const b = THREE.MathUtils.clamp(to, a, this.length)
+    let gain = 0
+    let prev = this.positionAt(a).y
+    for (let i = 0; i < this.points.length; i++) {
+      const d = this.cumulative[i]
+      if (d <= a) continue
+      if (d >= b) break
+      if (this.points[i].y > prev) gain += this.points[i].y - prev
+      prev = this.points[i].y
+    }
+    const last = this.positionAt(b).y
+    if (last > prev) gain += last - prev
+    return { length: b - a, gain }
+  }
+
+  /** 출발 → 이정표들 → 정상 순서의 구간 목록 */
+  sections(): Section[] {
+    const stops = [
+      { name: this.data.start, distance: 0 },
+      ...this.data.checkpoints,
+      { name: this.data.summit, distance: this.length },
+    ]
+    return stops.slice(1).map((stop, i) => {
+      const prev = stops[i]
+      const { length, gain } = this.statsBetween(prev.distance, stop.distance)
+      return {
+        from: prev.name,
+        to: stop.name,
+        start: prev.distance,
+        end: stop.distance,
+        length,
+        gain,
+        elevation: this.positionAt(stop.distance).y,
+        minutes: estimateMinutes(length, gain),
+      }
+    })
   }
 
   /** 진행 방향 (수평). 앞뒤 몇 m 를 보고 계산해 흔들림을 줄인다 */

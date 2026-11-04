@@ -20,9 +20,19 @@ const COURSE = {
   id: 'bukhansan-baegundae',
   mountain: '북한산',
   name: '백운대 코스',
-  start: { name: '백운대탐방지원센터', lat: 37.6598, lon: 126.9894 },
+  // 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
+  start: { name: '백운대탐방지원센터', lat: 37.65815, lon: 126.99129 },
   summit: { name: '백운대', osmId: 5515194671, elevation: 835.6 },
+  // 가는 길에 지나는 이정표. 등산로에서 MAX_CHECKPOINT_OFFSET 보다 멀면 빼고 경고한다
+  checkpoints: [
+    { name: '하루재', lat: 37.66227, lon: 126.98696, note: '코스의 첫 고개' },
+    { name: '인수암', lat: 37.66106, lon: 126.98483, note: '작은 암자. 근처에 화장실과 산악구조대가 있다' },
+    { name: '깔딱고개', lat: 37.65992, lon: 126.98475, note: '이름처럼 숨이 깔딱 넘어가는 오르막' },
+    { name: '백운산장', lat: 37.65848, lon: 126.98115, note: '정상 전 마지막 쉼터. 바로 옆에 샘터가 있다' },
+    { name: '백운봉암문(위문)', lat: 37.65765, lon: 126.97955, note: '북한산성의 암문. 여기서부터 정상까지 바위 구간이다' },
+  ],
 }
+const MAX_CHECKPOINT_OFFSET = 40 // m
 
 // ── 좌표 유틸 ───────────────────────────────────────
 const R = 6378137
@@ -210,11 +220,31 @@ async function buildTrail(sampleHeight) {
   const points = pts.map((p) => [+p.x.toFixed(2), +sampleHeight(p.x, p.z).toFixed(2), +p.z.toFixed(2)])
 
   let length = 0, gain = 0
+  const cumulative = [0]
   for (let k = 1; k < points.length; k++) {
     const [x0, y0, z0] = points[k - 1], [x1, y1, z1] = points[k]
     length += Math.hypot(x1 - x0, y1 - y0, z1 - z0)
+    cumulative.push(length)
     if (y1 > y0) gain += y1 - y0
   }
+
+  // 이정표를 등산로 위 가장 가까운 점에 붙이고 출발점에서의 거리를 구한다
+  const checkpoints = []
+  for (const cp of COURSE.checkpoints) {
+    const p = toLocal(cp.lat, cp.lon)
+    let best = 0, bestD = Infinity
+    points.forEach(([x, , z], k) => {
+      const d = Math.hypot(x - p.x, z - p.z)
+      if (d < bestD) { bestD = d; best = k }
+    })
+    if (bestD > MAX_CHECKPOINT_OFFSET) {
+      console.warn(`  ! ${cp.name} 은 등산로에서 ${bestD.toFixed(0)}m 떨어져 있어 뺐다`)
+      continue
+    }
+    checkpoints.push({ name: cp.name, note: cp.note, distance: Math.round(cumulative[best]) })
+    console.log(`  이정표 ${cp.name}: 출발 ${Math.round(cumulative[best])}m, 해발 ${points[best][1].toFixed(0)}m, 길에서 ${bestD.toFixed(0)}m`)
+  }
+  checkpoints.sort((a, b) => a.distance - b.distance)
   const trail = {
     id: COURSE.id,
     mountain: COURSE.mountain,
@@ -224,6 +254,7 @@ async function buildTrail(sampleHeight) {
     summitElevation: COURSE.summit.elevation,
     length: Math.round(length),
     elevationGain: Math.round(gain),
+    checkpoints,
     points,
   }
   await fs.writeFile(path.join(OUT, 'trail.json'), JSON.stringify(trail))
