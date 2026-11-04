@@ -3,6 +3,7 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
 import { World } from './scene/World'
+import { Hud } from './ui/Hud'
 
 export default function App() {
   const [data, setData] = useState<{ terrain: Terrain; trail: Trail } | null>(null)
@@ -22,6 +23,7 @@ export default function App() {
       <Canvas shadows camera={{ fov: 55, near: 0.5, far: 20000 }} gl={{ toneMapping: THREE.ACESFilmicToneMapping }} dpr={[1, 2]}>
         <World terrain={data.terrain} trail={data.trail} />
       </Canvas>
+      <Hud trail={data.trail} />
       <div className="attribution">
         지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 AWS Terrain Tiles
       </div>

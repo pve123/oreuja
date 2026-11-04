@@ -1,5 +1,9 @@
 :root {
+  --panel-bg: rgba(255, 255, 255, 0.88);
   --text: #1b1f24;
+  --muted: #5b6470;
+  --accent: #e63946;
+  --accent-2: #f2c14e;
   --navy: #1d3557;
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
   color: var(--text);
@@ -40,4 +44,108 @@ canvas {
 }
 .attribution a {
   color: inherit;
+}
+
+.panel {
+  position: fixed;
+  background: var(--panel-bg);
+  backdrop-filter: blur(8px);
+  border-radius: 14px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
+  padding: 14px 16px;
+}
+
+.course {
+  top: 16px;
+  left: 16px;
+  width: min(300px, calc(100vw - 32px));
+}
+.eyebrow {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+.course h1 {
+  margin: 2px 0 2px;
+  font-size: 20px;
+}
+.course-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin: 12px 0 0;
+}
+.stats div {
+  background: rgba(29, 53, 87, 0.07);
+  border-radius: 8px;
+  padding: 6px 8px;
+}
+.stats dt {
+  font-size: 11px;
+  color: var(--muted);
+}
+.stats dd {
+  margin: 2px 0 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.progress {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  width: min(520px, calc(100vw - 32px));
+}
+.progress-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+}
+.bar {
+  margin: 8px 0 6px;
+  height: 8px;
+  border-radius: 99px;
+  background: rgba(29, 53, 87, 0.15);
+  overflow: hidden;
+}
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-2), var(--accent));
+}
+.hint {
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.hold-button {
+  position: fixed;
+  right: 16px;
+  bottom: 120px;
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  border: none;
+  background: var(--accent);
+  color: #fff;
+  font-size: 18px;
+  font-weight: 800;
+  box-shadow: 0 6px 20px rgba(230, 57, 70, 0.4);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: none;
+  cursor: pointer;
+}
+.hold-button:active {
+  transform: scale(0.95);
+}
+@media (hover: hover) and (pointer: fine) {
+  .hold-button {
+    display: none;
+  }
 }
