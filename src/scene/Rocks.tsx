@@ -4,7 +4,8 @@ import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
-import { withOcclusionCutout } from '../lib/occlusion'
+import { withOcclusionShrink } from '../lib/occlusion'
+import { PHOTO_CAMERA_BACK, distanceToSegmentXZ, summitVista } from '../lib/summit'
 
 const COUNT = 5000
 const NEAR_TRAIL_SHARE = 0.5 // 절반은 등산로 150m 안에 둬서 걸으며 보이게 한다
@@ -37,8 +38,8 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   }, [])
 
   const { settled, layers } = usePhotoLayers()
-  // 카메라와 아바타 사이에 낀 큰 바위는 비워서 아바타를 가리지 않게 한다
-  const material = useMemo(() => withOcclusionCutout(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true })), [])
+  // 카메라와 아바타 사이에 들어온 바위는 통째로 줄여 아바타를 가리지 않게 한다
+  const material = useMemo(() => withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), 0), [])
 
   const instances = useMemo(() => {
     if (!settled) return []
@@ -61,15 +62,18 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       out.push({ matrix: new THREE.Matrix4().compose(p, q, s), color })
     }
 
-    // 1) 백운대 정상 둘레의 큰 바위 (길 쪽은 비운다)
+    // 1) 백운대 정상 둘레의 큰 바위. 길 쪽과 기념사진 카메라와 아바타 사이는 비운다
     const top = trail.points[trail.points.length - 1]
+    const vista = summitVista(terrain, trail)
+    const photoCamera = top.clone().addScaledVector(vista, -(PHOTO_CAMERA_BACK + 3))
     let placed = 0
     for (let tries = 0; placed < SUMMIT_BOULDERS && tries < 400; tries++) {
       const a = rand() * Math.PI * 2
-      const r = 6 + rand() * 22
+      const r = 8 + rand() * 22
       const x = top.x + Math.sin(a) * r
       const z = top.z + Math.cos(a) * r
       if (nearTrail(x, z, 3.5)) continue
+      if (distanceToSegmentXZ(x, z, top, photoCamera) < 6) continue
       add(x, z, 2.5 + rand() * 3)
       placed++
     }

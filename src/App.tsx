@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
 import { World } from './scene/World'
 import { MAPBOX_TOKEN } from './lib/satellite'
+import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 
 export default function App() {
@@ -31,6 +32,7 @@ export default function App() {
         <World terrain={data.terrain} trail={data.trail} />
       </Canvas>
       <Hud trail={data.trail} />
+      <AvatarThumbnails />
       <SummitModal trail={data.trail} />
       <div className="attribution">
         지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 국토지리정보원 수치지형도, AWS Terrain Tiles
