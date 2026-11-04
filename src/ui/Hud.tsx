@@ -25,6 +25,8 @@ function useKeyboard() {
       else if (e.code === 'KeyS' || e.code === 'ArrowDown') input.backward = on
       else if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.left = on
       else if (e.code === 'KeyD' || e.code === 'ArrowRight') input.right = on
+      else if (e.code === 'KeyQ') input.turnLeft = on
+      else if (e.code === 'KeyE') input.turnRight = on
       else if (e.key === 'Shift') input.run = on
     }
     const down = (e: KeyboardEvent) => {
@@ -38,7 +40,16 @@ function useKeyboard() {
     }
     const up = (e: KeyboardEvent) => set(e, false)
     const blur = () =>
-      Object.assign(input, { forward: false, backward: false, left: false, right: false, run: false, jump: false })
+      Object.assign(input, {
+        forward: false,
+        backward: false,
+        left: false,
+        right: false,
+        run: false,
+        jump: false,
+        turnLeft: false,
+        turnRight: false,
+      })
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', blur)
@@ -125,10 +136,11 @@ export function Hud({ trail }: { trail: Trail }) {
           <span>정상까지 {formatDistance(remaining)}</span>
           <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · 마우스로 시점 회전</div>
+        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · Q/E 시점 회전 · 마우스로 둘러보기</div>
       </div>
 
       <ArrivalToast trail={trail} />
+      <ReturnNotice />
       <AvatarBar />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
@@ -160,6 +172,29 @@ function AvatarBar() {
         </button>
       ))}
     </div>
+  )
+}
+
+/** 길에서 너무 멀어져 등산로로 순간이동했을 때: 화면이 잠깐 깜빡이고 알림이 뜬다 */
+function ReturnNotice() {
+  const returnedAt = useGame((s) => s.returnedAt)
+  const [hiddenAt, setHiddenAt] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!returnedAt) return
+    const t = setTimeout(() => setHiddenAt(returnedAt), 3000)
+    return () => clearTimeout(t)
+  }, [returnedAt])
+
+  if (!returnedAt || hiddenAt === returnedAt) return null
+  return (
+    <>
+      <div className="teleport-fade" key={`fade-${returnedAt}`} />
+      <div className="toast" key={`toast-${returnedAt}`} role="status">
+        <div className="toast-title">등산로로 돌아왔어요</div>
+        <div className="toast-note">길에서 30m 넘게 멀어지면 등산로 위로 옮겨 드려요.</div>
+      </div>
+    </>
   )
 }
 

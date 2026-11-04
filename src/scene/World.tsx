@@ -21,8 +21,11 @@ const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
 const STRAFE_SPEED = 3 // 옆걸음 m/s
 const STRAFE_RUN_SPEED = 7
-/** 등산로 좌우로 이만큼까지만 비킬 수 있다 (m) */
-export const MAX_OFFSET = 18
+/** 등산로에서 이만큼 넘게 멀어지면 등산로 위로 순간이동한다 (m) */
+export const ROAM_LIMIT = 30
+const TURN_SPEED = 1.8 // Q/E 시점 회전 속도(rad/s)
+const FOLLOW_RATE = 2.2 // 카메라가 캐릭터 뒤로 돌아가는 빠르기 (클수록 빨리)
+const MANUAL_HOLD_MS = 2000 // 마우스로 돌린 뒤 이 시간 동안은 자동으로 돌지 않는다
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
@@ -63,6 +66,8 @@ export function World({ terrain, trail }: Props) {
   const jump = useRef({ height: 0, velocity: 0 })
   /** 등산로 진행 방향 기준으로 아바타가 바라보는 각도 (0 = 정면) */
   const facing = useRef(0)
+  /** 마우스로 시점을 돌리는 중인지, 마지막으로 직접 돌린 시각 */
+  const manual = useRef({ dragging: false, at: 0 })
 
   // 정상에서 가장 낮게 트인 방향 (기념사진 배경으로 쓸 풍경 쪽)
   const vista = useMemo(() => summitVista(terrain, trail), [terrain, trail])
@@ -77,7 +82,7 @@ export function World({ terrain, trail }: Props) {
     if (debugAvatar && AVATARS.some((a) => a.kind === debugAvatar)) useGame.getState().setAvatar(debugAvatar as AvatarKind)
     // ?o=12 처럼 주면 등산로에서 옆으로 비킨 곳에서 시작한다
     const debugOffset = import.meta.env.DEV ? Number(new URLSearchParams(location.search).get('o')) || 0 : 0
-    if (debugOffset) useGame.getState().setOffset(THREE.MathUtils.clamp(debugOffset, -MAX_OFFSET, MAX_OFFSET))
+    if (debugOffset) useGame.getState().setOffset(THREE.MathUtils.clamp(debugOffset, -ROAM_LIMIT, ROAM_LIMIT))
     // ?photo 를 붙이면 정상 도착 직후 기념사진까지 자동으로 찍는다
     if (import.meta.env.DEV && new URLSearchParams(location.search).has('photo')) {
       const off = useGame.subscribe((s) => {
@@ -100,8 +105,9 @@ export function World({ terrain, trail }: Props) {
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
     let { distance, offset } = game
+    let walkingAlong = false // 이번 프레임에 앞뒤로 걸었는지 (카메라 자동 따라 돌기에 쓴다)
 
-    // 1) 이동: 앞뒤는 등산로를 따라, 옆은 등산로 좌우 MAX_OFFSET 안에서
+    // 1) 이동: 앞뒤는 등산로를 따라, 옆은 자유롭게. 등산로에서 ROAM_LIMIT 넘게 멀어지면 등산로로 순간이동
     if (game.mode === 'hiking') {
       const dir = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
       const side = (input.right ? 1 : 0) - (input.left ? 1 : 0)
@@ -114,13 +120,19 @@ export function World({ terrain, trail }: Props) {
       }
       if (side !== 0) {
         const speed = input.run ? STRAFE_RUN_SPEED : STRAFE_SPEED
-        const next = THREE.MathUtils.clamp(offset + side * speed * dt, -MAX_OFFSET, MAX_OFFSET)
-        hiker.current.stride(next - offset)
-        offset = next
-        game.setOffset(offset)
+        const next = offset + side * speed * dt
+        if (Math.abs(next) > ROAM_LIMIT) {
+          offset = 0
+          game.returnToTrail()
+        } else {
+          hiker.current.stride(next - offset)
+          offset = next
+          game.setOffset(offset)
+        }
       }
       // 움직이는 쪽을 바라본다. 멈추면 마지막 방향을 유지
       if (dir !== 0 || side !== 0) facing.current = Math.atan2(-side, dir)
+      walkingAlong = dir !== 0
       // 앞으로 걸어서 이정표를 처음 지나면 도착 알림
       const cps = trail.data.checkpoints
       let reached = game.reachedCheckpoint
@@ -199,6 +211,23 @@ export function World({ terrain, trail }: Props) {
     const target = pos.clone().setY(pos.y + 1.5)
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
+
+    // 시점 돌리기: Q/E 는 직접 돌리고, 앞뒤로 걸을 때는 캐릭터 뒤쪽으로 부드럽게 돌아간다
+    const off = camera.position.clone().sub(target)
+    const horizontal = Math.hypot(off.x, off.z)
+    let azimuth = Math.atan2(off.x, off.z)
+    const turn = (input.turnRight ? 1 : 0) - (input.turnLeft ? 1 : 0)
+    const now = performance.now()
+    if (turn !== 0) {
+      azimuth += turn * TURN_SPEED * dt
+      manual.current.at = now
+    } else if (walkingAlong && !manual.current.dragging && now - manual.current.at > MANUAL_HOLD_MS) {
+      const behind = heading + facing.current + Math.PI // 캐릭터가 보는 방향의 반대편
+      const diff = Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) // 가까운 쪽으로 돈다
+      azimuth += diff * (1 - Math.exp(-FOLLOW_RATE * dt))
+    }
+    camera.position.set(target.x + Math.sin(azimuth) * horizontal, camera.position.y, target.z + Math.cos(azimuth) * horizontal)
+
     controls.current.target.copy(target)
     lastTarget.current.copy(target)
     controls.current.update()
@@ -236,6 +265,11 @@ export function World({ terrain, trail }: Props) {
         minDistance={4}
         maxDistance={400}
         maxPolarAngle={Math.PI * 0.49}
+        onStart={() => (manual.current.dragging = true)}
+        onEnd={() => {
+          manual.current.dragging = false
+          manual.current.at = performance.now()
+        }}
       />
     </>
   )

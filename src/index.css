@@ -430,3 +430,21 @@ canvas {
     top: 72px;
   }
 }
+
+/* 등산로로 순간이동할 때 화면이 잠깐 하얗게 깜빡인다 */
+.teleport-fade {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  background: #fff;
+  pointer-events: none;
+  animation: teleport-fade 0.6s ease-out forwards;
+}
+@keyframes teleport-fade {
+  from {
+    opacity: 0.85;
+  }
+  to {
+    opacity: 0;
+  }
+}
