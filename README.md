@@ -22,7 +22,7 @@ npm run dev      # http://localhost:5173
 | `1` `2` `3` 또는 왼쪽 아래 👋 🙌 ❤️ 버튼 | 감정 표현. 내 머리 위와 같은 코스 사람들 화면에 3초 동안 뜬다 |
 | 왼쪽 아래 닉네임 ✎ | 닉네임 바꾸기 (12자까지, 브라우저에 기억) |
 | 화면 왼쪽 아래 스피커 버튼 | 소리 켜기·끄기. 소리는 첫 키나 클릭 뒤에 나온다 |
-| 화면 오른쪽 위 캐릭터 그림 | 아바타 바꾸기 (기본 등산객, 형광 아저씨, 감자, 오리, 두부). 고른 캐릭터는 브라우저에 기억한다 |
+| 화면 오른쪽 위 캐릭터 그림 | 아바타 바꾸기. 도형으로 만든 병맛 캐릭터 5종(기본 등산객, 형광 아저씨, 감자, 오리, 두부)과 GLB 캐릭터 6종(꼬마 수염 아저씨, 꼬마 등산객, 꼬마 개구쟁이, 곰탈 전사, 숲지기, 갑옷 기사). 고른 캐릭터는 브라우저에 기억한다 |
 | 화면 오른쪽 아래 「걷기」 버튼 | 터치 화면에서 누르고 있는 동안 걷기 |
 | 화면 오른쪽 아래 「점프」 버튼 | 터치 화면에서 점프 |
 | 화면 왼쪽 아래 ◀ ▶ 버튼 | 터치 화면에서 옆으로 걷기 |
@@ -77,7 +77,9 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현 |
 | `src/scene/Peers.tsx` | 같은 코스 다른 사람의 아바타와 이름표를 그린다 |
 | `src/ui/MiniMap.tsx` | 오른쪽 아래 미니맵. 위성사진 위에 코스와 지금 위치를 그린다. 화면이 좁으면 숨긴다 |
-| `src/scene/Hiker.tsx` | 도형으로 만든 임시 아바타다. GLB 캐릭터로 바꿀 예정이다 |
+| `src/scene/Avatar.tsx` | 캐릭터 종류에 따라 도형 아바타나 GLB 캐릭터를 그린다. GLB 캐릭터는 쉬기·걷기·공중·만세 동작을 섞고, 걷기는 걸은 거리에 맞춰 돌린다 |
+| `src/scene/Hiker.tsx` | 도형으로 만든 병맛 아바타 5종 |
+| `scripts/prepare-avatars.mjs` | GLB 캐릭터 파일을 `public/models/avatars/` 에 준비한다. 아래 「GLB 캐릭터」 참고 |
 | `src/ui/Hud.tsx` | 코스 정보, 진행률, 정상 배지와 사진 창을 그린다 |
 
 ## 지형과 등산로 데이터
@@ -122,6 +124,18 @@ npm run data
 
 `public/data/terrain.bin` 은 이 데이터로 만든 결과물이다. 신청할 때 사용 목적은 「교육, 학습, 연구」로 했다. 레포를 공개하거나 서비스로 운영하려면 국토지리정보원 이용 조건을 다시 확인한다.
 
+## GLB 캐릭터
+
+Kenney Mini Characters 3종과 KayKit Adventurers 3종을 쓴다. 둘 다 CC0 1.0 이다. 캐릭터를 바꾸거나 더하려면 두 팩을 받아 압축을 풀고 스크립트에 폴더를 넘긴다.
+
+```bash
+node scripts/prepare-avatars.mjs ~/Downloads/kenney_mini-characters ~/Downloads/KayKit_Adventurers_2.0_FREE
+```
+
+- 받는 곳: https://kenney.nl/assets/mini-characters , https://kaylousberg.itch.io/kaykit-adventurers
+- 쓸 캐릭터는 스크립트 위쪽 `KENNEY`·`KAYKIT` 목록에, 화면 이름과 동작 이름은 `src/lib/avatars.ts` 의 `AVATARS`·`AVATAR_MODELS` 에 적는다. 같이하기 서버(`server/index.mjs`)의 `AVATARS` 에도 더해야 다른 사람에게 보인다.
+- Kenney 캐릭터는 동작이 파일 안에 들어 있다. KayKit 은 동작이 따로 있어서, 스크립트가 쓰는 동작(`Idle_A`, `Walking_A`, `Jump_Idle`, `Jump_Full_Short`)만 골라 메시를 뺀 `animations.glb`(약 160KB)로 합친다. 원본 두 파일은 마네킹 메시까지 들어 있어 1.5MB 가 넘는다.
+
 ## 데이터 출처
 
 | 데이터 | 출처 | 비고 |
@@ -130,4 +144,5 @@ npm run data
 | 정밀 지형 | 국토지리정보원 1:5,000 수치지형도 | 등고선과 표고점으로 만든다. 도엽 밖은 아래 AWS 지형을 쓴다 |
 | 지형 | AWS Terrain Tiles | SRTM 같은 공개 DEM을 바탕으로 한다 |
 | 위성사진 | © Mapbox, © Maxar | 토큰이 있을 때만 쓰고 화면에 출처를 표시한다 |
+| 캐릭터 모델 | Kenney Mini Characters, KayKit Adventurers (Kay Lousberg) | CC0 1.0. 출처 표시 의무는 없다. `public/models/avatars/` |
 | 나무 모델 | Quaternius Stylized Nature MegaKit (무료판) | CC0 1.0. 출처 표시 의무는 없지만 화면에 적는다. `public/models/trees/` 에 6개만 넣었다 |
