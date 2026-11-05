@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrthographicCamera } from '@react-three/drei'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
@@ -10,6 +10,8 @@ const FRAME_HEIGHT = 2.6 // 그림 한 장에 담을 높이(m)
 // 캐릭터 사이 간격(m). 한 칸이 그림 한 장이 되므로 높이와 같아야 정사각형으로 찌그러짐 없이 잘린다
 const SPACING = FRAME_HEIGHT
 const SETTLE_FRAMES = 4 // 몇 프레임 그린 뒤(만세 자세가 잡힌 뒤) 찍는다
+/** 첫 화면(지형·내 캐릭터)을 먼저 받도록 이만큼 기다렸다가 나머지 캐릭터 파일을 받아 찍는다 (ms) */
+const START_DELAY = 2000
 
 /** 다섯 캐릭터를 나란히 세워 한 번에 찍고, 한 칸씩 잘라 그림으로 만든다 */
 function Studio() {
@@ -60,12 +62,18 @@ function Studio() {
  */
 export function AvatarThumbnails() {
   const done = useAvatarThumbs((s) => s.done)
-  // 끝내 못 찍어도 목록은 이름으로 보이니, 10초 뒤에는 숨은 화면을 치운다
+  const [started, setStarted] = useState(false)
   useEffect(() => {
-    const t = setTimeout(() => useAvatarThumbs.setState({ done: true }), 10000)
+    const t = setTimeout(() => setStarted(true), START_DELAY)
     return () => clearTimeout(t)
   }, [])
-  if (done) return null
+  // 끝내 못 찍어도 목록은 이름으로 보이니, 시작하고 10초 뒤에는 숨은 화면을 치운다
+  useEffect(() => {
+    if (!started) return
+    const t = setTimeout(() => useAvatarThumbs.setState({ done: true }), 10000)
+    return () => clearTimeout(t)
+  }, [started])
+  if (done || !started) return null
 
   const width = AVATARS.length * SPACING
   return (
