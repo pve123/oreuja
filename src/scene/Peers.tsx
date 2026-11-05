@@ -5,7 +5,8 @@ import * as THREE from 'three'
 import { sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { EMOTES, EMOTE_MS, useNet, type Peer } from '../lib/net'
 import { occlusionUniforms } from '../lib/occlusion'
-import { Hiker, type HikerHandle } from './Hiker'
+import { Avatar } from './Avatar'
+import type { HikerHandle } from './Hiker'
 
 const FOLLOW = 10 // 받은 위치로 따라가는 빠르기 (클수록 바로 붙는다)
 const SNAP = 40 // 이보다 멀리 뛰면(순간이동·코스 재시작) 따라가지 않고 바로 옮긴다(m)
@@ -80,7 +81,7 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
 
   return (
     <>
-      <Hiker ref={hiker} kind={peer.avatar} />
+      <Avatar ref={hiker} kind={peer.avatar} />
       <group ref={label}>
         {view.near && (
           <Html position={[0, 2.6, 0]} center distanceFactor={14} zIndexRange={[10, 0]}>
