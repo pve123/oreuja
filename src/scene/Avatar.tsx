@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js'
 import { AVATAR_MODELS, type AvatarKind, type AvatarModel } from '../lib/avatars'
 import { Hiker, type HikerHandle } from './Hiker'
+import { attachTrekkingPole } from './TrekkingPole'
 
 /** GLB 캐릭터 키를 이 높이(m)로 맞춘다. 도형 아바타(기본 등산객 약 2m)와 비슷하게 */
 const TARGET_HEIGHT = 1.9
@@ -14,6 +15,7 @@ const STRIDE_RAD_PER_M = 2.2
 const BLEND = 10
 
 type Motion = { phase: number; swing: number; cheering: boolean; airborne: boolean; ready: boolean }
+const REST: Motion = { phase: 0, swing: 0, cheering: false, airborne: false, ready: false }
 
 /**
  * 캐릭터 종류에 맞게 도형 아바타(Hiker) 또는 GLB 캐릭터를 그린다.
@@ -90,13 +92,24 @@ function ModelBody({ model, motion, onReady }: { model: AvatarModel; motion: Ref
     return { root, scale: size.y > 0 ? TARGET_HEIGHT / size.y : 1 }
   }, [gltf.scene])
 
-  const animator = useMemo(() => createAnimator(root, animGltf.animations, model), [root, animGltf.animations, model])
+  const animator = useMemo(() => {
+    const animator = createAnimator(root, animGltf.animations, model)
+    // 쉬는 자세를 입힌 뒤 그 자세 기준으로 스틱을 손에 붙인다
+    animator.start()
+    animator.update(0, REST)
+    if (!root.getObjectByName('trekking-pole') && !attachTrekkingPole(root, model.pole.bone, model.pole.grip, scale)) {
+      console.warn(`[Avatar] ${model.url} 에서 스틱을 쥘 뼈 ${model.pole.bone} 를 찾지 못했다`)
+    }
+    return animator
+  }, [root, animGltf.animations, model, scale])
 
   useEffect(() => {
+    // StrictMode 는 effect 를 정리했다가 다시 부르므로, 멈춘 동작을 여기서 다시 튼다
+    animator.start()
     onReady(true)
     return () => {
       onReady(false)
-      animator.dispose()
+      animator.stop()
     }
   }, [animator, onReady])
 
@@ -115,10 +128,8 @@ function createAnimator(root: THREE.Object3D, clips: THREE.AnimationClip[], mode
   for (const slot of SLOTS) {
     const clip = THREE.AnimationClip.findByName(clips, model.clips[slot])
     if (!clip) console.warn(`[Avatar] ${model.url} 에 ${model.clips[slot]} 동작이 없다`)
-    actions[slot] = clip ? mixer.clipAction(clip).setEffectiveWeight(slot === 'idle' ? 1 : 0).play() : null
+    actions[slot] = clip ? mixer.clipAction(clip) : null
   }
-  // 걷기는 시간이 아니라 걸은 거리로 돌린다
-  if (actions.walk) actions.walk.timeScale = 0
   const weights: Record<Slot, number> = { idle: 1, walk: 0, air: 0, cheer: 0 }
 
   return {
@@ -139,9 +150,13 @@ function createAnimator(root: THREE.Object3D, clips: THREE.AnimationClip[], mode
       }
       mixer.update(dt)
     },
-    dispose() {
+    start() {
+      for (const slot of SLOTS) actions[slot]?.setEffectiveWeight(weights[slot]).play()
+      // 걷기는 시간이 아니라 걸은 거리로 돌린다
+      if (actions.walk) actions.walk.timeScale = 0
+    },
+    stop() {
       mixer.stopAllAction()
-      mixer.uncacheRoot(root)
     },
   }
 }
