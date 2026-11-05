@@ -38,19 +38,24 @@ export type AvatarModel = {
   /** 동작이 캐릭터 파일 밖에 따로 있으면 그 파일 */
   animUrl?: string
   clips: { idle: string; walk: string; air: string; cheer: string }
+  /** 등산 스틱을 쥘 뼈. grip 이 'bone' 이면 뼈 원점이 손, 'tip' 이면 그 뼈에 붙은 가장 먼 꼭짓점이 손끝 */
+  pole: { bone: string; grip: 'bone' | 'tip' }
 }
 
 const KENNEY_CLIPS = { idle: 'idle', walk: 'walk', air: 'fall', cheer: 'emote-yes' }
+// Kenney 는 손 뼈가 없어 팔 뼈 끝을 쓴다. KayKit 은 손에 물건을 쥐는 handslot 뼈가 있다 (GLTFLoader 가 이름의 . 을 뺀다)
+const KENNEY_POLE = { bone: 'arm-right', grip: 'tip' } as const
+const KAYKIT_POLE = { bone: 'handslotr', grip: 'bone' } as const
 const KAYKIT_ANIMS = '/models/avatars/kaykit/animations.glb'
 const KAYKIT_CLIPS = { idle: 'Idle_A', walk: 'Walking_A', air: 'Jump_Idle', cheer: 'Jump_Full_Short' }
 
 export const AVATAR_MODELS: Partial<Record<AvatarKind, AvatarModel>> = {
-  'mini-beard': { url: '/models/avatars/kenney/character-male-b.glb', clips: KENNEY_CLIPS },
-  'mini-girl': { url: '/models/avatars/kenney/character-female-b.glb', clips: KENNEY_CLIPS },
-  'mini-kid': { url: '/models/avatars/kenney/character-male-e.glb', clips: KENNEY_CLIPS },
-  barbarian: { url: '/models/avatars/kaykit/Barbarian.glb', animUrl: KAYKIT_ANIMS, clips: KAYKIT_CLIPS },
-  ranger: { url: '/models/avatars/kaykit/Ranger.glb', animUrl: KAYKIT_ANIMS, clips: KAYKIT_CLIPS },
-  knight: { url: '/models/avatars/kaykit/Knight.glb', animUrl: KAYKIT_ANIMS, clips: KAYKIT_CLIPS },
+  'mini-beard': { url: '/models/avatars/kenney/character-male-b.glb', clips: KENNEY_CLIPS, pole: KENNEY_POLE },
+  'mini-girl': { url: '/models/avatars/kenney/character-female-b.glb', clips: KENNEY_CLIPS, pole: KENNEY_POLE },
+  'mini-kid': { url: '/models/avatars/kenney/character-male-e.glb', clips: KENNEY_CLIPS, pole: KENNEY_POLE },
+  barbarian: { url: '/models/avatars/kaykit/Barbarian.glb', animUrl: KAYKIT_ANIMS, clips: KAYKIT_CLIPS, pole: KAYKIT_POLE },
+  ranger: { url: '/models/avatars/kaykit/Ranger.glb', animUrl: KAYKIT_ANIMS, clips: KAYKIT_CLIPS, pole: KAYKIT_POLE },
+  knight: { url: '/models/avatars/kaykit/Knight.glb', animUrl: KAYKIT_ANIMS, clips: KAYKIT_CLIPS, pole: KAYKIT_POLE },
 }
 
 const AVATAR_KEY = 'hiking-metaverse:avatar'
