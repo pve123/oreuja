@@ -187,6 +187,20 @@ export function meshHeight(t: Terrain, x: number, z: number) {
   return h(i + 1, j + 1) + (1 - u) * (h(i, j + 1) - h(i + 1, j + 1)) + (1 - v) * (h(i + 1, j) - h(i + 1, j + 1))
 }
 
+/** 발 둘레 반지름(m). 비탈에서 오르막 쪽 발이 땅에 묻히지 않게 이 둘레까지 높이를 잰다 */
+const FOOT_RADIUS = 0.3
+
+/**
+ * 캐릭터가 (x, z) 에 섰을 때 발바닥 높이(m). 화면에 그린 지형 면(meshHeight)을 따른다.
+ * 격자 보간(sampleHeight)은 그린 면과 최대 2m 가까이 달라서, 그걸 쓰면 굴곡진 비탈에서 몸이 땅에 묻힌다.
+ * 가운데와 발 둘레 네 점 가운데 가장 높은 곳에 서서, 가파른 비탈에서도 오르막 쪽 발이 묻히지 않는다.
+ */
+export function standHeight(t: Terrain, x: number, z: number) {
+  let y = meshHeight(t, x, z)
+  for (const [dx, dz] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) y = Math.max(y, meshHeight(t, x + dx * FOOT_RADIUS, z + dz * FOOT_RADIUS))
+  return y
+}
+
 /** 지형 한 장과 그 위의 코스 목록을 불러온다 */
 export async function loadData(): Promise<{ terrain: Terrain; trails: Trail[] }> {
   const [meta, buf, courses] = await Promise.all([

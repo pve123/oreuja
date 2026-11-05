@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
-import { sampleHeight, type Terrain, type Trail } from '../lib/data'
+import type { Terrain, Trail } from '../lib/data'
+import { groundAt, stoneSteps } from '../lib/steps'
 import { EMOTES, EMOTE_MS, useNet, type Peer } from '../lib/net'
 import { occlusionUniforms } from '../lib/occlusion'
 import { Avatar } from './Avatar'
@@ -60,11 +61,10 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
     s.offset += (p.offset - s.offset) * k
     const heading = trail.headingAt(s.distance)
     const pos = trail.positionAt(s.distance)
-    if (s.offset !== 0) {
-      pos.x += -Math.cos(heading) * s.offset
-      pos.z += Math.sin(heading) * s.offset
-      pos.y = sampleHeight(terrain, pos.x, pos.z)
-    }
+    pos.x += -Math.cos(heading) * s.offset
+    pos.z += Math.sin(heading) * s.offset
+    // 내 캐릭터와 같은 높이 규칙 (등산로·돌계단·지형)
+    pos.y = groundAt(terrain, trail, stoneSteps(terrain, trail), s.distance, s.offset, pos.x, pos.z).y
     hiker.current.stride(s.distance + s.offset - before)
     hiker.current.group.position.copy(pos).setY(pos.y + p.jump)
     hiker.current.group.rotation.y = heading + p.facing
