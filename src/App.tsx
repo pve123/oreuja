@@ -8,11 +8,15 @@ import { MAPBOX_TOKEN } from './lib/satellite'
 import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 import { SoundControls } from './ui/SoundControls'
+import { startNet } from './lib/net'
 
 export default function App() {
   const [data, setData] = useState<{ terrain: Terrain; trails: Trail[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
   const courseId = useGame((s) => s.courseId)
+
+  // 같이하기 서버에 붙는다. 서버가 없으면 혼자 오르기로 동작한다
+  useEffect(() => startNet(), [])
 
   useEffect(() => {
     // 개발 중에는 ?course=bukhansan-sanseong 처럼 코스를 골라 시작할 수 있다

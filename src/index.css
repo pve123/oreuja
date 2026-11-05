@@ -433,6 +433,106 @@ canvas {
     display: none;
   }
 }
+.together {
+  left: 16px;
+  bottom: 76px;
+  padding: 10px 12px;
+  display: grid;
+  gap: 6px;
+  width: 210px;
+}
+.together-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b0b6bd;
+}
+.dot.online {
+  background: #2fa84f;
+}
+.dot.connecting {
+  background: var(--accent-2);
+}
+.together-name {
+  justify-self: start;
+  font-size: 14px;
+  text-decoration: none;
+}
+.together-name input {
+  width: 100%;
+  font: inherit;
+  padding: 3px 6px;
+  border-radius: 6px;
+  border: 1.5px solid var(--navy);
+}
+.emotes {
+  display: flex;
+  gap: 6px;
+}
+.emote-button {
+  flex: 1;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: rgba(29, 53, 87, 0.08);
+  font-size: 18px;
+  cursor: pointer;
+}
+.emote-button:hover {
+  background: rgba(29, 53, 87, 0.16);
+}
+.peer-label {
+  position: relative;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(29, 53, 87, 0.85);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.emote-bubble {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 8px;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 22px;
+  line-height: 1;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+  animation: emote-pop 0.3s ease-out;
+}
+.emote-bubble.mine {
+  position: static;
+  transform: none;
+}
+@keyframes emote-pop {
+  from {
+    transform: translateX(-50%) scale(0.4);
+  }
+  to {
+    transform: translateX(-50%) scale(1);
+  }
+}
+.emote-bubble.mine {
+  animation: none;
+}
+/* 터치 화면에서는 옆걸음 버튼 위로 올린다 */
+@media (hover: none) {
+  .together {
+    bottom: 200px;
+  }
+}
 .attribution {
   position: fixed;
   right: 8px;
