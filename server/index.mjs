@@ -10,7 +10,7 @@ const MAX_PLAYERS = 50
 const MAX_MESSAGE = 512 // 한 메시지 최대 크기(바이트). 위치 메시지는 200바이트 안팎이다
 const MAX_MESSAGES_PER_SEC = 30
 const NAME_MAX = 12
-const AVATARS = new Set(['hiker', 'uncle', 'potato', 'duck', 'tofu'])
+const AVATARS = new Set(['hiker', 'uncle', 'potato', 'duck', 'tofu', 'mini-beard', 'mini-girl', 'mini-kid', 'barbarian', 'ranger', 'knight'])
 const MODES = new Set(['hiking', 'summit', 'photo', 'photoResult'])
 const EMOTES = new Set(['wave', 'cheer', 'heart'])
 

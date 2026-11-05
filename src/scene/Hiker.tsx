@@ -12,6 +12,8 @@ export type HikerHandle = {
   setCheering: (on: boolean) => void
   /** 공중에 떠 있으면 다리를 접는다 */
   setAirborne: (on: boolean) => void
+  /** 모습을 다 그릴 준비가 됐는지 (GLB 캐릭터는 파일을 받은 뒤 true) */
+  ready: () => boolean
 }
 
 /** 캐릭터마다 다른 골격 치수와 몸통. 원점은 발바닥, 앞쪽이 +z */
@@ -265,6 +267,7 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
     setAirborne: (on) => {
       state.current.airborne = on
     },
+    ready: () => true,
   }))
 
   useFrame((_, dt) => {
