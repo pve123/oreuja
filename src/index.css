@@ -27,14 +27,6 @@ canvas {
   touch-action: none;
 }
 
-.loading {
-  display: grid;
-  place-items: center;
-  height: 100%;
-  font-size: 18px;
-  color: var(--navy);
-}
-
 .panel {
   position: fixed;
   background: var(--panel-bg);
