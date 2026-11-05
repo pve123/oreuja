@@ -147,6 +147,8 @@ function WorldScene({ terrain, trail }: Props) {
   /** 휠로 고른 카메라 거리(arm)와 스프링 암이 실제로 보여 주는 거리(shown) */
   const zoom = useRef({ arm: CAMERA_MIN_DISTANCE, shown: CAMERA_MIN_DISTANCE })
   const photoFrames = useRef(0)
+  /** 처음 몇 프레임을 그렸는지 (첫 화면을 걷어 낼 때를 정한다) */
+  const drawnFrames = useRef(0)
   /** 등산로 진행 방향 기준으로 아바타가 바라보는 각도 (0 = 정면). 같이하기 서버로 보낸다 */
   const facing = useRef(0)
   /**
@@ -479,6 +481,8 @@ function WorldScene({ terrain, trail }: Props) {
     z.shown = want < z.shown ? want : z.shown + (want - z.shown) * (1 - Math.exp(-CAMERA_RELEASE_RATE * dt))
     camera.position.copy(target).addScaledVector(dir, z.shown)
     occlusionUniforms.uOccCamera.value.copy(camera.position)
+    // 캐릭터와 카메라가 자리 잡고 몇 프레임 그린 뒤 첫 화면을 걷어 내게 알린다
+    if (drawnFrames.current < 5 && ++drawnFrames.current === 5) useGame.setState({ sceneReady: true })
   })
 
   return (

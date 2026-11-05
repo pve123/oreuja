@@ -33,6 +33,8 @@ type State = {
   /** 등산로에서 멀어진 정도. 0 은 걱정 없는 거리, 1 은 더 나갈 수 없는 경계 (화면 가장자리 어둡게·안내에 쓴다) */
   roam: number
   setRoam: (v: number) => void
+  /** 3D 장면(물리·내 캐릭터 포함)이 처음 그려졌는지. 첫 화면(스플래시)을 걷어 낼 때 쓴다 */
+  sceneReady: boolean
   setDistance: (d: number) => void
   setOffset: (m: number) => void
   reachCheckpoint: (index: number) => void
@@ -72,6 +74,7 @@ const freshClimb = {
   reachedCheckpoint: -1,
   arrival: null,
   roam: 0,
+  sceneReady: false,
 }
 
 // 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
