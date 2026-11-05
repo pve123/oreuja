@@ -123,6 +123,33 @@ export class Trail {
     })
   }
 
+  /**
+   * (x, z) 에서 가장 가까운 등산로 위 지점의 거리(m).
+   * near 앞뒤 range 안의 구간만 본다. 구불구불한 길에서 멀리 떨어진 다른 굽이로 진행이 건너뛰지 않게 하려는 것이다.
+   */
+  nearestDistance(x: number, z: number, near: number, range = 80) {
+    const lo = this.segmentAt(near - range).i
+    const hi = this.segmentAt(near + range).i
+    let best = near
+    let bestSq = Infinity
+    for (let i = lo; i <= hi && i + 1 < this.points.length; i++) {
+      const a = this.points[i]
+      const b = this.points[i + 1]
+      const dx = b.x - a.x
+      const dz = b.z - a.z
+      const len2 = dx * dx + dz * dz || 1
+      const t = THREE.MathUtils.clamp(((x - a.x) * dx + (z - a.z) * dz) / len2, 0, 1)
+      const px = a.x + dx * t - x
+      const pz = a.z + dz * t - z
+      const d2 = px * px + pz * pz
+      if (d2 < bestSq) {
+        bestSq = d2
+        best = this.cumulative[i] + t * (this.cumulative[i + 1] - this.cumulative[i])
+      }
+    }
+    return best
+  }
+
   /** 진행 방향 (수평). 앞뒤 몇 m 를 보고 계산해 흔들림을 줄인다 */
   headingAt(distance: number) {
     const a = this.positionAt(distance - 4)
