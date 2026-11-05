@@ -69,14 +69,16 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 |---|---|
 | `scripts/prepare-data.mjs` | 지형과 등산로 데이터를 만든다 (`npm run data`) |
 | `src/lib/data.ts` | 데이터를 불러오고, 등산로 위 위치와 실제 소요 시간을 계산한다 |
-| `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다 |
+| `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다. 이동은 Rapier 캐릭터 컨트롤러(캡슐 몸, 부딪히면 미끄러지기, 45cm 턱 오르기, 땅에 붙이기, 최대 경사 60°)로, 카메라는 스프링 암(지형·건물에 막히면 당기기)으로 움직인다 |
+| `src/scene/Colliders.tsx` | 물리 충돌체를 만든다. 등산로 둘레 40m 지형(화면 지형과 같은 삼각형), 돌계단 경사로, 나무 줄기·바위·랜드마크 원기둥 |
+| `src/lib/collider-mesh.ts` | 등산로 둘레 지형 충돌 메시 |
 | `src/scene/Terrain.tsx` | 지형 메시를 고도와 경사에 따라 칠한다 |
 | `src/scene/Forest.tsx` | 나무를 `InstancedMesh` 로 심는다. 멀리 있는 나무는 가벼운 도형이다 |
 | `src/scene/DetailTrees.tsx` | 아바타 둘레 70m 안의 나무만 Quaternius 나무 모델로 바꿔 그린다 |
 | `src/scene/Landmarks.tsx` | 이정표마다 이름에 맞는 랜드마크를 세운다. 고개는 돌탑, 깔딱고개는 돌탑과 벤치, 절·암자는 연등 단 암자, 산장은 굴뚝 있는 산장, 문은 돌 성문, 문터는 무너진 성벽, 폭포는 절벽과 물줄기 |
 | `src/lib/landmarks.ts` | 랜드마크 종류·자리·충돌 원을 정한다. 길 위에 서는 성문은 등산로가 벽에 걸리지 않는 방향으로 돌리고, 그래도 걸리는 충돌 원은 뺀다 |
-| `src/lib/obstacles.ts` | 나무 줄기·바위·랜드마크를 바닥 원으로 모아, 부딪히면 둘레를 따라 미끄러지게 밀어낸다 |
-| `src/lib/steps.ts` | 돌계단 자리와 높이. 걸은 거리에 맞춰 칸마다 평평하게 딛고 가장자리에서 다음 칸으로 올라서며, 내 캐릭터와 친구 캐릭터가 같은 높이 규칙(`groundAt`)을 쓴다 |
+| `src/lib/obstacles.ts` | 나무 줄기·바위·랜드마크를 바닥 원으로 모은다. `Colliders` 가 이 목록으로 충돌체를 만든다 |
+| `src/lib/steps.ts` | 돌계단 자리와 높이. 물리는 칸 사이를 곧게 이은 보이지 않는 경사로를 걷고(가장자리는 땅속에 묻어 걸리지 않게), 몸 그림만 칸마다 평평하게 딛는 높이로 얹는다. 같이하기 친구 캐릭터는 `groundAt` 으로 같은 높이에 선다 |
 | `src/lib/sound.ts` | 발소리, 바람·새소리, 도착음을 음원 파일 없이 Web Audio 로 만든다 |
 | `server/index.mjs` | 같이하기 서버. 접속한 사람들 상태를 1초에 10번 모두에게 나눠 준다 (`npm run server`) |
 | `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현 |
