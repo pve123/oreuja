@@ -97,8 +97,8 @@ function ModelBody({ model, motion, onReady }: { model: AvatarModel; motion: Ref
     // 쉬는 자세를 입힌 뒤 그 자세 기준으로 스틱을 손에 붙인다
     animator.start()
     animator.update(0, REST)
-    if (!root.getObjectByName('trekking-pole') && !attachTrekkingPole(root, model.pole.bone, model.pole.grip, scale)) {
-      console.warn(`[Avatar] ${model.url} 에서 스틱을 쥘 뼈 ${model.pole.bone} 를 찾지 못했다`)
+    for (const bone of model.pole.bones) {
+      if (!attachTrekkingPole(root, bone, model.pole.grip, scale)) console.warn(`[Avatar] ${model.url} 에서 스틱을 쥘 뼈 ${bone} 를 찾지 못했다`)
     }
     return animator
   }, [root, animGltf.animations, model, scale])

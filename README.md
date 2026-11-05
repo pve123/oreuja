@@ -79,7 +79,7 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/ui/MiniMap.tsx` | 오른쪽 아래 미니맵. 위성사진 위에 코스와 지금 위치를 그린다. 화면이 좁으면 숨긴다 |
 | `src/scene/Avatar.tsx` | 캐릭터 종류에 따라 도형 아바타나 GLB 캐릭터를 그린다. GLB 캐릭터는 쉬기·걷기·공중·만세 동작을 섞고, 걷기는 걸은 거리에 맞춰 돌린다 |
 | `src/scene/Hiker.tsx` | 도형으로 만든 병맛 아바타 5종 |
-| `src/scene/TrekkingPole.ts` | 모든 아바타가 오른손에 쥐는 등산 스틱. GLB 캐릭터는 쉬는 자세 기준으로 손 뼈에 붙여 동작을 따라 움직인다 |
+| `src/scene/TrekkingPole.ts` | 모든 아바타가 양손에 쥐는 등산 스틱. GLB 캐릭터는 쉬는 자세 기준으로 손 뼈에 붙여 동작을 따라 움직인다 |
 | `scripts/prepare-avatars.mjs` | GLB 캐릭터 파일을 `public/models/avatars/` 에 준비한다. 아래 「GLB 캐릭터」 참고 |
 | `src/ui/Hud.tsx` | 코스 정보, 진행률, 정상 배지와 사진 창을 그린다 |
 
