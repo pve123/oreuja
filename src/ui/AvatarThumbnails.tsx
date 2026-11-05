@@ -2,7 +2,8 @@ import { useEffect, useRef } from 'react'
 import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { OrthographicCamera } from '@react-three/drei'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
-import { Hiker, type HikerHandle } from '../scene/Hiker'
+import { Avatar } from '../scene/Avatar'
+import type { HikerHandle } from '../scene/Hiker'
 
 const SIZE = 160 // 그림 한 장 크기(px)
 const FRAME_HEIGHT = 2.6 // 그림 한 장에 담을 높이(m)
@@ -19,6 +20,8 @@ function Studio() {
   useFrame(() => {
     if (useAvatarThumbs.getState().done) return
     handles.current.forEach((h) => h?.setCheering(true))
+    // GLB 캐릭터 파일을 다 받은 뒤부터 센다
+    if (!handles.current.every((h) => h?.ready())) return
     if (++frames.current < SETTLE_FRAMES) return
 
     const src = gl.domElement
@@ -39,7 +42,7 @@ function Studio() {
       <directionalLight position={[2, 4, 5]} intensity={2} />
       {AVATARS.map((a, i) => (
         <group key={a.kind} position={[(i - (AVATARS.length - 1) / 2) * SPACING, 0, 0]}>
-          <Hiker
+          <Avatar
             ref={(h) => {
               handles.current[i] = h
             }}
