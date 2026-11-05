@@ -1,4 +1,4 @@
-import { Suspense, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { sampleHeight, type Terrain, type Trail } from '../lib/data'
@@ -6,6 +6,8 @@ import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
 import { ringDepthMaterial, withOcclusionShrink } from '../lib/occlusion'
+import { makeLandmarkClear } from '../lib/landmarks'
+import { setObstacles } from '../lib/obstacles'
 import { DETAIL_VARIANTS, DetailTrees } from './DetailTrees'
 
 const COUNT = 30000
@@ -15,6 +17,8 @@ const TRAIL_CLEARANCE = 4 // 등산로 양옆 4m 는 비움
 const START_CLEARANCE = 30 // 출발점 둘레 30m 는 공터로 비워 첫 화면을 가리지 않게 함
 const TREE_LINE = 760 // 사진이 없을 때: 이보다 높으면 바위 지대라 나무 없음
 const PINE_SHARE = 0.3 // 소나무 비율. 나머지는 참나무 같은 둥근 활엽수
+/** 줄기 반지름(m). 도형 줄기 아래 굵기(0.32)에 나무 크기를 곱한다 */
+const TRUNK_RADIUS = 0.32
 /** 위성사진의 숲 색은 그늘이 섞여 어두워서 나무 색으로 쓸 때 이만큼 밝힌다 */
 const PHOTO_BRIGHTEN = 1.7
 
@@ -60,6 +64,7 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     if (!settled) return []
     const rand = seededRandom(42)
     const nearTrail = makeNearTrail(trail)
+    const nearLandmark = makeLandmarkClear(terrain, trail)
     const start = trail.points[0]
     const usePhoto = layers.length > 0
     const out: Tree[] = []
@@ -83,6 +88,7 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       const slope = Math.hypot(sampleHeight(terrain, x + 6, z) - y, sampleHeight(terrain, x, z + 6) - y) / 6
       if (slope > 1.3) continue
       if (nearTrail(x, z, TRAIL_CLEARANCE)) continue
+      if (nearLandmark(x, z)) continue
       if ((x - start.x) ** 2 + (z - start.z) ** 2 < START_CLEARANCE ** 2) continue
 
       const color = new THREE.Color()
@@ -105,6 +111,20 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     }
     return out
   }, [terrain, trail, settled, layers])
+
+  // 줄기는 지나갈 수 없다. 수관은 머리 위라 막지 않는다
+  useEffect(() => {
+    const scale = new THREE.Vector3()
+    setObstacles(
+      'trees',
+      trees.map((t) => {
+        scale.setFromMatrixColumn(t.matrix, 0)
+        const e = t.matrix.elements
+        return { x: e[12], z: e[14], r: TRUNK_RADIUS * scale.length(), height: Infinity }
+      }),
+    )
+    return () => setObstacles('trees', [])
+  }, [trees])
 
   const shapes = useMemo(
     () => ({
