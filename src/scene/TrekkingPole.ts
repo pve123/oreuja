@@ -35,12 +35,14 @@ const _m = new THREE.Matrix4()
  *
  * - grip 이 'bone' 이면 뼈 원점을 손 위치로 본다 (KayKit 의 handslot).
  * - 'tip' 이면 그 뼈에 붙은 꼭짓점 가운데 뼈에서 가장 먼 점을 손끝으로 본다 (손 뼈가 없는 Kenney).
- * root 는 부모가 없고 크기가 1 인 상태여야 한다. 붙이면 true.
+ * root 는 부모가 없고 크기가 1 인 상태여야 한다. 붙였거나 이미 붙어 있으면 true.
  */
 export function attachTrekkingPole(root: THREE.Object3D, boneName: string, grip: 'bone' | 'tip', metersPerUnit: number) {
   root.updateMatrixWorld(true)
   const bone = root.getObjectByName(boneName) as THREE.Bone | undefined
   if (!bone) return false
+  // 이미 쥐고 있으면 그대로 둔다 (StrictMode 가 useMemo 를 두 번 부를 때)
+  if (bone.children.some((c) => c.name === 'trekking-pole')) return true
   const bonePos = new THREE.Vector3().setFromMatrixPosition(bone.matrixWorld)
 
   const hand = bonePos.clone()
