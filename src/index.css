@@ -606,7 +606,8 @@ canvas {
   background: var(--panel-bg);
   backdrop-filter: blur(8px);
   box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
-  max-width: calc(100vw - 32px);
+  /* 왼쪽 코스 패널(300px)과 겹치지 않게. 칸이 모자라면 옆으로 밀어 본다 */
+  max-width: calc(100vw - 32px - 300px - 12px);
   overflow-x: auto;
 }
 .avatar-chip {
@@ -646,6 +647,7 @@ canvas {
 @media (max-width: 760px) {
   .avatar-bar {
     left: 16px;
+    max-width: calc(100vw - 32px);
   }
   .course {
     top: 72px;
