@@ -1,11 +1,12 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
-import { withOcclusionShrink } from '../lib/occlusion'
+import { ringDepthMaterial, withOcclusionShrink } from '../lib/occlusion'
+import { DETAIL_VARIANTS, DetailTrees } from './DetailTrees'
 
 const COUNT = 30000
 const NEAR_TRAIL_SHARE = 0.45 // 절반 가까이는 등산로 250m 안에 심어 걸으며 보이게 한다
@@ -17,7 +18,8 @@ const PINE_SHARE = 0.3 // 소나무 비율. 나머지는 참나무 같은 둥근
 /** 위성사진의 숲 색은 그늘이 섞여 어두워서 나무 색으로 쓸 때 이만큼 밝힌다 */
 const PHOTO_BRIGHTEN = 1.7
 
-type Tree = { matrix: THREE.Matrix4; color: THREE.Color; pine: boolean }
+/** 나무 한 그루. variant 는 가까이서 쓸 정밀 모델 번호 */
+export type Tree = { matrix: THREE.Matrix4; color: THREE.Color; pine: boolean; variant: number }
 
 /** 꼭짓점을 조금씩 흔들어 울퉁불퉁한 둥근 수관을 만든다 */
 function broadleafCanopy() {
@@ -98,7 +100,8 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       const s = 0.7 + rand() * 0.7
       q.setFromAxisAngle(up, rand() * Math.PI * 2)
       const scale = new THREE.Vector3(s * (0.85 + rand() * 0.3), s * (0.85 + rand() * 0.4), s * (0.85 + rand() * 0.3))
-      out.push({ matrix: new THREE.Matrix4().compose(new THREE.Vector3(x, y - 0.3, z), q, scale), color, pine })
+      const variant = Math.floor(rand() * DETAIL_VARIANTS)
+      out.push({ matrix: new THREE.Matrix4().compose(new THREE.Vector3(x, y - 0.3, z), q, scale), color, pine, variant })
     }
     return out
   }, [terrain, trail, settled, layers])
@@ -113,10 +116,12 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   )
 
   // 카메라와 아바타 사이에 들어온 나무는 통째로 줄여 아바타를 가리지 않게 한다 (판정 중심은 수관 가운데)
+  // 아바타 가까이는 정밀 모델(DetailTrees)이 그리므로 도형 나무는 그 안에서 그림자까지 숨긴다
   const materials = useMemo(
     () => ({
-      canopy: withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 4),
-      trunk: withOcclusionShrink(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 }), 4),
+      canopy: withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 4, { ring: 'far' }),
+      trunk: withOcclusionShrink(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 }), 4, { ring: 'far' }),
+      depth: ringDepthMaterial(4, 'far'),
     }),
     [],
   )
@@ -144,9 +149,13 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
   return (
     <group>
-      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, COUNT]} castShadow />
-      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, COUNT]} castShadow />
+      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, COUNT]} castShadow customDepthMaterial={materials.depth} />
+      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, COUNT]} castShadow customDepthMaterial={materials.depth} />
       <instancedMesh ref={trunks} args={[shapes.trunk, materials.trunk, COUNT]} />
+      {/* 정밀 모델은 받는 동안 도형 나무가 그대로 보인다 */}
+      <Suspense fallback={null}>
+        <DetailTrees trees={trees} />
+      </Suspense>
     </group>
   )
 }
