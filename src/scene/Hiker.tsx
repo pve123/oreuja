@@ -4,6 +4,7 @@ import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { seededRandom } from '../lib/random'
 import type { AvatarKind } from '../lib/avatars'
+import { makeTrekkingPole } from './TrekkingPole'
 
 export type HikerHandle = {
   group: THREE.Group
@@ -208,7 +209,7 @@ function rigOf(kind: AvatarKind, potato: THREE.BufferGeometry): Rig {
 }
 
 /** 관절(엉덩이·어깨)에서 아래로 늘어진 팔다리 */
-function Limb({ limbRef, x, y, len, r, color, foot, footColor }: {
+function Limb({ limbRef, x, y, len, r, color, foot, footColor, children }: {
   limbRef: RefObject<THREE.Group | null>
   x: number
   y: number
@@ -217,6 +218,8 @@ function Limb({ limbRef, x, y, len, r, color, foot, footColor }: {
   color: string
   foot?: Rig['foot']
   footColor?: string
+  /** 손(팔 끝)에 쥐어 줄 것 */
+  children?: ReactNode
 }) {
   return (
     <group ref={limbRef} position={[x, y, 0]}>
@@ -236,6 +239,7 @@ function Limb({ limbRef, x, y, len, r, color, foot, footColor }: {
           {std(footColor ?? '#ff9f1c')}
         </mesh>
       )}
+      {children && <group position={[0, -len, 0]}>{children}</group>}
     </group>
   )
 }
@@ -254,6 +258,12 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
   const state = useRef({ phase: 0, swing: 0, cheering: false, airborne: false, time: 0 })
   const potato = useMemo(() => potatoGeometry(), [])
   const rig = useMemo(() => rigOf(kind, potato), [kind, potato])
+  // 오른손(캐릭터 기준, -x 쪽)에 쥔 등산 스틱. 손잡이가 주먹 위로 조금 나오고 끝은 땅에 닿는다
+  const pole = useMemo(() => {
+    const p = makeTrekkingPole(rig.shoulderY - rig.armLen + 0.05)
+    p.position.y = 0.05
+    return p
+  }, [rig])
 
   useImperativeHandle(ref, () => ({
     group: group.current,
@@ -314,7 +324,9 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
       <Limb limbRef={legR} x={rig.legX} y={rig.hipY} len={rig.legLen} r={rig.legR} color={rig.legColor} foot={rig.foot} footColor={rig.footColor} />
       <group ref={upper}>
         {rig.body}
-        <Limb limbRef={armL} x={-rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor} />
+        <Limb limbRef={armL} x={-rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor}>
+          <primitive object={pole} />
+        </Limb>
         <Limb limbRef={armR} x={rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor} />
         {rig.eyes &&
           [-1, 1].map((side, i) => (
