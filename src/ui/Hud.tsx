@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { estimateMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
+import { MiniMap } from './MiniMap'
 
 function formatMinutes(min: number) {
   const h = Math.floor(min / 60)
@@ -159,6 +160,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 
       <ArrivalToast trail={trail} />
       <ReturnNotice />
+      <MiniMap trail={trail} trails={trails} />
       <AvatarBar />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />

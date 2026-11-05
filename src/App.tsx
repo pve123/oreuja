@@ -7,6 +7,7 @@ import { World } from './scene/World'
 import { MAPBOX_TOKEN } from './lib/satellite'
 import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
+import { SoundControls } from './ui/SoundControls'
 
 export default function App() {
   const [data, setData] = useState<{ terrain: Terrain; trails: Trail[] } | null>(null)
@@ -41,9 +42,11 @@ export default function App() {
       </Canvas>
       <Hud trail={trail} trails={data.trails} />
       <AvatarThumbnails />
+      <SoundControls />
       <SummitModal trail={trail} />
       <div className="attribution">
-        지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 국토지리정보원 수치지형도, AWS Terrain Tiles
+        지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 국토지리정보원 수치지형도, AWS Terrain Tiles · 나무{' '}
+        <a href="https://quaternius.com">Quaternius</a>
         {MAPBOX_TOKEN && (
           <>
             {' · 위성사진 © '}
