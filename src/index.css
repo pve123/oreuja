@@ -120,6 +120,11 @@ canvas {
   align-items: flex-end;
   gap: 8px;
   min-width: 0;
+  /* 묶음 상자는 패널 사이 빈 곳까지 덮으므로, 패널 밖에서는 마우스가 3D 화면에 닿게 한다 */
+  pointer-events: none;
+}
+.side-stack > * {
+  pointer-events: auto;
 }
 .side-panel {
   max-width: 100%;
