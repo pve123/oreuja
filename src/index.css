@@ -45,9 +45,27 @@ canvas {
   z-index: 20;
 }
 
-.course {
+/* 위쪽 패널 줄: 왼쪽 코스, 오른쪽 캐릭터·도움말. 빈 곳은 3D 화면을 그대로 누를 수 있다 */
+.hud-top {
+  position: fixed;
   top: 16px;
   left: 16px;
+  right: 16px;
+  z-index: 21;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  pointer-events: none;
+}
+.hud-top > * {
+  pointer-events: auto;
+}
+.hud-top .panel {
+  position: relative;
+}
+.course {
+  flex: none;
   width: min(300px, calc(100vw - 32px));
   max-height: calc(100vh - 200px);
   overflow-y: auto;
@@ -59,9 +77,154 @@ canvas {
 }
 .course-head {
   display: flex;
-  justify-content: space-between;
   align-items: center;
   gap: 8px;
+}
+.course-head .eyebrow {
+  margin-right: auto;
+}
+
+/* 접기·펼치기 */
+.fold-button {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  margin: -4px -6px -4px 0;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+}
+.fold-button:hover,
+.side-head:hover .fold-icon {
+  color: var(--navy);
+}
+.fold-button:hover {
+  background: rgba(29, 53, 87, 0.08);
+}
+.fold-icon {
+  flex: none;
+  transition: transform 0.15s;
+}
+[aria-expanded='false'] > .fold-icon,
+[aria-expanded='false'].fold-button .fold-icon {
+  transform: rotate(-90deg);
+}
+
+/* 오른쪽 위 패널 묶음 (캐릭터, 도움말) */
+.side-stack {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+.side-panel {
+  max-width: 100%;
+  padding: 8px 10px;
+}
+.side-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 2px 4px;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--muted);
+  text-align: left;
+  cursor: pointer;
+}
+.side-title {
+  font-size: 13px;
+  font-weight: 800;
+  color: var(--navy);
+}
+.side-sub {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  font-size: 12px;
+}
+.side-body {
+  margin-top: 8px;
+}
+.avatar-mini {
+  width: 22px;
+  height: 22px;
+  margin: -4px 0;
+}
+
+/* 도움말: 왼쪽에 누를 키, 오른쪽에 하는 일 */
+.help-panel {
+  width: 300px;
+}
+.help-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0 4px 4px;
+}
+.help-row {
+  display: grid;
+  grid-template-columns: 112px 1fr;
+  align-items: start;
+  gap: 10px;
+}
+.help-row dt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.help-keys {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.help-or {
+  margin-right: 1px;
+  font-size: 11px;
+  color: var(--muted);
+}
+kbd {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border: 1px solid rgba(29, 53, 87, 0.22);
+  border-bottom-width: 2px;
+  border-radius: 6px;
+  background: #fff;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  color: var(--navy);
+}
+.help-row dd {
+  margin: 0;
+  padding-top: 1px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.help-row small {
+  display: block;
+  margin-top: 1px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--muted);
+}
+/* 터치 화면에는 키보드가 없고, 좁은 화면은 위쪽 자리가 모자라다 */
+@media (hover: none), (max-width: 760px) {
+  .help-panel {
+    display: none;
+  }
 }
 .link-button {
   border: 0;
@@ -245,11 +408,7 @@ canvas {
 .tick.passed {
   background: #fff;
 }
-.hint {
-  font-size: 12px;
-  color: var(--muted);
-  text-align: center;
-}
+
 
 .hold-button {
   position: fixed;
@@ -593,22 +752,13 @@ canvas {
   pointer-events: none;
 }
 
-/* 캐릭터 고르기: 오른쪽 위에 늘 보이는 칩 줄 */
+/* 캐릭터 고르기 칩 줄. 칸이 모자라면 옆으로 밀어 본다 */
 .avatar-bar {
-  position: fixed;
-  top: 16px;
-  right: 16px;
-  z-index: 21;
   display: flex;
   gap: 6px;
-  padding: 6px;
-  border-radius: 14px;
-  background: var(--panel-bg);
-  backdrop-filter: blur(8px);
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.15);
-  /* 왼쪽 코스 패널(300px)과 겹치지 않게. 칸이 모자라면 옆으로 밀어 본다 */
-  max-width: calc(100vw - 32px - 300px - 12px);
+  max-width: 100%;
   overflow-x: auto;
+  scrollbar-width: thin;
 }
 .avatar-chip {
   flex: none;
@@ -643,21 +793,27 @@ canvas {
   width: 52px;
   height: 52px;
 }
-/* 좁은 화면: 칩 줄을 맨 위 전체 폭으로 두고 코스 패널을 그 아래로 내린다 */
+/* 좁은 화면: 캐릭터·도움말을 위에, 코스 패널을 그 아래 쌓는다. 오른쪽 위 모서리는 소리 버튼 자리 */
 @media (max-width: 760px) {
-  .avatar-bar {
-    left: 16px;
-    max-width: calc(100vw - 32px);
+  .hud-top {
+    right: 64px;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .side-stack {
+    order: -1;
+    align-items: stretch;
   }
   .course {
-    top: 72px;
-    width: calc(100vw - 32px - 52px);
+    width: auto;
+    max-height: calc(100vh - 340px);
   }
   .sound-toggle {
     left: auto;
     right: 16px;
     bottom: auto;
-    top: 72px;
+    top: 16px;
   }
 }
 
