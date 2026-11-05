@@ -11,7 +11,8 @@ import { Forest } from './Forest'
 import { Signposts } from './Signposts'
 import { TrailDetails } from './TrailDetails'
 import { Rocks } from './Rocks'
-import { Hiker, type HikerHandle } from './Hiker'
+import { Avatar } from './Avatar'
+import type { HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
 import { occlusionUniforms } from '../lib/occlusion'
 import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
@@ -304,7 +305,7 @@ export function World({ terrain, trail }: Props) {
       <TrailDetails terrain={terrain} trail={trail} />
       <SummitFlag terrain={terrain} trail={trail} />
       <Signposts trail={trail} />
-      <Hiker ref={hiker} kind={avatar} />
+      <Avatar ref={hiker} kind={avatar} />
       <Peers terrain={terrain} trail={trail} />
       <OrbitControls
         ref={controls}
