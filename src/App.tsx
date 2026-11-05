@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useProgress } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
@@ -9,6 +10,13 @@ import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 import { SoundControls } from './ui/SoundControls'
 import { startNet } from './lib/net'
+import { failSplash, hideSplash, setSplash } from './lib/splash'
+
+/** 첫 화면 진행 막대 몫: 지형 데이터 0.05~0.6, 3D 모델·텍스처 0.6~0.92, 장면 준비 나머지 */
+const DATA_END = 0.6
+const ASSETS_END = 0.92
+/** 장면 준비 신호가 끝내 오지 않아도 이 시간(ms)이 지나면 첫 화면을 걷는다 */
+const SPLASH_TIMEOUT = 25000
 
 export default function App() {
   const [data, setData] = useState<{ terrain: Terrain; trails: Trail[] } | null>(null)
@@ -21,16 +29,26 @@ export default function App() {
   useEffect(() => {
     // 개발 중에는 ?course=bukhansan-sanseong 처럼 코스를 골라 시작할 수 있다
     const debugCourse = import.meta.env.DEV ? new URLSearchParams(location.search).get('course') : null
-    loadData()
+    setSplash('지형을 펼치는 중', 0.05)
+    loadData((p) => setSplash('지형을 펼치는 중', 0.05 + p * (DATA_END - 0.05)))
       .then((d) => {
         if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse })
+        setSplash('숲과 길을 그리는 중', DATA_END)
         setData(d)
       })
-      .catch((e) => setError(String(e)))
+      .catch((e) => {
+        console.error(e)
+        setError(String(e))
+      })
   }, [])
 
-  if (error) return <div className="loading">데이터를 불러오지 못했어요: {error}</div>
-  if (!data) return <div className="loading">북한산을 불러오는 중…</div>
+  // 실패하면 첫 화면에 안내와 다시 시도 버튼을 띄운다 (원문 오류는 콘솔에만)
+  useEffect(() => {
+    if (error) failSplash('산길을 불러오지 못했어요. 연결을 확인하고 다시 시도해 주세요')
+  }, [error])
+
+  // 첫 화면(스플래시)은 데이터를 받는 동안 index.html 의 것이 그대로 보인다
+  if (!data) return null
   const trail = data.trails.find((t) => t.data.id === courseId) ?? data.trails[0]
 
   return (
@@ -44,6 +62,7 @@ export default function App() {
       >
         <World terrain={data.terrain} trail={trail} />
       </Canvas>
+      <SplashProgress />
       <Hud trail={trail} trails={data.trails} />
       <AvatarThumbnails />
       <SoundControls />
@@ -60,4 +79,26 @@ export default function App() {
       </div>
     </>
   )
+}
+
+/** 3D 모델·텍스처를 받는 정도를 첫 화면 진행 막대에 이어 보여 주고, 장면이 그려지면 첫 화면을 걷는다 */
+function SplashProgress() {
+  const { active, progress } = useProgress()
+  const ready = useGame((s) => s.sceneReady)
+
+  useEffect(() => {
+    // 모델 받기가 시작되기 전에도 active 가 잠깐 false 라, 다 받았을 때(100%)만 다음 단계 문구로 넘긴다
+    const assetsDone = !active && progress >= 100
+    if (!ready) setSplash(assetsDone ? '출발 준비 중' : '숲과 길을 그리는 중', DATA_END + (progress / 100) * (ASSETS_END - DATA_END))
+  }, [active, progress, ready])
+
+  useEffect(() => {
+    if (ready && !active) hideSplash()
+  }, [ready, active])
+
+  useEffect(() => {
+    const t = setTimeout(hideSplash, SPLASH_TIMEOUT)
+    return () => clearTimeout(t)
+  }, [])
+  return null
 }
