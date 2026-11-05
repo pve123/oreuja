@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { estimateMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
@@ -23,12 +23,10 @@ function formatDuration(sec: number) {
 function useKeyboard() {
   useEffect(() => {
     const set = (e: KeyboardEvent, on: boolean) => {
-      if (e.code === 'KeyW' || e.code === 'ArrowUp') input.forward = on
-      else if (e.code === 'KeyS' || e.code === 'ArrowDown') input.backward = on
-      else if (e.code === 'KeyA' || e.code === 'ArrowLeft') input.left = on
-      else if (e.code === 'KeyD' || e.code === 'ArrowRight') input.right = on
-      else if (e.code === 'KeyQ') input.turnLeft = on
-      else if (e.code === 'KeyE') input.turnRight = on
+      if (e.code === 'ArrowUp') input.forward = on
+      else if (e.code === 'ArrowDown') input.backward = on
+      else if (e.code === 'ArrowLeft') input.left = on
+      else if (e.code === 'ArrowRight') input.right = on
       else if (e.key === 'Shift') input.run = on
     }
     const down = (e: KeyboardEvent) => {
@@ -50,8 +48,6 @@ function useKeyboard() {
         right: false,
         run: false,
         jump: false,
-        turnLeft: false,
-        turnRight: false,
       })
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
@@ -67,6 +63,8 @@ function useKeyboard() {
 export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   useKeyboard()
   const [picking, setPicking] = useState(false)
+  // 좁은 화면에서는 코스 정보가 3D 화면을 많이 가려서 처음에는 접어 둔다
+  const [courseFolded, toggleCourse] = useFolded('course', true)
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
   const sections = useMemo(() => trail.sections(), [trail])
@@ -83,54 +81,66 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 
   return (
     <>
-      <div className="panel course">
-        <div className="course-head">
-          <div className="eyebrow">
-            {trail.data.mountain} · {trail.data.level}
+      {/* 위쪽 패널들: 왼쪽은 코스, 오른쪽은 캐릭터와 도움말. 좁은 화면에서는 위아래로 쌓인다 */}
+      <div className="hud-top">
+        <section className="panel course">
+          <div className="course-head">
+            <div className="eyebrow">
+              {trail.data.mountain} · {trail.data.level}
+            </div>
+            <button className="link-button" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+              {picking ? '닫기' : '코스 바꾸기'}
+            </button>
+            <FoldButton label="코스 정보" collapsed={courseFolded} onToggle={toggleCourse} />
           </div>
-          <button className="link-button" aria-expanded={picking} onClick={() => setPicking(!picking)}>
-            {picking ? '닫기' : '코스 바꾸기'}
-          </button>
+          {picking && (
+            <CoursePicker
+              trails={trails}
+              current={trail}
+              onPick={(id) => {
+                setPicking(false)
+                if (id !== trail.data.id) useGame.getState().setCourse(id)
+              }}
+            />
+          )}
+          <h1>{trail.data.name}</h1>
+          {!courseFolded && (
+            <>
+              <div className="course-meta">
+                {trail.data.start} → {trail.data.summit}
+              </div>
+              <dl className="stats">
+                <div>
+                  <dt>거리</dt>
+                  <dd>{(trail.data.length / 1000).toFixed(2)}km</dd>
+                </div>
+                <div>
+                  <dt>오르막</dt>
+                  <dd>{trail.data.elevationGain}m</dd>
+                </div>
+                <div>
+                  <dt>실제 예상</dt>
+                  <dd>{formatMinutes(realMinutes)}</dd>
+                </div>
+              </dl>
+              {/* 실제로 걸을 때 구간별 거리와 예상 시간 (코스 예습) */}
+              <ol className="sections">
+                {sections.map((sec, i) => (
+                  <li key={sec.to} className={i < current || current === -1 ? 'done' : i === current ? 'now' : ''}>
+                    <span className="sec-name">{sec.to}</span>
+                    <span className="sec-meta">
+                      {formatDistance(sec.length)} · 약 {formatMinutes(sec.minutes)}
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </section>
+        <div className="side-stack">
+          <AvatarPanel />
+          <HelpPanel />
         </div>
-        {picking && (
-          <CoursePicker
-            trails={trails}
-            current={trail}
-            onPick={(id) => {
-              setPicking(false)
-              if (id !== trail.data.id) useGame.getState().setCourse(id)
-            }}
-          />
-        )}
-        <h1>{trail.data.name}</h1>
-        <div className="course-meta">
-          {trail.data.start} → {trail.data.summit}
-        </div>
-        <dl className="stats">
-          <div>
-            <dt>거리</dt>
-            <dd>{(trail.data.length / 1000).toFixed(2)}km</dd>
-          </div>
-          <div>
-            <dt>오르막</dt>
-            <dd>{trail.data.elevationGain}m</dd>
-          </div>
-          <div>
-            <dt>실제 예상</dt>
-            <dd>{formatMinutes(realMinutes)}</dd>
-          </div>
-        </dl>
-        {/* 실제로 걸을 때 구간별 거리와 예상 시간 (코스 예습) */}
-        <ol className="sections">
-          {sections.map((sec, i) => (
-            <li key={sec.to} className={i < current || current === -1 ? 'done' : i === current ? 'now' : ''}>
-              <span className="sec-name">{sec.to}</span>
-              <span className="sec-meta">
-                {formatDistance(sec.length)} · 약 {formatMinutes(sec.minutes)}
-              </span>
-            </li>
-          ))}
-        </ol>
       </div>
 
       <div className="panel progress">
@@ -157,14 +167,12 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
           <span>정상까지 {formatDistance(remaining)}</span>
           <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · Q/E 회전 · 1~3 인사 · 휠 확대</div>
       </div>
 
       <ArrivalToast trail={trail} />
       <ReturnNotice />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
-      <AvatarBar />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
       <HoldButton label="◀" className="side left" onHold={(on) => (input.left = on)} />
@@ -203,28 +211,137 @@ function CoursePicker({ trails, current, onPick }: { trails: Trail[]; current: T
   )
 }
 
-/** 위쪽에 늘 보이는 캐릭터 목록. 캐릭터 모습 그림을 누르면 바로 바뀐다 (그림을 만들기 전에는 이름) */
-function AvatarBar() {
+const FOLD_KEY = 'hiking-metaverse:folded:'
+
+/** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 foldOnNarrow 에 따라 좁은 화면에서 접어 둔다 */
+function useFolded(name: string, foldOnNarrow = false): [boolean, () => void] {
+  const [folded, setFolded] = useState(() => {
+    try {
+      const saved = localStorage.getItem(FOLD_KEY + name)
+      if (saved !== null) return saved === '1'
+    } catch {
+      // 저장소를 못 쓰는 환경이면 기본값
+    }
+    return foldOnNarrow && window.matchMedia('(max-width: 760px)').matches
+  })
+  const toggle = () =>
+    setFolded((f) => {
+      try {
+        localStorage.setItem(FOLD_KEY + name, f ? '0' : '1')
+      } catch {
+        // 저장소를 못 쓰는 환경이면 기억하지 않는다
+      }
+      return !f
+    })
+  return [folded, toggle]
+}
+
+function FoldIcon() {
+  return (
+    <svg className="fold-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+      <path d="M3 5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  )
+}
+
+/** 접기·펼치기 단추 (코스 패널처럼 머리줄에 다른 단추가 있을 때) */
+function FoldButton({ label, collapsed, onToggle }: { label: string; collapsed: boolean; onToggle: () => void }) {
+  return (
+    <button className="fold-button" aria-expanded={!collapsed} aria-label={`${label} ${collapsed ? '펼치기' : '접기'}`} onClick={onToggle}>
+      <FoldIcon />
+    </button>
+  )
+}
+
+/** 오른쪽 위 패널. 머리줄 전체를 눌러 접고 편다 */
+function SidePanel({ name, title, sub, className, children }: { name: string; title: string; sub?: ReactNode; className?: string; children: ReactNode }) {
+  const [folded, toggle] = useFolded(name)
+  return (
+    <section className={`panel side-panel ${className ?? ''}`}>
+      <button className="side-head" aria-expanded={!folded} onClick={toggle}>
+        <span className="side-title">{title}</span>
+        {sub && <span className="side-sub">{sub}</span>}
+        <FoldIcon />
+      </button>
+      {!folded && <div className="side-body">{children}</div>}
+    </section>
+  )
+}
+
+/** 캐릭터 고르기. 모습 그림을 누르면 바로 바뀐다 (그림을 만들기 전에는 이름) */
+function AvatarPanel() {
   const avatar = useGame((s) => s.avatar)
   const setAvatar = useGame((s) => s.setAvatar)
   const thumbs = useAvatarThumbs((s) => s.thumbs)
+  const current = AVATARS.find((a) => a.kind === avatar)
 
   return (
-    <div className="avatar-bar" role="radiogroup" aria-label="캐릭터 고르기">
-      {AVATARS.map((a) => (
-        <button
-          key={a.kind}
-          role="radio"
-          aria-checked={a.kind === avatar}
-          className={a.kind === avatar ? 'avatar-chip selected' : 'avatar-chip'}
-          title={`${a.name} · ${a.desc}`}
-          aria-label={a.name}
-          onClick={() => setAvatar(a.kind)}
-        >
-          {thumbs[a.kind] ? <img src={thumbs[a.kind]} alt="" className="avatar-thumb" /> : a.name}
-        </button>
-      ))}
-    </div>
+    <SidePanel
+      name="avatar"
+      title="캐릭터"
+      className="avatar-panel"
+      sub={
+        <>
+          {thumbs[avatar] && <img src={thumbs[avatar]} alt="" className="avatar-mini" />}
+          {current?.name}
+        </>
+      }
+    >
+      <div className="avatar-bar" role="radiogroup" aria-label="캐릭터 고르기">
+        {AVATARS.map((a) => (
+          <button
+            key={a.kind}
+            role="radio"
+            aria-checked={a.kind === avatar}
+            className={a.kind === avatar ? 'avatar-chip selected' : 'avatar-chip'}
+            title={`${a.name} · ${a.desc}`}
+            aria-label={a.name}
+            onClick={() => setAvatar(a.kind)}
+          >
+            {thumbs[a.kind] ? <img src={thumbs[a.kind]} alt="" className="avatar-thumb" /> : a.name}
+          </button>
+        ))}
+      </div>
+    </SidePanel>
+  )
+}
+
+/** 키보드 조작 도움말 [누를 키 묶음, 설명, 덧붙임] */
+const HELP: [string[][], string, string?][] = [
+  [[['↑']], '앞으로 걷기', '보고 있는 쪽으로 걸어요'],
+  [[['←', '→']], '몸 돌리기', '↑ 와 같이 누르면 걸으면서 돌아요'],
+  [[['↓']], '뒤로 물러나기'],
+  [[['Shift']], '빨리 걷기', '걷는 키와 같이 눌러요'],
+  [[['Space']], '점프'],
+  [[['휠']], '확대·축소', '마우스 휠을 굴려요'],
+  [[['1', '2', '3']], '인사하기', '👋 🙌 ❤️ 가 머리 위에 떠요'],
+  [[['길 밖']], '자유롭게 걷기', '등산로에서 30m 넘게 벗어나면 길 위로 돌아와요'],
+]
+
+function HelpPanel() {
+  return (
+    <SidePanel name="help" title="도움말" sub="키보드 조작" className="help-panel">
+      <dl className="help-list">
+        {HELP.map(([groups, label, note]) => (
+          <div key={label} className="help-row">
+            <dt>
+              {groups.map((keys, gi) => (
+                <span key={gi} className="help-keys">
+                  {gi > 0 && <span className="help-or">또는</span>}
+                  {keys.map((k) => (
+                    <kbd key={k}>{k}</kbd>
+                  ))}
+                </span>
+              ))}
+            </dt>
+            <dd>
+              {label}
+              {note && <small>{note}</small>}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </SidePanel>
   )
 }
 
