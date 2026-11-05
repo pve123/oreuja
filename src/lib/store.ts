@@ -127,7 +127,4 @@ export const input = {
   right: false,
   run: false,
   jump: false,
-  /** Q/E 키 시점 회전 */
-  turnLeft: false,
-  turnRight: false,
 }
