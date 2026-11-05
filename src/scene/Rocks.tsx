@@ -1,10 +1,12 @@
-import { useLayoutEffect, useMemo, useRef } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
 import { withOcclusionShrink } from '../lib/occlusion'
+import { makeLandmarkClear } from '../lib/landmarks'
+import { setObstacles, type Obstacle } from '../lib/obstacles'
 import { PHOTO_CAMERA_BACK, distanceToSegmentXZ, summitVista } from '../lib/summit'
 
 const COUNT = 5000
@@ -13,6 +15,10 @@ const NEAR_TRAIL_RANGE = 150
 const SUMMIT_BOULDERS = 14
 const TRAIL_CLEARANCE = 2.5 // 등산로 양옆 2.5m 에는 바위를 두지 않는다
 const HIGH_GROUND = 620 // 이보다 높으면 화강암이 드러난 곳이 많다(m)
+/** 이보다 낮게 솟은 바위는 막지 않고 넘어간다(m). 발목 높이 돌에 걸려 멈추면 답답하다 */
+const STEP_OVER = 0.4
+/** 바위가 막더라도 등산로 가운데에서 이만큼은 비워 길이 막히지 않게 한다(m) */
+const TRAIL_KEEP = 1.1
 
 /** 바위가 드러난 곳의 화강암(위성사진이 있으면 사진에서 바위인 곳), 백운대 정상 둘레의 큰 바위 */
 export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
@@ -41,14 +47,17 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   // 카메라와 아바타 사이에 들어온 바위는 통째로 줄여 아바타를 가리지 않게 한다
   const material = useMemo(() => withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), 0), [])
 
-  const instances = useMemo(() => {
-    if (!settled) return []
+  const { instances, obstacles } = useMemo(() => {
+    if (!settled) return { instances: [], obstacles: [] }
     const rand = seededRandom(99)
     const nearTrail = makeNearTrail(trail)
+    const nearLandmark = makeLandmarkClear(terrain, trail)
     const usePhoto = layers.length > 0
 
     const out: { matrix: THREE.Matrix4; color: THREE.Color }[] = []
+    const obstacles: Obstacle[] = []
     const add = (x: number, z: number, size: number) => {
+      if (nearLandmark(x, z)) return false
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rand() * 0.4, rand() * Math.PI * 2, rand() * 0.4))
       const s = new THREE.Vector3(size * (0.8 + rand() * 0.6), size * (0.6 + rand() * 0.6), size * (0.8 + rand() * 0.6))
       // 바닥을 살짝 묻어 떠 보이지 않게
@@ -60,6 +69,14 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
         color.lerp(new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace), 0.7)
       }
       out.push({ matrix: new THREE.Matrix4().compose(p, q, s), color })
+      // 땅 위로 솟은 높이: 도형 꼭대기(납작하게 0.65, 꼭짓점을 최대 1.2배)에서 묻은 만큼 뺀다
+      const height = s.y * 0.65 * 1.2 - size * 0.25
+      if (height > STEP_OVER) {
+        let r = 0.85 * Math.max(s.x, s.z)
+        while (r > 0.3 && nearTrail(x, z, r + TRAIL_KEEP)) r *= 0.8
+        obstacles.push({ x, z, r, height })
+      }
+      return true
     }
 
     // 1) 백운대 정상 둘레의 큰 바위. 길 쪽과 기념사진 카메라와 아바타 사이는 비운다
@@ -74,8 +91,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       const z = top.z + Math.cos(a) * r
       if (nearTrail(x, z, 3.5)) continue
       if (distanceToSegmentXZ(x, z, top, photoCamera) < 6) continue
-      add(x, z, 2.5 + rand() * 3)
-      placed++
+      if (add(x, z, 2.5 + rand() * 3)) placed++
     }
 
     // 2) 바위가 드러난 곳에 흩어진 바위. 사진이 있으면 사진에서 바위인 곳에만 둔다
@@ -102,8 +118,13 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       }
       add(x, z, 0.4 + rand() * rand() * 3)
     }
-    return out
+    return { instances: out, obstacles }
   }, [terrain, trail, settled, layers])
+
+  useEffect(() => {
+    setObstacles('rocks', obstacles)
+    return () => setObstacles('rocks', [])
+  }, [obstacles])
 
   useLayoutEffect(() => {
     instances.forEach(({ matrix, color }, i) => {
