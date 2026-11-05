@@ -17,6 +17,8 @@ import { occlusionUniforms } from '../lib/occlusion'
 import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
 import { AVATARS, type AvatarKind } from '../lib/avatars'
 import { playJump, playStep, setAmbience, type Surface } from '../lib/sound'
+import { localPlayer } from '../lib/net'
+import { Peers } from './Peers'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
@@ -206,6 +208,16 @@ export function World({ terrain, trail }: Props) {
     hiker.current.group.rotation.y = heading + facing.current
     hiker.current.setCheering(game.mode !== 'hiking')
     hiker.current.setAirborne(j.height > 0)
+    // 같이하기 서버로 보낼 내 상태
+    Object.assign(localPlayer, {
+      course: trail.data.id,
+      avatar: game.avatar,
+      distance,
+      offset,
+      facing: facing.current,
+      jump: j.height,
+      mode: game.mode,
+    })
 
     // 산속 소리: 1초에 한 번, 높이 올라갈수록 바람이 세지고 새소리는 줄어든다
     const now0 = performance.now()
@@ -293,6 +305,7 @@ export function World({ terrain, trail }: Props) {
       <SummitFlag terrain={terrain} trail={trail} />
       <Signposts trail={trail} />
       <Hiker ref={hiker} kind={avatar} />
+      <Peers terrain={terrain} trail={trail} />
       <OrbitControls
         ref={controls}
         makeDefault

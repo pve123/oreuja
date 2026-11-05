@@ -3,6 +3,7 @@ import { estimateMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { MiniMap } from './MiniMap'
+import { TogetherPanel } from './TogetherPanel'
 
 function formatMinutes(min: number) {
   const h = Math.floor(min / 60)
@@ -31,6 +32,7 @@ function useKeyboard() {
       else if (e.key === 'Shift') input.run = on
     }
     const down = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement) return // 닉네임을 고치는 중
       if (e.code === 'Space') {
         // 페이지 스크롤이나 포커스된 버튼 누름을 막고, 꾹 눌러도 한 번만 뛴다
         e.preventDefault()
@@ -155,12 +157,13 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
           <span>정상까지 {formatDistance(remaining)}</span>
           <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
         </div>
-        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · Q/E 시점 회전 · 휠 확대·축소</div>
+        <div className="hint">W/↑ 걷기 · S/↓ 뒤로 · A/D 옆으로 · Shift 빨리 · Space 점프 · Q/E 회전 · 1~3 인사 · 휠 확대</div>
       </div>
 
       <ArrivalToast trail={trail} />
       <ReturnNotice />
       <MiniMap trail={trail} trails={trails} />
+      <TogetherPanel trail={trail} />
       <AvatarBar />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
