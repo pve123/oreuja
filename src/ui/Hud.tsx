@@ -61,8 +61,9 @@ function useKeyboard() {
   }, [])
 }
 
-export function Hud({ trail }: { trail: Trail }) {
+export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   useKeyboard()
+  const [picking, setPicking] = useState(false)
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
   const sections = useMemo(() => trail.sections(), [trail])
@@ -80,7 +81,24 @@ export function Hud({ trail }: { trail: Trail }) {
   return (
     <>
       <div className="panel course">
-        <div className="eyebrow">{trail.data.mountain}</div>
+        <div className="course-head">
+          <div className="eyebrow">
+            {trail.data.mountain} · {trail.data.level}
+          </div>
+          <button className="link-button" aria-expanded={picking} onClick={() => setPicking(!picking)}>
+            {picking ? '닫기' : '코스 바꾸기'}
+          </button>
+        </div>
+        {picking && (
+          <CoursePicker
+            trails={trails}
+            current={trail}
+            onPick={(id) => {
+              setPicking(false)
+              if (id !== trail.data.id) useGame.getState().setCourse(id)
+            }}
+          />
+        )}
         <h1>{trail.data.name}</h1>
         <div className="course-meta">
           {trail.data.start} → {trail.data.summit}
@@ -147,6 +165,36 @@ export function Hud({ trail }: { trail: Trail }) {
       <HoldButton label="◀" className="side left" onHold={(on) => (input.left = on)} />
       <HoldButton label="▶" className="side right" onHold={(on) => (input.right = on)} />
     </>
+  )
+}
+
+/** 코스 목록. 고르면 그 코스 출발점에서 처음부터 오른다 */
+function CoursePicker({ trails, current, onPick }: { trails: Trail[]; current: Trail; onPick: (id: string) => void }) {
+  const records = useGame((s) => s.records)
+  return (
+    <ul className="course-list">
+      {trails.map((t) => {
+        const count = records.filter((r) => r.trailId === t.data.id).length
+        return (
+          <li key={t.data.id}>
+            <button
+              className={t === current ? 'course-item selected' : 'course-item'}
+              aria-current={t === current}
+              onClick={() => onPick(t.data.id)}
+            >
+              <span className="course-item-title">
+                {t.data.name}
+                <span className={`level level-${t.data.level}`}>{t.data.level}</span>
+              </span>
+              <span className="course-item-meta">
+                {t.data.start} → {t.data.summit} · {(t.data.length / 1000).toFixed(1)}km · 오르막 {t.data.elevationGain}m
+                {count > 0 && ` · 완등 ${count}회`}
+              </span>
+            </button>
+          </li>
+        )
+      })}
+    </ul>
   )
 }
 

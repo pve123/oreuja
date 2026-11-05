@@ -18,7 +18,7 @@ type Props = { terrain: Terrain; trail: Trail }
 /** 진행 방향의 오른쪽 단위 벡터 */
 const rightOf = (heading: number) => new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
 
-/** 흙길, 가파른 구간의 돌계단, 위문~정상 바위 구간의 철제 난간 */
+/** 흙길, 가파른 구간의 돌계단, 위문~정상 바위 구간의 철제 난간 (위문을 지나는 코스만) */
 export function TrailDetails({ terrain, trail }: Props) {
   return (
     <group>
@@ -33,9 +33,8 @@ const DIRT = new THREE.Color('#7f6f5b') // 숲 그늘 아래 흙길 색 (사진 
 const GRANITE = new THREE.Color('#a9a49b')
 const SURFACE_BLEND = 30 // 흙길에서 바위 바닥으로 바뀌는 구간 길이(m)
 
-/** 위문 이정표 거리. 없으면 정상 300m 전 */
-const gateDistance = (trail: Trail) =>
-  trail.data.checkpoints.find((cp) => cp.name.includes('위문'))?.distance ?? Math.max(0, trail.length - 300)
+/** 위문 이정표 거리. 위문을 지나지 않는 코스면 null (바위 바닥·난간 없음) */
+const gateDistance = (trail: Trail) => trail.data.checkpoints.find((cp) => cp.name.includes('위문'))?.distance ?? null
 
 /** 등산로를 따라 지면에 붙인 길 띠. 위문부터 정상까지는 화강암 바닥 색 */
 function PathSurface({ terrain, trail }: Props) {
@@ -43,7 +42,7 @@ function PathSurface({ terrain, trail }: Props) {
     const positions: number[] = []
     const colors: number[] = []
     const indices: number[] = []
-    const gate = gateDistance(trail)
+    const gate = gateDistance(trail) ?? Infinity
     const color = new THREE.Color()
     const n = Math.ceil(trail.length)
     for (let k = 0; k <= n; k++) {
@@ -137,7 +136,7 @@ function Railings({ terrain, trail }: Props) {
   const rails = useRef<THREE.InstancedMesh>(null!)
 
   const { postMatrices, railMatrices } = useMemo(() => {
-    const from = gateDistance(trail)
+    const from = gateDistance(trail) ?? Infinity
     const postMatrices: THREE.Matrix4[] = []
     const railMatrices: THREE.Matrix4[] = []
     const one = new THREE.Vector3(1, 1, 1)

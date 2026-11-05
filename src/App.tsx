@@ -2,23 +2,31 @@ import { useEffect, useState } from 'react'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
+import { useGame } from './lib/store'
 import { World } from './scene/World'
 import { MAPBOX_TOKEN } from './lib/satellite'
 import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 
 export default function App() {
-  const [data, setData] = useState<{ terrain: Terrain; trail: Trail } | null>(null)
+  const [data, setData] = useState<{ terrain: Terrain; trails: Trail[] } | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const courseId = useGame((s) => s.courseId)
 
   useEffect(() => {
+    // 개발 중에는 ?course=bukhansan-sanseong 처럼 코스를 골라 시작할 수 있다
+    const debugCourse = import.meta.env.DEV ? new URLSearchParams(location.search).get('course') : null
     loadData()
-      .then(setData)
+      .then((d) => {
+        if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse })
+        setData(d)
+      })
       .catch((e) => setError(String(e)))
   }, [])
 
   if (error) return <div className="loading">데이터를 불러오지 못했어요: {error}</div>
   if (!data) return <div className="loading">북한산을 불러오는 중…</div>
+  const trail = data.trails.find((t) => t.data.id === courseId) ?? data.trails[0]
 
   return (
     <>
@@ -29,11 +37,11 @@ export default function App() {
         gl={{ preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping }}
         dpr={[1, 2]}
       >
-        <World terrain={data.terrain} trail={data.trail} />
+        <World terrain={data.terrain} trail={trail} />
       </Canvas>
-      <Hud trail={data.trail} />
+      <Hud trail={trail} trails={data.trails} />
       <AvatarThumbnails />
-      <SummitModal trail={data.trail} />
+      <SummitModal trail={trail} />
       <div className="attribution">
         지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 국토지리정보원 수치지형도, AWS Terrain Tiles
         {MAPBOX_TOKEN && (

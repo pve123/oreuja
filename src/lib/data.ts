@@ -19,6 +19,8 @@ export type TrailData = {
   id: string
   mountain: string
   name: string
+  /** 난이도: 쉬움·보통·어려움 */
+  level: string
   start: string
   summit: string
   summitElevation: number
@@ -158,13 +160,14 @@ export function meshHeight(t: Terrain, x: number, z: number) {
   return h(i + 1, j + 1) + (1 - u) * (h(i, j + 1) - h(i + 1, j + 1)) + (1 - v) * (h(i + 1, j) - h(i + 1, j + 1))
 }
 
-export async function loadData(): Promise<{ terrain: Terrain; trail: Trail }> {
-  const [meta, buf, trail] = await Promise.all([
+/** 지형 한 장과 그 위의 코스 목록을 불러온다 */
+export async function loadData(): Promise<{ terrain: Terrain; trails: Trail[] }> {
+  const [meta, buf, courses] = await Promise.all([
     fetch('/data/terrain.json').then((r) => r.json() as Promise<TerrainMeta>),
     fetch('/data/terrain.bin').then((r) => r.arrayBuffer()),
-    fetch('/data/trail.json').then((r) => r.json() as Promise<TrailData>),
+    fetch('/data/courses.json').then((r) => r.json() as Promise<TrailData[]>),
   ])
-  return { terrain: { ...meta, heights: new Float32Array(buf) }, trail: new Trail(trail) }
+  return { terrain: { ...meta, heights: new Float32Array(buf) }, trails: courses.map((c) => new Trail(c)) }
 }
 
 /** 실제 등산 예상 시간(분): 평지 시속 4km + 오르막 600m 당 1시간 (Naismith 규칙) */
