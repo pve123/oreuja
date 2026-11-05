@@ -745,16 +745,30 @@ kbd {
   color: var(--accent-2);
 }
 
-/* 3D 표지판 위 이름 */
-.signpost-label {
-  padding: 3px 8px;
-  border-radius: 6px;
-  background: rgba(107, 74, 47, 0.92);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
+/* 3D 랜드마크 위 이름 */
+.landmark-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(6px);
+  color: #1d3557;
+  font-size: 14px;
+  font-weight: 800;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.22);
   white-space: nowrap;
   pointer-events: none;
+}
+.landmark-icon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #f1f5f9;
+  font-size: 14px;
 }
 
 /* 캐릭터 고르기 칩 줄. 칸이 모자라면 옆으로 밀어 본다 */
@@ -823,19 +837,29 @@ kbd {
 }
 
 /* 등산로로 순간이동할 때 화면이 잠깐 하얗게 깜빡인다 */
-.teleport-fade {
+.roam-vignette {
   position: fixed;
   inset: 0;
   z-index: 19;
-  background: #fff;
   pointer-events: none;
-  animation: teleport-fade 0.6s ease-out forwards;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(12, 20, 32, 0.55) 100%);
+  transition: opacity 0.4s ease;
 }
-@keyframes teleport-fade {
-  from {
-    opacity: 0.85;
-  }
-  to {
-    opacity: 0;
-  }
+.roam-hint {
+  position: fixed;
+  left: 50%;
+  bottom: 120px;
+  transform: translateX(-50%);
+  z-index: 24;
+  padding: 10px 18px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.78);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-size: 14px;
+  font-weight: 700;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  animation: toast-in 0.35s ease-out;
+  pointer-events: none;
 }

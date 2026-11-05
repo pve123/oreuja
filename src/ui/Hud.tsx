@@ -170,7 +170,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       </div>
 
       <ArrivalToast trail={trail} />
-      <ReturnNotice />
+      <RoamNotice />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
       <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
@@ -316,7 +316,7 @@ const HELP: [string[][], string, string?][] = [
   [[['드래그']], '둘러보기', '마우스로 끌면 내 캐릭터 정면도 봐요. 다시 걸으면 등 뒤로 돌아와요'],
   [[['휠']], '확대·축소', '마우스 휠을 굴려요'],
   [[['1', '2', '3']], '인사하기', '👋 🙌 ❤️ 가 머리 위에 떠요'],
-  [[['길 밖']], '자유롭게 걷기', '등산로에서 30m 넘게 벗어나면 길 위로 돌아와요'],
+  [[['길 밖']], '자유롭게 걷기', '등산로에서 20m까지 걸어 나갈 수 있어요. 나무와 바위는 돌아서 가요'],
 ]
 
 function HelpPanel() {
@@ -346,25 +346,17 @@ function HelpPanel() {
   )
 }
 
-/** 길에서 너무 멀어져 등산로로 순간이동했을 때: 화면이 잠깐 깜빡이고 알림이 뜬다 */
-function ReturnNotice() {
-  const returnedAt = useGame((s) => s.returnedAt)
-  const [hiddenAt, setHiddenAt] = useState<number | null>(null)
-
-  useEffect(() => {
-    if (!returnedAt) return
-    const t = setTimeout(() => setHiddenAt(returnedAt), 3000)
-    return () => clearTimeout(t)
-  }, [returnedAt])
-
-  if (!returnedAt || hiddenAt === returnedAt) return null
+/** 등산로에서 멀어질수록 화면 가장자리가 어두워지고, 경계에 가까우면 돌아가라는 안내가 뜬다 */
+function RoamNotice() {
+  const roam = useGame((s) => s.roam)
   return (
     <>
-      <div className="teleport-fade" key={`fade-${returnedAt}`} />
-      <div className="toast" key={`toast-${returnedAt}`} role="status">
-        <div className="toast-title">등산로로 돌아왔어요</div>
-        <div className="toast-note">길에서 30m 넘게 멀어지면 등산로 위로 옮겨 드려요.</div>
-      </div>
+      <div className="roam-vignette" style={{ opacity: roam }} aria-hidden />
+      {roam >= 0.35 && (
+        <div className="roam-hint" role="status">
+          <span aria-hidden>🧭</span> 등산로에서 멀어지고 있어요. 길 쪽으로 돌아가요
+        </div>
+      )}
     </>
   )
 }

@@ -3,12 +3,12 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Sky } from '@react-three/drei'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { meshHeight, sampleHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
+import { meshHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
 import { SummitFlag } from './SummitFlag'
 import { Forest } from './Forest'
-import { Signposts } from './Signposts'
+import { Landmarks } from './Landmarks'
 import { TrailDetails } from './TrailDetails'
 import { Rocks } from './Rocks'
 import { Avatar } from './Avatar'
@@ -18,6 +18,8 @@ import { occlusionUniforms } from '../lib/occlusion'
 import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
 import { AVATARS, type AvatarKind } from '../lib/avatars'
 import { playJump, playStep, setAmbience, type Surface } from '../lib/sound'
+import { resolveCollision } from '../lib/obstacles'
+import { groundAt, stoneSteps } from '../lib/steps'
 import { localPlayer } from '../lib/net'
 import { Peers } from './Peers'
 
@@ -25,8 +27,22 @@ const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
 const BACK_SPEED = 3 // ↓ 로 뒤로 물러나는 빠르기 m/s
 const BACK_RUN_SPEED = 6
-/** 등산로에서 이만큼 넘게 멀어지면 등산로 위로 순간이동한다 (m) */
-export const ROAM_LIMIT = 30
+/**
+ * 길 밖 자유롭게 걷기의 경계 (오픈월드 게임의 부드러운 경계처럼).
+ * ROAM_SOFT 부터 바깥쪽 걸음이 점점 느려지고 화면 가장자리가 어두워지며, ROAM_LIMIT 에서는 더 나가지 못하고 경계를 따라 미끄러진다.
+ */
+const ROAM_SOFT = 12
+export const ROAM_LIMIT = 20
+/** 경계에 닿을 때 바깥쪽 걸음 빠르기가 이만큼으로 줄어든다 */
+const ROAM_EDGE_SPEED = 0.25
+/** 캐릭터 몸 반지름(m). 나무 줄기·바위·건물과 이만큼 떨어진다 */
+const BODY_RADIUS = 0.35
+/** 계단에 들어서거나 나올 때 높이 차를 메우는 빠르기. 클수록 빠르게 (약 0.1초) */
+const STEP_SNAP = 24
+/** 오르막 계단에서는 이만큼 느리게 걷는다 */
+const STAIR_UP_SPEED = 0.8
+/** 카메라 높이가 캐릭터 높이를 따라가는 빠르기. 계단에서 카메라가 덜컹거리지 않게 몸보다 느리게 */
+const CAMERA_Y_RATE = 6
 const TURN_SPEED = 3.6 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 200도
 /** 카메라와 캐릭터 가슴 사이 거리(m). 첫 화면은 가장 가까이에서 시작한다 */
 const CAMERA_MIN_DISTANCE = 4
@@ -40,8 +56,6 @@ const CAMERA_GROUND_CLEARANCE = 0.8
 /** 첫 화면에서 카메라가 캐릭터를 내려다보는 각도 */
 const CAMERA_PITCH = THREE.MathUtils.degToRad(22)
 const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
-/** 등산로 가운데에서 이만큼 안쪽은 등산로 높이(돌계단 포함)를, 바깥쪽은 지형 높이를 쓴다 (m) */
-const TRAIL_SURFACE = 1
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
@@ -95,6 +109,11 @@ export function World({ terrain, trail }: Props) {
   const body = useRef({ x: 0, z: 0, yaw: 0, synced: { distance: NaN, offset: NaN } })
   /** 다음 발소리까지 남은 걸음 주기와 산속 소리를 마지막으로 맞춘 시각 */
   const footstep = useRef({ phase: 0, ambienceAt: 0 })
+  /** 계단: 마지막으로 밟은 칸 번호(-1 은 땅), 계단 판정 안에 있었는지, 이어 붙이는 중 남은 높이 차(m), 마지막으로 그린 높이 */
+  const stair = useRef({ index: -1, on: false, lag: 0, y: NaN })
+  /** 카메라가 바라보는 높이 (계단에서 덜컹거리지 않게 따로 부드럽게 따라간다) */
+  const cameraY = useRef(NaN)
+  const steps = useMemo(() => stoneSteps(terrain, trail), [terrain, trail])
 
   // 발소리 바닥: 위문부터는 바위, 그 전 가파른 곳은 돌계단, 나머지는 흙길
   const gate = useMemo(() => trail.data.checkpoints.find((cp) => cp.name.includes('위문'))?.distance ?? Infinity, [trail])
@@ -154,35 +173,60 @@ export function World({ terrain, trail }: Props) {
       b.yaw = h
     }
 
-    // 1) 이동: ←/→ 로 몸을 돌리고 ↑ 로 보는 쪽으로, ↓ 로 뒤로 걷는다. 등산로에서 ROAM_LIMIT 넘게 멀어지면 등산로로 순간이동
+    // 1) 이동: ←/→ 로 몸을 돌리고 ↑ 로 보는 쪽으로, ↓ 로 뒤로 걷는다.
+    //    나무·바위·건물에 부딪히면 둘레를 따라 미끄러지고, 등산로에서 멀어질수록 바깥쪽 걸음이 느려지다 ROAM_LIMIT 에서 멈춘다
     if (game.mode === 'hiking') {
       const turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
       const move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
       b.yaw += turn * TURN_SPEED * dt
+      const startX = b.x
+      const startZ = b.z
       if (move !== 0) {
-        const speed = move > 0 ? (input.run ? RUN_SPEED : WALK_SPEED) : input.run ? BACK_RUN_SPEED : BACK_SPEED
-        const step = move * speed * dt
-        b.x += Math.sin(b.yaw) * step
-        b.z += Math.cos(b.yaw) * step
-        hiker.current.stride(step)
-      } else if (turn !== 0) {
-        hiker.current.stride(TURN_SPEED * dt * 0.3) // 제자리에서 돌 때도 발을 조금 뗀다
+        let speed = move > 0 ? (input.run ? RUN_SPEED : WALK_SPEED) : input.run ? BACK_RUN_SPEED : BACK_SPEED
+        const dx = Math.sin(b.yaw) * move
+        const dz = Math.cos(b.yaw) * move
+        // 오르막 계단은 조금 느리게
+        if (stair.current.index >= 0) {
+          const ahead = trail.positionAt(distance + 1).y - trail.positionAt(distance).y
+          const along = dx * Math.sin(trail.headingAt(distance)) + dz * Math.cos(trail.headingAt(distance))
+          if (ahead * along > 0) speed *= STAIR_UP_SPEED
+        }
+        // 등산로에서 멀어지는 쪽 걸음은 경계에 가까울수록 느리게
+        const p0 = trail.positionAt(distance)
+        const ox = b.x - p0.x
+        const oz = b.z - p0.z
+        const away0 = Math.hypot(ox, oz)
+        if (away0 > ROAM_SOFT && ox * dx + oz * dz > 0) {
+          speed *= THREE.MathUtils.lerp(1, ROAM_EDGE_SPEED, THREE.MathUtils.smoothstep(away0, ROAM_SOFT, ROAM_LIMIT))
+        }
+        const step = speed * dt
+        b.x += dx * step
+        b.z += dz * step
       }
+      // 장애물 밖으로 밀어낸다 (점프 중이면 낮은 바위는 넘어간다)
+      const pushed = resolveCollision(b.x, b.z, BODY_RADIUS, jump.current.height)
+      b.x = pushed.x
+      b.z = pushed.z
 
       // 등산로 기준 값으로 바꾼다
       distance = trail.nearestDistance(b.x, b.z, distance)
       const h = trail.headingAt(distance)
       const p = trail.positionAt(distance)
-      if (Math.hypot(b.x - p.x, b.z - p.z) > ROAM_LIMIT) {
-        offset = 0
-        b.x = p.x
-        b.z = p.z
-        b.yaw = h
-        game.returnToTrail()
-      } else {
-        offset = (b.x - p.x) * -Math.cos(h) + (b.z - p.z) * Math.sin(h)
-        if (offset !== game.offset) game.setOffset(offset)
+      const away = Math.hypot(b.x - p.x, b.z - p.z)
+      if (away > ROAM_LIMIT) {
+        // 보이지 않는 벽: 경계 원 위로 되돌려 경계를 따라 미끄러지게 한다
+        b.x = p.x + ((b.x - p.x) / away) * ROAM_LIMIT
+        b.z = p.z + ((b.z - p.z) / away) * ROAM_LIMIT
       }
+      offset = (b.x - p.x) * -Math.cos(h) + (b.z - p.z) * Math.sin(h)
+      if (offset !== game.offset) game.setOffset(offset)
+      const roam = Math.round(THREE.MathUtils.smoothstep(Math.min(away, ROAM_LIMIT), ROAM_SOFT, ROAM_LIMIT) * 20) / 20
+      if (roam !== game.roam) game.setRoam(roam)
+
+      // 실제로 움직인 만큼 걸음 동작을 돌린다 (벽에 막히면 제자리걸음을 하지 않게). 제자리에서 돌 때도 발을 조금 뗀다
+      const moved = Math.hypot(b.x - startX, b.z - startZ)
+      if (move !== 0 && moved > 1e-4) hiker.current.stride(moved * Math.sign(move))
+      else if (turn !== 0) hiker.current.stride(TURN_SPEED * dt * 0.3)
       if (distance !== game.distance) game.setDistance(distance)
       facing.current = b.yaw - h
       // 앞으로 걸어서 이정표를 처음 지나면 도착 알림
@@ -209,8 +253,13 @@ export function World({ terrain, trail }: Props) {
         playJump()
       }
     }
-    // 발소리: 땅에 붙어 걸은 거리만큼 걸음 주기를 돌리고 반 바퀴마다 한 발
-    if (j.height === 0) {
+    // 발소리: 계단에서는 한 칸 디딜 때마다, 그 밖에는 땅에 붙어 걸은 거리만큼 걸음 주기를 돌려 반 바퀴마다 한 발
+    const footing = groundAt(terrain, trail, steps, distance, offset, b.x, b.z)
+    const onStep = footing.step
+    if (onStep && j.height === 0) {
+      if (onStep.index !== stair.current.index && onStep.index >= 0) playStep('step', input.run)
+      footstep.current.phase = 0
+    } else if (j.height === 0) {
       const moved = Math.abs(distance - before.distance) + Math.abs(offset - before.offset)
       const fs = footstep.current
       fs.phase += moved * STEP_PHASE_PER_M
@@ -234,12 +283,23 @@ export function World({ terrain, trail }: Props) {
     // 3) 아바타 배치: 등산로 위 점에서 오른쪽으로 offset 만큼 비키고 높이는 지형에서 읽는다
     b.synced.distance = distance
     b.synced.offset = offset
-    const onTrail = trail.positionAt(distance)
-    const away = Math.hypot(b.x - onTrail.x, b.z - onTrail.z)
     const pos = new THREE.Vector3(b.x, 0, b.z)
-    // 등산로 위는 돌계단 높이를 따르고, 벗어날수록 지형 높이로 넘어간다
-    const k = THREE.MathUtils.smoothstep(away, TRAIL_SURFACE, TRAIL_SURFACE * 3)
-    pos.y = THREE.MathUtils.lerp(onTrail.y, sampleHeight(terrain, pos.x, pos.z), k)
+    // 등산로·돌계단·지형 높이 (lib/steps 의 groundAt)
+    const groundY = footing.y
+    // 계단 위 높이는 stairAt 이 걸은 거리에 맞춰 칸마다 올려 주고, 계단 드나들 때도 이어 준다.
+    // 계단 옆으로 비켜 나갈 때처럼 그래도 높이가 끊기면 그 차를 짧게 이어 붙인다 (순간이동·코스 바꾸기처럼 크게 끊기면 바로 옮긴다)
+    const st = stair.current
+    const stepIndex = onStep ? onStep.index : -1
+    if (!!onStep !== st.on) {
+      // 바로 앞 프레임에 딛던 높이(st.y - st.lag)와 지금 높이의 차를 이어 붙인다
+      const jumpBy = Number.isNaN(st.y) ? Infinity : st.y - st.lag - groundY
+      st.lag = Math.abs(jumpBy) > 3 ? 0 : st.lag + jumpBy
+      st.on = !!onStep
+    }
+    st.index = stepIndex
+    st.lag *= Math.exp(-STEP_SNAP * dt)
+    pos.y = groundY + st.lag
+    st.y = pos.y
     hiker.current.group.position.copy(pos).setY(pos.y + j.height)
     hiker.current.group.rotation.y = b.yaw
     hiker.current.setCheering(game.mode !== 'hiking')
@@ -291,7 +351,10 @@ export function World({ terrain, trail }: Props) {
     photoFrames.current = 0
 
     // 아바타를 따라가되, 지금 보는 각도는 유지
-    const target = pos.clone().setY(pos.y + 1.5)
+    // 바라보는 높이는 몸보다 느리게 따라가, 계단을 오를 때 화면이 덜컹거리지 않게 한다
+    if (Number.isNaN(cameraY.current) || Math.abs(cameraY.current - pos.y) > 3) cameraY.current = pos.y
+    cameraY.current += (pos.y - cameraY.current) * (1 - Math.exp(-CAMERA_Y_RATE * dt))
+    const target = pos.clone().setY(cameraY.current + 1.5)
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
 
@@ -337,7 +400,7 @@ export function World({ terrain, trail }: Props) {
       <Rocks terrain={terrain} trail={trail} />
       <TrailDetails terrain={terrain} trail={trail} />
       <SummitFlag terrain={terrain} trail={trail} />
-      <Signposts trail={trail} />
+      <Landmarks terrain={terrain} trail={trail} />
       <Avatar ref={hiker} kind={avatar} />
       <Peers terrain={terrain} trail={trail} />
       <OrbitControls

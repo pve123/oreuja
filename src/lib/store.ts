@@ -30,9 +30,9 @@ type State = {
   reachedCheckpoint: number
   /** 이정표 도착 알림. at 이 바뀌면 알림을 새로 띄운다 */
   arrival: { index: number; at: number } | null
-  /** 길에서 너무 멀어져 등산로로 돌아온 시각 (알림과 화면 깜빡임에 쓴다) */
-  returnedAt: number | null
-  returnToTrail: () => void
+  /** 등산로에서 멀어진 정도. 0 은 걱정 없는 거리, 1 은 더 나갈 수 없는 경계 (화면 가장자리 어둡게·안내에 쓴다) */
+  roam: number
+  setRoam: (v: number) => void
   setDistance: (d: number) => void
   setOffset: (m: number) => void
   reachCheckpoint: (index: number) => void
@@ -71,7 +71,7 @@ const freshClimb = {
   photo: null,
   reachedCheckpoint: -1,
   arrival: null,
-  returnedAt: null,
+  roam: 0,
 }
 
 // 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
@@ -103,7 +103,7 @@ export const useGame = create<State>((set, get) => ({
     set({ avatar })
   },
   records: loadRecords(),
-  returnToTrail: () => set({ offset: 0, returnedAt: Date.now() }),
+  setRoam: (roam) => set({ roam }),
   setDistance: (distance) =>
     set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
   setOffset: (offset) => set({ offset }),
