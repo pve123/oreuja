@@ -56,8 +56,8 @@ export default function App() {
       <Canvas
         shadows
         camera={{ fov: 55, near: 0.5, far: 20000 }}
-        // 기념사진 캡처를 위해 그린 화면을 유지
-        gl={{ preserveDrawingBuffer: true, toneMapping: THREE.ACESFilmicToneMapping }}
+        // 기념사진 캡처를 위해 그린 화면을 유지. 톤 매핑은 후처리 맨 끝에서 한다 (scene/World 의 PostEffects)
+        gl={{ preserveDrawingBuffer: true, toneMapping: THREE.NoToneMapping }}
         dpr={[1, 2]}
       >
         <World terrain={data.terrain} trail={trail} />

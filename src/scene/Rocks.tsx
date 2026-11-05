@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
@@ -7,6 +7,7 @@ import { makeNearTrail, usePhotoLayers } from '../lib/placement'
 import { withOcclusionShrink } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles, type Obstacle } from '../lib/obstacles'
+import { NearModels, type NearItem } from './NearModels'
 import { PHOTO_CAMERA_BACK, distanceToSegmentXZ, summitVista } from '../lib/summit'
 
 const COUNT = 5000
@@ -15,6 +16,16 @@ const NEAR_TRAIL_RANGE = 150
 const SUMMIT_BOULDERS = 14
 const TRAIL_CLEARANCE = 2.5 // 등산로 양옆 2.5m 에는 바위를 두지 않는다
 const HIGH_GROUND = 620 // 이보다 높으면 화강암이 드러난 곳이 많다(m)
+/** 가까이 그릴 바위 모델 (Quaternius Stylized Nature MegaKit, CC0). 약 3.2m × 2.2m × 3m, 바닥이 y≈0 */
+const ROCK_MODELS = ['Rock_Medium_1', 'Rock_Medium_2', 'Rock_Medium_3'].map((n) => `/models/nature/${n}.gltf`)
+/** 바위 색: 북한산 화강암 (모델 텍스처는 무늬만 쓰고 이 색으로 다시 칠한다) */
+const ROCK_TINT = '#b7b1a6'
+/** 모델 반폭(m). 도형 바위 반지름(크기 1)에 맞추려고 나눈다 */
+const ROCK_MODEL_HALF = 1.6
+/** 도형 바위 색의 평균 밝기(선형). 모델 바위 색을 이 값으로 나눠 1 안팎으로 만든다 */
+const ROCK_BASE_LUMA = 0.26
+/** 모델 높이(m) */
+const ROCK_MODEL_HEIGHT = 2.2
 /** 이보다 낮게 솟은 바위는 막지 않고 넘어간다(m). 발목 높이 돌에 걸려 멈추면 답답하다 */
 const STEP_OVER = 0.4
 /** 바위가 막더라도 등산로 가운데에서 이만큼은 비워 길이 막히지 않게 한다(m) */
@@ -45,10 +56,11 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
   const { settled, layers } = usePhotoLayers()
   // 카메라와 아바타 사이에 들어온 바위는 통째로 줄여 아바타를 가리지 않게 한다
-  const material = useMemo(() => withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), 0), [])
+  // 캐릭터 둘레(정밀 반경)는 바위 모델이 그리므로, 도형 바위는 반경 밖만 그린다
+  const material = useMemo(() => withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), 0, { ring: 'far' }), [])
 
-  const { instances, obstacles } = useMemo(() => {
-    if (!settled) return { instances: [], obstacles: [] }
+  const { instances, obstacles, models } = useMemo(() => {
+    if (!settled) return { instances: [], obstacles: [], models: [] }
     const rand = seededRandom(99)
     const nearTrail = makeNearTrail(trail)
     const nearLandmark = makeLandmarkClear(terrain, trail)
@@ -56,6 +68,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
     const out: { matrix: THREE.Matrix4; color: THREE.Color }[] = []
     const obstacles: Obstacle[] = []
+    const models: NearItem[] = []
     const add = (x: number, z: number, size: number) => {
       if (nearLandmark(x, z)) return false
       const q = new THREE.Quaternion().setFromEuler(new THREE.Euler(rand() * 0.4, rand() * Math.PI * 2, rand() * 0.4))
@@ -69,6 +82,20 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
         color.lerp(new THREE.Color().setRGB(rgb[0] / 255, rgb[1] / 255, rgb[2] / 255, THREE.SRGBColorSpace), 0.7)
       }
       out.push({ matrix: new THREE.Matrix4().compose(p, q, s), color })
+      // 같은 바위를 모델로: 가로는 도형 반지름에, 높이는 도형이 땅 위로 솟은 만큼에 맞춘다. 기울기는 줄여 땅에 앉힌다
+      const visible = Math.max(0.2, s.y * 0.65 * 1.1 - size * 0.25)
+      const sink = size * 0.12
+      const mq = new THREE.Quaternion().setFromEuler(new THREE.Euler((rand() - 0.5) * 0.15, rand() * Math.PI * 2, (rand() - 0.5) * 0.15))
+      models.push({
+        matrix: new THREE.Matrix4().compose(
+          new THREE.Vector3(x, p.y + size * 0.25 - sink, z),
+          mq,
+          new THREE.Vector3(s.x / ROCK_MODEL_HALF, (visible + sink) / ROCK_MODEL_HEIGHT, s.z / ROCK_MODEL_HALF),
+        ),
+        model: Math.floor(rand() * ROCK_MODELS.length),
+        // 재질 색(ROCK_TINT)이 화강암 색을 내므로, 바위마다 색은 도형 바위 색의 밝기 비율만큼만 흔든다 (사진 색도 살짝 섞인다)
+        color: color.clone().multiplyScalar(1 / ROCK_BASE_LUMA).lerp(new THREE.Color(1, 1, 1), 0.4),
+      })
       // 땅 위로 솟은 높이: 도형 꼭대기(납작하게 0.65, 꼭짓점을 최대 1.2배)에서 묻은 만큼 뺀다
       const height = s.y * 0.65 * 1.2 - size * 0.25
       if (height > STEP_OVER) {
@@ -118,7 +145,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       }
       add(x, z, 0.4 + rand() * rand() * 3)
     }
-    return { instances: out, obstacles }
+    return { instances: out, obstacles, models }
   }, [terrain, trail, settled, layers])
 
   useEffect(() => {
@@ -138,6 +165,11 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   }, [instances])
 
   return (
-    <instancedMesh ref={ref} args={[shape, material, COUNT + SUMMIT_BOULDERS]} castShadow receiveShadow />
+    <group>
+      <instancedMesh ref={ref} args={[shape, material, COUNT + SUMMIT_BOULDERS]} castShadow receiveShadow />
+      <Suspense fallback={null}>
+        <NearModels urls={ROCK_MODELS} items={models} capacity={700} occlusionLift={0} ring tint={ROCK_TINT} />
+      </Suspense>
+    </group>
   )
 }
