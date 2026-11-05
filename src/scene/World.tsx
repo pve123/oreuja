@@ -23,13 +23,14 @@ import { Peers } from './Peers'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
-const STRAFE_SPEED = 3 // 옆걸음 m/s
-const STRAFE_RUN_SPEED = 7
+const BACK_SPEED = 3 // ↓ 로 뒤로 물러나는 빠르기 m/s
+const BACK_RUN_SPEED = 6
 /** 등산로에서 이만큼 넘게 멀어지면 등산로 위로 순간이동한다 (m) */
 export const ROAM_LIMIT = 30
-const TURN_SPEED = 1.8 // Q/E 시점 회전 속도(rad/s)
-const FOLLOW_RATE = 2.2 // 카메라가 캐릭터 뒤로 돌아가는 빠르기 (클수록 빨리)
-const MANUAL_HOLD_MS = 2000 // Q/E 로 돌린 뒤 이 시간 동안은 자동으로 돌지 않는다
+const TURN_SPEED = 2.4 // ←/→ 로 몸을 돌리는 빠르기(rad/s)
+const FOLLOW_RATE = 3 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
+/** 등산로 가운데에서 이만큼 안쪽은 등산로 높이(돌계단 포함)를, 바깥쪽은 지형 높이를 쓴다 (m) */
+const TRAIL_SURFACE = 1
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
@@ -70,10 +71,15 @@ export function World({ terrain, trail }: Props) {
   const photoFrames = useRef(0)
   /** 점프: 땅에서 떠 있는 높이(m)와 위쪽 속도(m/s) */
   const jump = useRef({ height: 0, velocity: 0 })
-  /** 등산로 진행 방향 기준으로 아바타가 바라보는 각도 (0 = 정면) */
+  /** 등산로 진행 방향 기준으로 아바타가 바라보는 각도 (0 = 정면). 같이하기 서버로 보낸다 */
   const facing = useRef(0)
-  /** Q/E 로 마지막으로 시점을 직접 돌린 시각 */
-  const manualTurnAt = useRef(0)
+  /**
+   * 내 수평 위치와 몸이 보는 방향(라디안, 0 = +z 쪽). 지형 위를 자유롭게 걷고,
+   * 등산로 진행 거리(distance)와 옆으로 비킨 거리(offset)는 여기서 계산해 store 에 넣는다.
+   * synced 는 마지막으로 store 에 넣은 값이다. store 값이 이와 다르면(처음, 코스 바꾸기, 다시 오르기,
+   * 등산로로 순간이동) 그 자리로 옮긴다.
+   */
+  const body = useRef({ x: 0, z: 0, yaw: 0, synced: { distance: NaN, offset: NaN } })
   /** 다음 발소리까지 남은 걸음 주기와 산속 소리를 마지막으로 맞춘 시각 */
   const footstep = useRef({ phase: 0, ambienceAt: 0 })
 
@@ -123,34 +129,46 @@ export function World({ terrain, trail }: Props) {
     const game = useGame.getState()
     let { distance, offset } = game
     const before = { distance, offset }
-    let walkingAlong = false // 이번 프레임에 앞뒤로 걸었는지 (카메라 자동 따라 돌기에 쓴다)
+    const b = body.current
+    if (distance !== b.synced.distance || offset !== b.synced.offset) {
+      const h = trail.headingAt(distance)
+      const p = trail.positionAt(distance)
+      b.x = p.x - Math.cos(h) * offset
+      b.z = p.z + Math.sin(h) * offset
+      b.yaw = h
+    }
 
-    // 1) 이동: 앞뒤는 등산로를 따라, 옆은 자유롭게. 등산로에서 ROAM_LIMIT 넘게 멀어지면 등산로로 순간이동
+    // 1) 이동: ←/→ 로 몸을 돌리고 ↑ 로 보는 쪽으로, ↓ 로 뒤로 걷는다. 등산로에서 ROAM_LIMIT 넘게 멀어지면 등산로로 순간이동
     if (game.mode === 'hiking') {
-      const dir = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
-      const side = (input.right ? 1 : 0) - (input.left ? 1 : 0)
-      if (dir !== 0) {
-        const speed = input.run ? RUN_SPEED : WALK_SPEED
-        const next = THREE.MathUtils.clamp(distance + dir * speed * dt, 0, trail.length)
-        hiker.current.stride(next - distance)
-        distance = next
-        game.setDistance(distance)
+      const turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
+      const move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
+      b.yaw += turn * TURN_SPEED * dt
+      if (move !== 0) {
+        const speed = move > 0 ? (input.run ? RUN_SPEED : WALK_SPEED) : input.run ? BACK_RUN_SPEED : BACK_SPEED
+        const step = move * speed * dt
+        b.x += Math.sin(b.yaw) * step
+        b.z += Math.cos(b.yaw) * step
+        hiker.current.stride(step)
+      } else if (turn !== 0) {
+        hiker.current.stride(TURN_SPEED * dt * 0.3) // 제자리에서 돌 때도 발을 조금 뗀다
       }
-      if (side !== 0) {
-        const speed = input.run ? STRAFE_RUN_SPEED : STRAFE_SPEED
-        const next = offset + side * speed * dt
-        if (Math.abs(next) > ROAM_LIMIT) {
-          offset = 0
-          game.returnToTrail()
-        } else {
-          hiker.current.stride(next - offset)
-          offset = next
-          game.setOffset(offset)
-        }
+
+      // 등산로 기준 값으로 바꾼다
+      distance = trail.nearestDistance(b.x, b.z, distance)
+      const h = trail.headingAt(distance)
+      const p = trail.positionAt(distance)
+      if (Math.hypot(b.x - p.x, b.z - p.z) > ROAM_LIMIT) {
+        offset = 0
+        b.x = p.x
+        b.z = p.z
+        b.yaw = h
+        game.returnToTrail()
+      } else {
+        offset = (b.x - p.x) * -Math.cos(h) + (b.z - p.z) * Math.sin(h)
+        if (offset !== game.offset) game.setOffset(offset)
       }
-      // 움직이는 쪽을 바라본다. 멈추면 마지막 방향을 유지
-      if (dir !== 0 || side !== 0) facing.current = Math.atan2(-side, dir)
-      walkingAlong = dir !== 0
+      if (distance !== game.distance) game.setDistance(distance)
+      facing.current = b.yaw - h
       // 앞으로 걸어서 이정표를 처음 지나면 도착 알림
       const cps = trail.data.checkpoints
       let reached = game.reachedCheckpoint
@@ -198,15 +216,16 @@ export function World({ terrain, trail }: Props) {
     }
 
     // 3) 아바타 배치: 등산로 위 점에서 오른쪽으로 offset 만큼 비키고 높이는 지형에서 읽는다
-    const heading = trail.headingAt(distance)
-    const pos = trail.positionAt(distance)
-    if (offset !== 0) {
-      pos.x += -Math.cos(heading) * offset
-      pos.z += Math.sin(heading) * offset
-      pos.y = sampleHeight(terrain, pos.x, pos.z)
-    }
+    b.synced.distance = distance
+    b.synced.offset = offset
+    const onTrail = trail.positionAt(distance)
+    const away = Math.hypot(b.x - onTrail.x, b.z - onTrail.z)
+    const pos = new THREE.Vector3(b.x, 0, b.z)
+    // 등산로 위는 돌계단 높이를 따르고, 벗어날수록 지형 높이로 넘어간다
+    const k = THREE.MathUtils.smoothstep(away, TRAIL_SURFACE, TRAIL_SURFACE * 3)
+    pos.y = THREE.MathUtils.lerp(onTrail.y, sampleHeight(terrain, pos.x, pos.z), k)
     hiker.current.group.position.copy(pos).setY(pos.y + j.height)
-    hiker.current.group.rotation.y = heading + facing.current
+    hiker.current.group.rotation.y = b.yaw
     hiker.current.setCheering(game.mode !== 'hiking')
     hiker.current.setAirborne(j.height > 0)
     // 같이하기 서버로 보낼 내 상태
@@ -260,20 +279,12 @@ export function World({ terrain, trail }: Props) {
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
 
-    // 시점 돌리기: Q/E 는 직접 돌리고, 앞뒤로 걸을 때는 캐릭터 뒤쪽으로 부드럽게 돌아간다
+    // 카메라는 늘 캐릭터 등 뒤로 부드럽게 돌아간다
     const off = camera.position.clone().sub(target)
     const horizontal = Math.hypot(off.x, off.z)
     let azimuth = Math.atan2(off.x, off.z)
-    const turn = (input.turnRight ? 1 : 0) - (input.turnLeft ? 1 : 0)
-    const now = performance.now()
-    if (turn !== 0) {
-      azimuth += turn * TURN_SPEED * dt
-      manualTurnAt.current = now
-    } else if (walkingAlong && now - manualTurnAt.current > MANUAL_HOLD_MS) {
-      const behind = heading + facing.current + Math.PI // 캐릭터가 보는 방향의 반대편
-      const diff = Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) // 가까운 쪽으로 돈다
-      azimuth += diff * (1 - Math.exp(-FOLLOW_RATE * dt))
-    }
+    const behind = b.yaw + Math.PI
+    azimuth += Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) * (1 - Math.exp(-FOLLOW_RATE * dt)) // 가까운 쪽으로 돈다
     camera.position.set(target.x + Math.sin(azimuth) * horizontal, camera.position.y, target.z + Math.cos(azimuth) * horizontal)
 
     controls.current.target.copy(target)
@@ -314,7 +325,7 @@ export function World({ terrain, trail }: Props) {
         minDistance={4}
         maxDistance={400}
         maxPolarAngle={Math.PI * 0.49}
-        // 시점은 자동 따라 돌기와 Q/E 로만 바꾼다. 마우스는 휠 확대·축소만
+        // 시점은 캐릭터 등 뒤로 자동으로 따라 돈다. 마우스는 휠 확대·축소만
         enableRotate={false}
       />
     </>
