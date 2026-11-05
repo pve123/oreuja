@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useRef } from 'react'
+import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Sky } from '@react-three/drei'
+import { Physics, useRapier, type RapierCollider } from '@react-three/rapier'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
-import { meshHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
+import { meshHeight, standHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
 import { SummitFlag } from './SummitFlag'
@@ -12,14 +13,15 @@ import { Landmarks } from './Landmarks'
 import { TrailDetails } from './TrailDetails'
 import { Rocks } from './Rocks'
 import { Avatar } from './Avatar'
+import { Colliders } from './Colliders'
+import { cameraBlockers } from '../lib/obstacles'
 import type { HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
 import { occlusionUniforms } from '../lib/occlusion'
 import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
 import { AVATARS, type AvatarKind } from '../lib/avatars'
 import { playJump, playStep, setAmbience, type Surface } from '../lib/sound'
-import { resolveCollision } from '../lib/obstacles'
-import { groundAt, stoneSteps } from '../lib/steps'
+import { STAIR_HALF_WIDTH, groundAt, stairAt, stoneSteps, trailGround } from '../lib/steps'
 import { localPlayer } from '../lib/net'
 import { Peers } from './Peers'
 
@@ -35,10 +37,30 @@ const ROAM_SOFT = 12
 export const ROAM_LIMIT = 20
 /** 경계에 닿을 때 바깥쪽 걸음 빠르기가 이만큼으로 줄어든다 */
 const ROAM_EDGE_SPEED = 0.25
-/** 캐릭터 몸 반지름(m). 나무 줄기·바위·건물과 이만큼 떨어진다 */
+
+/**
+ * 캐릭터 컨트롤러 (Unity CharacterController·Unreal CharacterMovement 와 같은 방식).
+ * 몸은 캡슐이고, 부딪히면 미끄러지며, 낮은 턱은 자동으로 오르고, 내리막에서는 땅에 붙는다.
+ */
 const BODY_RADIUS = 0.35
-/** 계단에 들어서거나 나올 때 높이 차를 메우는 빠르기. 클수록 빠르게 (약 0.1초) */
-const STEP_SNAP = 24
+/** 캡슐 가운데 원기둥 반높이(m). 키 = 2 × (반높이 + 반지름) = 1.8m */
+const BODY_HALF_HEIGHT = 0.55
+/** 발바닥에서 캡슐 가운데까지 높이 */
+const BODY_CENTER = BODY_HALF_HEIGHT + BODY_RADIUS
+/** 충돌체와 띄워 두는 틈(m). 너무 작으면 걸리고 크면 떠 보인다 */
+const SKIN = 0.02
+/** 이 높이까지의 턱은 걸어서 오른다(m). Unreal 기본 45cm 와 비슷하게 */
+const AUTOSTEP_HEIGHT = 0.45
+/** 내리막에서 이 거리 안이면 땅에 붙여 통통 튀지 않게(m) */
+const SNAP_TO_GROUND = 0.6
+/**
+ * 이보다 가파른 비탈은 오르지 못하고 미끄러진다. Unity·Unreal 기본은 45° 안팎이지만 북한산 등산로가 가팔라서 넉넉히 둔다.
+ * 코스 4개를 Rapier 로 끝까지 걸어 본 시험에서 55° 는 계단 옆·급경사에서 막히는 곳이 남았고 60° 는 0곳이었다
+ */
+const MAX_SLOPE = THREE.MathUtils.degToRad(60)
+
+/** 계단 모습(디딤판)과 물리 경사로의 높이 차를 몸 그림에 얹는 빠르기. 클수록 바로 붙는다 */
+const STEP_VISUAL_RATE = 30
 /** 오르막 계단에서는 이만큼 느리게 걷는다 */
 const STAIR_UP_SPEED = 0.8
 /** 카메라 높이가 캐릭터 높이를 따라가는 빠르기. 계단에서 카메라가 덜컹거리지 않게 몸보다 느리게 */
@@ -51,13 +73,24 @@ const CAMERA_MIN_DISTANCE = 4
  * 더 멀면 캐릭터가 점이 되어 지도를 보는 느낌이 된다
  */
 const CAMERA_MAX_DISTANCE = 15
-/** 카메라가 땅 위로 떠 있어야 하는 높이(m). 마우스로 돌리다 비탈 속으로 들어가지 않게 */
-const CAMERA_GROUND_CLEARANCE = 0.8
+/** 휠 한 칸에 바뀌는 거리 비율 */
+const ZOOM_STEP = 1.12
+/**
+ * 스프링 암 (Unreal SpringArm 과 같은 방식): 캐릭터에서 카메라 쪽으로 레이를 쏴 지형·건물에 막히면 그 앞으로 당긴다.
+ * 막히면 바로 당기고, 풀리면 천천히 원래 거리로 돌아간다.
+ */
+const CAMERA_PROBE_MARGIN = 0.3
+const CAMERA_MIN_ARM = 1.2
+const CAMERA_RELEASE_RATE = 3
 /** 첫 화면에서 카메라가 캐릭터를 내려다보는 각도 */
 const CAMERA_PITCH = THREE.MathUtils.degToRad(22)
 const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
+/** 땅에 서 있을 때도 아래로 살짝 눌러 비탈에서 뜨지 않게 (m/s) */
+const GROUND_STICK = 2
+/** 이 시간보다 오래 땅에서 떨어져 있으면 공중 동작으로 바꾼다(s). 턱을 내려설 때마다 다리를 접지 않게 */
+const AIRBORNE_AFTER = 0.12
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
 /** Hiker 걸음 주기와 같게: 1m 에 2.2 라디안, 반 바퀴(π)마다 한 발 */
 const STEP_PHASE_PER_M = 2.2
@@ -85,35 +118,82 @@ function SkyDome() {
   )
 }
 
-export function World({ terrain, trail }: Props) {
+/** 물리 세계(Rapier). 시뮬레이션할 물체는 없고 캐릭터 컨트롤러와 카메라 레이가 충돌체를 묻는 데만 쓴다 */
+export function World(props: Props) {
+  return (
+    <Suspense fallback={null}>
+      <Physics gravity={[0, 0, 0]} timeStep="vary">
+        <Colliders terrain={props.terrain} trail={props.trail} />
+        <WorldScene {...props} />
+      </Physics>
+    </Suspense>
+  )
+}
+
+type Character = { collider: RapierCollider; controller: ReturnType<ReturnType<typeof useRapier>['world']['createCharacterController']> }
+
+function WorldScene({ terrain, trail }: Props) {
   const hiker = useRef<HikerHandle>(null!)
   const controls = useRef<OrbitControlsImpl>(null!)
   const sun = useRef<THREE.DirectionalLight>(null!)
   const camera = useThree((s) => s.camera)
   const avatar = useGame((s) => s.avatar)
   const gl = useThree((s) => s.gl)
+  const { world, rapier } = useRapier()
+  const character = useRef<Character | null>(null)
   const lastTarget = useRef(new THREE.Vector3())
   /** 마우스로 카메라를 돌려 둘러보는 중. 다시 걷거나 몸을 돌리면 등 뒤로 돌아간다 */
   const freeLook = useRef(false)
+  /** 휠로 고른 카메라 거리(arm)와 스프링 암이 실제로 보여 주는 거리(shown) */
+  const zoom = useRef({ arm: CAMERA_MIN_DISTANCE, shown: CAMERA_MIN_DISTANCE })
   const photoFrames = useRef(0)
-  /** 점프: 땅에서 떠 있는 높이(m)와 위쪽 속도(m/s) */
-  const jump = useRef({ height: 0, velocity: 0 })
   /** 등산로 진행 방향 기준으로 아바타가 바라보는 각도 (0 = 정면). 같이하기 서버로 보낸다 */
   const facing = useRef(0)
   /**
-   * 내 수평 위치와 몸이 보는 방향(라디안, 0 = +z 쪽). 지형 위를 자유롭게 걷고,
+   * 내 발바닥 위치와 몸이 보는 방향(라디안, 0 = +z 쪽), 위쪽 속도, 땅에 붙어 있는지.
    * 등산로 진행 거리(distance)와 옆으로 비킨 거리(offset)는 여기서 계산해 store 에 넣는다.
-   * synced 는 마지막으로 store 에 넣은 값이다. store 값이 이와 다르면(처음, 코스 바꾸기, 다시 오르기,
-   * 등산로로 순간이동) 그 자리로 옮긴다.
+   * synced 는 마지막으로 store 에 넣은 값이다. store 값이 이와 다르면(처음, 코스 바꾸기, 다시 오르기) 그 자리로 옮긴다.
    */
-  const body = useRef({ x: 0, z: 0, yaw: 0, synced: { distance: NaN, offset: NaN } })
+  const body = useRef({ x: 0, y: 0, z: 0, yaw: 0, vy: 0, grounded: true, airTime: 0, synced: { distance: NaN, offset: NaN } })
   /** 다음 발소리까지 남은 걸음 주기와 산속 소리를 마지막으로 맞춘 시각 */
   const footstep = useRef({ phase: 0, ambienceAt: 0 })
-  /** 계단: 마지막으로 밟은 칸 번호(-1 은 땅), 계단 판정 안에 있었는지, 이어 붙이는 중 남은 높이 차(m), 마지막으로 그린 높이 */
-  const stair = useRef({ index: -1, on: false, lag: 0, y: NaN })
+  /** 계단: 마지막으로 디딘 칸 번호(-1 은 땅), 몸 그림에 얹는 디딤판 높이 차(m) */
+  const stair = useRef({ index: -1, visual: 0 })
   /** 카메라가 바라보는 높이 (계단에서 덜컹거리지 않게 따로 부드럽게 따라간다) */
   const cameraY = useRef(NaN)
   const steps = useMemo(() => stoneSteps(terrain, trail), [terrain, trail])
+  const groundOfTrail = useMemo(() => trailGround(terrain, trail), [terrain, trail])
+
+  // 캐릭터 캡슐과 컨트롤러. 몸에 리지드바디를 달지 않고 충돌체를 직접 옮긴다 (시뮬레이션할 일이 없다)
+  useEffect(() => {
+    const collider = world.createCollider(rapier.ColliderDesc.capsule(BODY_HALF_HEIGHT, BODY_RADIUS))
+    const controller = world.createCharacterController(SKIN)
+    controller.setUp({ x: 0, y: 1, z: 0 })
+    controller.setSlideEnabled(true)
+    controller.enableAutostep(AUTOSTEP_HEIGHT, 0.15, false)
+    controller.enableSnapToGround(SNAP_TO_GROUND)
+    controller.setMaxSlopeClimbAngle(MAX_SLOPE)
+    controller.setMinSlopeSlideAngle(MAX_SLOPE)
+    character.current = { collider, controller }
+    // 다음 프레임에 지금 store 위치로 다시 놓는다
+    body.current.synced.distance = NaN
+    return () => {
+      character.current = null
+      world.removeCharacterController(controller)
+      world.removeCollider(collider, false)
+    }
+  }, [world, rapier])
+
+  // 휠 확대·축소는 직접 맡는다 (스프링 암이 당긴 거리를 OrbitControls 가 사용자가 고른 거리로 착각하지 않게)
+  useEffect(() => {
+    const el = gl.domElement
+    const onWheel = (e: WheelEvent) => {
+      const z = zoom.current
+      z.arm = THREE.MathUtils.clamp(z.arm * (e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)
+    }
+    el.addEventListener('wheel', onWheel, { passive: true })
+    return () => el.removeEventListener('wheel', onWheel)
+  }, [gl])
 
   // 발소리 바닥: 위문부터는 바위, 그 전 가파른 곳은 돌계단, 나머지는 흙길
   const gate = useMemo(() => trail.data.checkpoints.find((cp) => cp.name.includes('위문'))?.distance ?? Infinity, [trail])
@@ -153,6 +233,7 @@ export function World({ terrain, trail }: Props) {
     // 캐릭터 등 뒤 가장 가까운 거리에서, 어깨 너머로 조금 내려다보며 시작한다
     const back = Math.cos(CAMERA_PITCH) * CAMERA_MIN_DISTANCE
     const up = Math.sin(CAMERA_PITCH) * CAMERA_MIN_DISTANCE
+    zoom.current.arm = zoom.current.shown = CAMERA_MIN_DISTANCE
     lastTarget.current.copy(start).setY(start.y + 1.5)
     camera.position.set(start.x - Math.sin(h) * back, lastTarget.current.y + up, start.z - Math.cos(h) * back)
     controls.current.target.copy(lastTarget.current)
@@ -160,69 +241,98 @@ export function World({ terrain, trail }: Props) {
   }, [camera, trail])
 
   useFrame((_, rawDt) => {
+    const ch = character.current
+    if (!ch) return
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
     let { distance, offset } = game
     const before = { distance, offset }
     const b = body.current
     if (distance !== b.synced.distance || offset !== b.synced.offset) {
+      // 처음·코스 바꾸기·다시 오르기: 그 등산로 지점의 땅(또는 디딤판) 위에 놓는다
       const h = trail.headingAt(distance)
       const p = trail.positionAt(distance)
       b.x = p.x - Math.cos(h) * offset
       b.z = p.z + Math.sin(h) * offset
+      b.y = groundAt(terrain, trail, steps, distance, offset, b.x, b.z).y + 0.05
       b.yaw = h
+      b.vy = 0
+      cameraY.current = NaN
     }
 
-    // 1) 이동: ←/→ 로 몸을 돌리고 ↑ 로 보는 쪽으로, ↓ 로 뒤로 걷는다.
-    //    나무·바위·건물에 부딪히면 둘레를 따라 미끄러지고, 등산로에서 멀어질수록 바깥쪽 걸음이 느려지다 ROAM_LIMIT 에서 멈춘다
+    // 1) 이동: ←/→ 로 몸을 돌리고 ↑ 로 보는 쪽으로, ↓ 로 뒤로 걷는다. 점프와 중력도 여기서.
+    //    캐릭터 컨트롤러가 나무·바위·건물에 부딪히면 미끄러뜨리고, 낮은 턱은 오르고, 너무 가파른 비탈은 막는다.
+    //    등산로에서 멀어질수록 바깥쪽 걸음이 느려지다 ROAM_LIMIT 에서 멈춘다
+    let move = 0
+    let turn = 0
+    if (input.jump) {
+      input.jump = false
+      if (b.grounded && game.mode === 'hiking') {
+        b.vy = JUMP_SPEED
+        playJump()
+      }
+    }
     if (game.mode === 'hiking') {
-      const turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
-      const move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
+      turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
+      move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
       b.yaw += turn * TURN_SPEED * dt
-      const startX = b.x
-      const startZ = b.z
-      if (move !== 0) {
-        let speed = move > 0 ? (input.run ? RUN_SPEED : WALK_SPEED) : input.run ? BACK_RUN_SPEED : BACK_SPEED
-        const dx = Math.sin(b.yaw) * move
-        const dz = Math.cos(b.yaw) * move
-        // 오르막 계단은 조금 느리게
-        if (stair.current.index >= 0) {
-          const ahead = trail.positionAt(distance + 1).y - trail.positionAt(distance).y
-          const along = dx * Math.sin(trail.headingAt(distance)) + dz * Math.cos(trail.headingAt(distance))
-          if (ahead * along > 0) speed *= STAIR_UP_SPEED
-        }
-        // 등산로에서 멀어지는 쪽 걸음은 경계에 가까울수록 느리게
-        const p0 = trail.positionAt(distance)
-        const ox = b.x - p0.x
-        const oz = b.z - p0.z
-        const away0 = Math.hypot(ox, oz)
-        if (away0 > ROAM_SOFT && ox * dx + oz * dz > 0) {
-          speed *= THREE.MathUtils.lerp(1, ROAM_EDGE_SPEED, THREE.MathUtils.smoothstep(away0, ROAM_SOFT, ROAM_LIMIT))
-        }
-        const step = speed * dt
-        b.x += dx * step
-        b.z += dz * step
+    }
+    let dx = 0
+    let dz = 0
+    if (move !== 0) {
+      let speed = move > 0 ? (input.run ? RUN_SPEED : WALK_SPEED) : input.run ? BACK_RUN_SPEED : BACK_SPEED
+      const fx = Math.sin(b.yaw) * move
+      const fz = Math.cos(b.yaw) * move
+      // 오르막 계단은 조금 느리게
+      if (stair.current.index >= 0) {
+        const ahead = trail.positionAt(distance + 1).y - trail.positionAt(distance).y
+        const along = fx * Math.sin(trail.headingAt(distance)) + fz * Math.cos(trail.headingAt(distance))
+        if (ahead * along > 0) speed *= STAIR_UP_SPEED
       }
-      // 장애물 밖으로 밀어낸다 (점프 중이면 낮은 바위는 넘어간다)
-      const pushed = resolveCollision(b.x, b.z, BODY_RADIUS, jump.current.height)
-      b.x = pushed.x
-      b.z = pushed.z
+      // 등산로에서 멀어지는 쪽 걸음은 경계에 가까울수록 느리게
+      const p0 = trail.positionAt(distance)
+      const ox = b.x - p0.x
+      const oz = b.z - p0.z
+      const away0 = Math.hypot(ox, oz)
+      if (away0 > ROAM_SOFT && ox * fx + oz * fz > 0) {
+        speed *= THREE.MathUtils.lerp(1, ROAM_EDGE_SPEED, THREE.MathUtils.smoothstep(away0, ROAM_SOFT, ROAM_LIMIT))
+      }
+      dx = fx * speed * dt
+      dz = fz * speed * dt
+    }
+    // 중력: 땅에 서 있으면 살짝 눌러 붙이고, 떠 있으면 떨어진다
+    b.vy = b.grounded && b.vy <= 0 ? -GROUND_STICK : b.vy - GRAVITY * dt
+    ch.collider.setTranslation({ x: b.x, y: b.y + BODY_CENTER, z: b.z })
+    ch.controller.computeColliderMovement(ch.collider, { x: dx, y: b.vy * dt, z: dz })
+    const m = ch.controller.computedMovement()
+    const startX = b.x
+    const startZ = b.z
+    b.x += m.x
+    b.y += m.y
+    b.z += m.z
+    b.grounded = ch.controller.computedGrounded()
+    if (b.grounded && b.vy < 0) b.vy = -GROUND_STICK
+    // 머리를 부딪히면 위로 가던 힘을 없앤다
+    if (b.vy > 0 && m.y < b.vy * dt * 0.5) b.vy = 0
+    b.airTime = b.grounded ? 0 : b.airTime + dt
 
-      // 등산로 기준 값으로 바꾼다
-      distance = trail.nearestDistance(b.x, b.z, distance)
-      const h = trail.headingAt(distance)
-      const p = trail.positionAt(distance)
-      const away = Math.hypot(b.x - p.x, b.z - p.z)
-      if (away > ROAM_LIMIT) {
-        // 보이지 않는 벽: 경계 원 위로 되돌려 경계를 따라 미끄러지게 한다
-        b.x = p.x + ((b.x - p.x) / away) * ROAM_LIMIT
-        b.z = p.z + ((b.z - p.z) / away) * ROAM_LIMIT
-      }
-      offset = (b.x - p.x) * -Math.cos(h) + (b.z - p.z) * Math.sin(h)
+    // 등산로 기준 값으로 바꾼다
+    distance = trail.nearestDistance(b.x, b.z, distance)
+    const h = trail.headingAt(distance)
+    const p = trail.positionAt(distance)
+    const away = Math.hypot(b.x - p.x, b.z - p.z)
+    if (away > ROAM_LIMIT) {
+      // 보이지 않는 벽: 경계 원 위로 되돌려 경계를 따라 미끄러지게 한다
+      b.x = p.x + ((b.x - p.x) / away) * ROAM_LIMIT
+      b.z = p.z + ((b.z - p.z) / away) * ROAM_LIMIT
+    }
+    ch.collider.setTranslation({ x: b.x, y: b.y + BODY_CENTER, z: b.z })
+    offset = (b.x - p.x) * -Math.cos(h) + (b.z - p.z) * Math.sin(h)
+
+    if (game.mode === 'hiking') {
       if (offset !== game.offset) game.setOffset(offset)
       const roam = Math.round(THREE.MathUtils.smoothstep(Math.min(away, ROAM_LIMIT), ROAM_SOFT, ROAM_LIMIT) * 20) / 20
       if (roam !== game.roam) game.setRoam(roam)
-
       // 실제로 움직인 만큼 걸음 동작을 돌린다 (벽에 막히면 제자리걸음을 하지 않게). 제자리에서 돌 때도 발을 조금 뗀다
       const moved = Math.hypot(b.x - startX, b.z - startZ)
       if (move !== 0 && moved > 1e-4) hiker.current.stride(moved * Math.sign(move))
@@ -243,67 +353,40 @@ export function World({ terrain, trail }: Props) {
         })
       }
     }
-
-    // 2) 점프 (사진 찍는 동안은 땅에 붙여 둔다)
-    const j = jump.current
-    if (input.jump) {
-      input.jump = false
-      if (j.height === 0 && game.mode !== 'photo') {
-        j.velocity = JUMP_SPEED
-        playJump()
-      }
-    }
-    // 발소리: 계단에서는 한 칸 디딜 때마다, 그 밖에는 땅에 붙어 걸은 거리만큼 걸음 주기를 돌려 반 바퀴마다 한 발
-    const footing = groundAt(terrain, trail, steps, distance, offset, b.x, b.z)
-    const onStep = footing.step
-    if (onStep && j.height === 0) {
-      if (onStep.index !== stair.current.index && onStep.index >= 0) playStep('step', input.run)
-      footstep.current.phase = 0
-    } else if (j.height === 0) {
-      const moved = Math.abs(distance - before.distance) + Math.abs(offset - before.offset)
-      const fs = footstep.current
-      fs.phase += moved * STEP_PHASE_PER_M
-      if (fs.phase >= Math.PI) {
-        fs.phase %= Math.PI
-        playStep(surfaceAt(distance, offset), input.run)
-      }
-    }
-    if (game.mode === 'photo') {
-      j.height = 0
-      j.velocity = 0
-    } else if (j.height > 0 || j.velocity > 0) {
-      j.height += j.velocity * dt
-      j.velocity -= GRAVITY * dt
-      if (j.height <= 0) {
-        j.height = 0
-        j.velocity = 0
-      }
-    }
-
-    // 3) 아바타 배치: 등산로 위 점에서 오른쪽으로 offset 만큼 비키고 높이는 지형에서 읽는다
     b.synced.distance = distance
     b.synced.offset = offset
-    const pos = new THREE.Vector3(b.x, 0, b.z)
-    // 등산로·돌계단·지형 높이 (lib/steps 의 groundAt)
-    const groundY = footing.y
-    // 계단 위 높이는 stairAt 이 걸은 거리에 맞춰 칸마다 올려 주고, 계단 드나들 때도 이어 준다.
-    // 계단 옆으로 비켜 나갈 때처럼 그래도 높이가 끊기면 그 차를 짧게 이어 붙인다 (순간이동·코스 바꾸기처럼 크게 끊기면 바로 옮긴다)
+
+    // 2) 계단 모습과 발소리. 물리는 매끈한 경사로를 걷고, 몸 그림만 칸마다 평평하게 딛는 높이로 얹는다
+    const onStairs = b.grounded && Math.abs(offset) < STAIR_HALF_WIDTH
+    const tread = onStairs ? stairAt(steps, distance, groundOfTrail) : null
+    const ramp = tread ? stairAt(steps, distance, groundOfTrail, 'ramp') : null
     const st = stair.current
-    const stepIndex = onStep ? onStep.index : -1
-    if (!!onStep !== st.on) {
-      // 바로 앞 프레임에 딛던 높이(st.y - st.lag)와 지금 높이의 차를 이어 붙인다
-      const jumpBy = Number.isNaN(st.y) ? Infinity : st.y - st.lag - groundY
-      st.lag = Math.abs(jumpBy) > 3 ? 0 : st.lag + jumpBy
-      st.on = !!onStep
+    const visualTarget = tread && ramp ? tread.y - ramp.y : 0
+    st.visual += (visualTarget - st.visual) * (1 - Math.exp(-STEP_VISUAL_RATE * dt))
+    if (b.grounded) {
+      if (tread && tread.index >= 0) {
+        if (tread.index !== st.index) playStep('step', input.run)
+        footstep.current.phase = 0
+      } else {
+        const moved = Math.abs(distance - before.distance) + Math.abs(offset - before.offset)
+        const fs = footstep.current
+        fs.phase += moved * STEP_PHASE_PER_M
+        if (fs.phase >= Math.PI) {
+          fs.phase %= Math.PI
+          playStep(surfaceAt(distance, offset), input.run)
+        }
+      }
     }
-    st.index = stepIndex
-    st.lag *= Math.exp(-STEP_SNAP * dt)
-    pos.y = groundY + st.lag
-    st.y = pos.y
-    hiker.current.group.position.copy(pos).setY(pos.y + j.height)
+    st.index = tread ? tread.index : -1
+
+    // 3) 아바타 배치
+    const pos = new THREE.Vector3(b.x, b.y + st.visual, b.z)
+    // 떠 있는 높이 (같이하기 친구 화면에서 점프로 보인다)
+    const lift = Math.max(0, b.y - standHeight(terrain, b.x, b.z))
+    hiker.current.group.position.copy(pos)
     hiker.current.group.rotation.y = b.yaw
     hiker.current.setCheering(game.mode !== 'hiking')
-    hiker.current.setAirborne(j.height > 0)
+    hiker.current.setAirborne(b.airTime > AIRBORNE_AFTER)
     // 같이하기 서버로 보낼 내 상태
     Object.assign(localPlayer, {
       course: trail.data.id,
@@ -311,7 +394,7 @@ export function World({ terrain, trail }: Props) {
       distance,
       offset,
       facing: facing.current,
-      jump: j.height,
+      jump: b.airTime > AIRBORNE_AFTER ? lift : 0,
       mode: game.mode,
     })
 
@@ -328,9 +411,9 @@ export function World({ terrain, trail }: Props) {
     sun.current.target.updateMatrixWorld()
 
     // 카메라와 아바타 사이에 낀 나무·바위를 비울 기준점 (아바타 가슴 높이)
-    occlusionUniforms.uOccTarget.value.copy(hiker.current.group.position).setY(hiker.current.group.position.y + 1.2)
+    occlusionUniforms.uOccTarget.value.copy(pos).setY(pos.y + 1.2)
 
-    // 4) 카메라 (점프해도 흔들리지 않게 땅 높이 기준)
+    // 4) 카메라
     if (game.mode === 'photo') {
       // 카메라는 오르막 쪽, 아바타는 카메라를 바라봄 → 트인 풍경이 배경
       const d = vista
@@ -350,13 +433,20 @@ export function World({ terrain, trail }: Props) {
     }
     photoFrames.current = 0
 
-    // 아바타를 따라가되, 지금 보는 각도는 유지
-    // 바라보는 높이는 몸보다 느리게 따라가, 계단을 오를 때 화면이 덜컹거리지 않게 한다
+    // 바라보는 높이는 몸보다 느리게 따라가, 계단을 오르거나 점프할 때 화면이 덜컹거리지 않게 한다 (점프는 더 느리게)
+    const lookY = b.airTime > 0 ? Math.min(pos.y, cameraY.current + 0.02) : pos.y
     if (Number.isNaN(cameraY.current) || Math.abs(cameraY.current - pos.y) > 3) cameraY.current = pos.y
-    cameraY.current += (pos.y - cameraY.current) * (1 - Math.exp(-CAMERA_Y_RATE * dt))
-    const target = pos.clone().setY(cameraY.current + 1.5)
+    cameraY.current += (lookY - cameraY.current) * (1 - Math.exp(-CAMERA_Y_RATE * dt))
+    const target = new THREE.Vector3(pos.x, cameraY.current + 1.5, pos.z)
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
+
+    // 스프링 암이 당겨 둔 거리를 풀어, 사용자가 고른 거리(arm) 기준으로 각도를 다룬다
+    const z = zoom.current
+    const dir = camera.position.clone().sub(target)
+    if (dir.lengthSq() < 1e-6) dir.set(0, 0.4, -1)
+    dir.normalize()
+    camera.position.copy(target).addScaledVector(dir, z.arm)
 
     // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
     if (input.forward || input.backward || input.left || input.right) freeLook.current = false
@@ -372,9 +462,22 @@ export function World({ terrain, trail }: Props) {
     controls.current.target.copy(target)
     lastTarget.current.copy(target)
     controls.current.update()
-    // 비탈 쪽에서 낮게 돌리면 카메라가 땅속으로 들어가므로 땅 위로 올린다
-    const ground = meshHeight(terrain, camera.position.x, camera.position.z) + CAMERA_GROUND_CLEARANCE
-    if (camera.position.y < ground) camera.position.setY(ground)
+
+    // 스프링 암: 캐릭터에서 카메라 쪽으로 레이를 쏴 지형·계단·건물에 막히면 그 앞으로 당긴다
+    dir.copy(camera.position).sub(target).normalize()
+    const hit = world.castRay(
+      new rapier.Ray(target, dir),
+      z.arm,
+      true,
+      undefined,
+      undefined,
+      ch.collider,
+      undefined,
+      (c) => cameraBlockers.has(c.handle),
+    )
+    const want = hit ? Math.max(CAMERA_MIN_ARM, hit.timeOfImpact - CAMERA_PROBE_MARGIN) : z.arm
+    z.shown = want < z.shown ? want : z.shown + (want - z.shown) * (1 - Math.exp(-CAMERA_RELEASE_RATE * dt))
+    camera.position.copy(target).addScaledVector(dir, z.shown)
     occlusionUniforms.uOccCamera.value.copy(camera.position)
   })
 
@@ -407,8 +510,10 @@ export function World({ terrain, trail }: Props) {
         ref={controls}
         makeDefault
         enablePan={false}
-        minDistance={CAMERA_MIN_DISTANCE}
-        maxDistance={CAMERA_MAX_DISTANCE}
+        // 거리는 휠 처리와 스프링 암이 맡는다
+        enableZoom={false}
+        minDistance={0.5}
+        maxDistance={100}
         // 바로 위에서 내려다보면 지도처럼 보이므로 너무 눕히지도 세우지도 않는다
         minPolarAngle={Math.PI * 0.2}
         maxPolarAngle={Math.PI * 0.49}
