@@ -74,6 +74,12 @@ export function World({ terrain, trail }: Props) {
   const facing = useRef(0)
   /** Q/E 로 마지막으로 시점을 직접 돌린 시각 */
   const manualTurnAt = useRef(0)
+  /**
+   * 방향키를 화면 기준으로 읽기 위한 값. 화면이 등산로 오르막 쪽을 보면 1, 내리막 쪽을 보면 -1.
+   * 키를 누르고 있는 동안에는 고정한다. 걷는 동안 카메라가 캐릭터 뒤로 돌아가면서 값이 뒤집히면
+   * 캐릭터가 왔다 갔다 하기 때문이다. 이동 키를 모두 뗐다가 새로 누를 때 다시 정한다.
+   */
+  const view = useRef({ sign: 1, held: false })
   /** 다음 발소리까지 남은 걸음 주기와 산속 소리를 마지막으로 맞춘 시각 */
   const footstep = useRef({ phase: 0, ambienceAt: 0 })
 
@@ -127,8 +133,17 @@ export function World({ terrain, trail }: Props) {
 
     // 1) 이동: 앞뒤는 등산로를 따라, 옆은 자유롭게. 등산로에서 ROAM_LIMIT 넘게 멀어지면 등산로로 순간이동
     if (game.mode === 'hiking') {
-      const dir = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
-      const side = (input.right ? 1 : 0) - (input.left ? 1 : 0)
+      const held = input.forward || input.backward || input.left || input.right
+      if (held && !view.current.held) {
+        // 카메라가 보는 방향(카메라에서 아바타 쪽)과 등산로 진행 방향을 견준다
+        const h = trail.headingAt(distance)
+        const look = lastTarget.current.clone().sub(camera.position)
+        view.current.sign = look.x * Math.sin(h) + look.z * Math.cos(h) >= 0 ? 1 : -1
+      }
+      view.current.held = held
+      // 화면 기준 방향키를 등산로 기준으로 바꾼다. 내리막을 보고 있으면 앞뒤와 좌우가 모두 뒤집힌다
+      const dir = view.current.sign * ((input.forward ? 1 : 0) - (input.backward ? 1 : 0))
+      const side = view.current.sign * ((input.right ? 1 : 0) - (input.left ? 1 : 0))
       if (dir !== 0) {
         const speed = input.run ? RUN_SPEED : WALK_SPEED
         const next = THREE.MathUtils.clamp(distance + dir * speed * dt, 0, trail.length)
