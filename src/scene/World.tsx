@@ -27,8 +27,19 @@ const BACK_SPEED = 3 // ↓ 로 뒤로 물러나는 빠르기 m/s
 const BACK_RUN_SPEED = 6
 /** 등산로에서 이만큼 넘게 멀어지면 등산로 위로 순간이동한다 (m) */
 export const ROAM_LIMIT = 30
-const TURN_SPEED = 2.4 // ←/→ 로 몸을 돌리는 빠르기(rad/s)
-const FOLLOW_RATE = 3 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
+const TURN_SPEED = 3.6 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 200도
+/** 카메라와 캐릭터 가슴 사이 거리(m). 첫 화면은 가장 가까이에서 시작한다 */
+const CAMERA_MIN_DISTANCE = 4
+/**
+ * 휠로 멀어질 수 있는 거리(m). 3인칭 게임은 보통 캐릭터 키의 몇 배 안쪽에서만 멀어지게 한다.
+ * 더 멀면 캐릭터가 점이 되어 지도를 보는 느낌이 된다
+ */
+const CAMERA_MAX_DISTANCE = 15
+/** 카메라가 땅 위로 떠 있어야 하는 높이(m). 마우스로 돌리다 비탈 속으로 들어가지 않게 */
+const CAMERA_GROUND_CLEARANCE = 0.8
+/** 첫 화면에서 카메라가 캐릭터를 내려다보는 각도 */
+const CAMERA_PITCH = THREE.MathUtils.degToRad(22)
+const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
 /** 등산로 가운데에서 이만큼 안쪽은 등산로 높이(돌계단 포함)를, 바깥쪽은 지형 높이를 쓴다 (m) */
 const TRAIL_SURFACE = 1
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
@@ -68,6 +79,8 @@ export function World({ terrain, trail }: Props) {
   const avatar = useGame((s) => s.avatar)
   const gl = useThree((s) => s.gl)
   const lastTarget = useRef(new THREE.Vector3())
+  /** 마우스로 카메라를 돌려 둘러보는 중. 다시 걷거나 몸을 돌리면 등 뒤로 돌아간다 */
+  const freeLook = useRef(false)
   const photoFrames = useRef(0)
   /** 점프: 땅에서 떠 있는 높이(m)와 위쪽 속도(m/s) */
   const jump = useRef({ height: 0, velocity: 0 })
@@ -118,8 +131,11 @@ export function World({ terrain, trail }: Props) {
     const d = useGame.getState().distance
     const start = trail.positionAt(d)
     const h = trail.headingAt(d)
-    camera.position.set(start.x - Math.sin(h) * 18, start.y + 9, start.z - Math.cos(h) * 18)
+    // 캐릭터 등 뒤 가장 가까운 거리에서, 어깨 너머로 조금 내려다보며 시작한다
+    const back = Math.cos(CAMERA_PITCH) * CAMERA_MIN_DISTANCE
+    const up = Math.sin(CAMERA_PITCH) * CAMERA_MIN_DISTANCE
     lastTarget.current.copy(start).setY(start.y + 1.5)
+    camera.position.set(start.x - Math.sin(h) * back, lastTarget.current.y + up, start.z - Math.cos(h) * back)
     controls.current.target.copy(lastTarget.current)
     controls.current.update()
   }, [camera, trail])
@@ -279,17 +295,23 @@ export function World({ terrain, trail }: Props) {
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
 
-    // 카메라는 늘 캐릭터 등 뒤로 부드럽게 돌아간다
-    const off = camera.position.clone().sub(target)
-    const horizontal = Math.hypot(off.x, off.z)
-    let azimuth = Math.atan2(off.x, off.z)
-    const behind = b.yaw + Math.PI
-    azimuth += Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) * (1 - Math.exp(-FOLLOW_RATE * dt)) // 가까운 쪽으로 돈다
-    camera.position.set(target.x + Math.sin(azimuth) * horizontal, camera.position.y, target.z + Math.cos(azimuth) * horizontal)
+    // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
+    if (input.forward || input.backward || input.left || input.right) freeLook.current = false
+    if (!freeLook.current) {
+      const off = camera.position.clone().sub(target)
+      const horizontal = Math.hypot(off.x, off.z)
+      let azimuth = Math.atan2(off.x, off.z)
+      const behind = b.yaw + Math.PI
+      azimuth += Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) * (1 - Math.exp(-FOLLOW_RATE * dt)) // 가까운 쪽으로 돈다
+      camera.position.set(target.x + Math.sin(azimuth) * horizontal, camera.position.y, target.z + Math.cos(azimuth) * horizontal)
+    }
 
     controls.current.target.copy(target)
     lastTarget.current.copy(target)
     controls.current.update()
+    // 비탈 쪽에서 낮게 돌리면 카메라가 땅속으로 들어가므로 땅 위로 올린다
+    const ground = meshHeight(terrain, camera.position.x, camera.position.z) + CAMERA_GROUND_CLEARANCE
+    if (camera.position.y < ground) camera.position.setY(ground)
     occlusionUniforms.uOccCamera.value.copy(camera.position)
   })
 
@@ -322,11 +344,16 @@ export function World({ terrain, trail }: Props) {
         ref={controls}
         makeDefault
         enablePan={false}
-        minDistance={4}
-        maxDistance={400}
+        minDistance={CAMERA_MIN_DISTANCE}
+        maxDistance={CAMERA_MAX_DISTANCE}
+        // 바로 위에서 내려다보면 지도처럼 보이므로 너무 눕히지도 세우지도 않는다
+        minPolarAngle={Math.PI * 0.2}
         maxPolarAngle={Math.PI * 0.49}
-        // 시점은 캐릭터 등 뒤로 자동으로 따라 돈다. 마우스는 휠 확대·축소만
-        enableRotate={false}
+        // 마우스로 끌면 캐릭터 둘레를 돌아 정면도 볼 수 있다. 걷기 시작하면 다시 등 뒤로 따라간다
+        rotateSpeed={0.6}
+        onStart={() => {
+          freeLook.current = true
+        }}
       />
     </>
   )
