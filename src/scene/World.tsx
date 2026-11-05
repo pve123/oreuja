@@ -16,6 +16,7 @@ import { composePhoto } from '../lib/photo'
 import { occlusionUniforms } from '../lib/occlusion'
 import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
 import { AVATARS, type AvatarKind } from '../lib/avatars'
+import { playJump, playStep, setAmbience, type Surface } from '../lib/sound'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
 const RUN_SPEED = 15
@@ -29,6 +30,8 @@ const MANUAL_HOLD_MS = 2000 // Q/E 로 돌린 뒤 이 시간 동안은 자동으
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
+/** Hiker 걸음 주기와 같게: 1m 에 2.2 라디안, 반 바퀴(π)마다 한 발 */
+const STEP_PHASE_PER_M = 2.2
 
 type Props = { terrain: TerrainData; trail: Trail }
 
@@ -68,6 +71,17 @@ export function World({ terrain, trail }: Props) {
   const facing = useRef(0)
   /** Q/E 로 마지막으로 시점을 직접 돌린 시각 */
   const manualTurnAt = useRef(0)
+  /** 다음 발소리까지 남은 걸음 주기와 산속 소리를 마지막으로 맞춘 시각 */
+  const footstep = useRef({ phase: 0, ambienceAt: 0 })
+
+  // 발소리 바닥: 위문부터는 바위, 그 전 가파른 곳은 돌계단, 나머지는 흙길
+  const gate = useMemo(() => trail.data.checkpoints.find((cp) => cp.name.includes('위문'))?.distance ?? Infinity, [trail])
+  const surfaceAt = (d: number, offset: number): Surface => {
+    if (Math.abs(offset) > 1.5) return 'dirt'
+    if (d >= gate) return 'rock'
+    const slope = Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
+    return slope >= 0.3 ? 'step' : 'dirt'
+  }
 
   // 정상에서 가장 낮게 트인 방향 (기념사진 배경으로 쓸 풍경 쪽)
   const vista = useMemo(() => summitVista(terrain, trail), [terrain, trail])
@@ -105,6 +119,7 @@ export function World({ terrain, trail }: Props) {
     const dt = Math.min(rawDt, 0.1)
     const game = useGame.getState()
     let { distance, offset } = game
+    const before = { distance, offset }
     let walkingAlong = false // 이번 프레임에 앞뒤로 걸었는지 (카메라 자동 따라 돌기에 쓴다)
 
     // 1) 이동: 앞뒤는 등산로를 따라, 옆은 자유롭게. 등산로에서 ROAM_LIMIT 넘게 멀어지면 등산로로 순간이동
@@ -152,7 +167,20 @@ export function World({ terrain, trail }: Props) {
     const j = jump.current
     if (input.jump) {
       input.jump = false
-      if (j.height === 0 && game.mode !== 'photo') j.velocity = JUMP_SPEED
+      if (j.height === 0 && game.mode !== 'photo') {
+        j.velocity = JUMP_SPEED
+        playJump()
+      }
+    }
+    // 발소리: 땅에 붙어 걸은 거리만큼 걸음 주기를 돌리고 반 바퀴마다 한 발
+    if (j.height === 0) {
+      const moved = Math.abs(distance - before.distance) + Math.abs(offset - before.offset)
+      const fs = footstep.current
+      fs.phase += moved * STEP_PHASE_PER_M
+      if (fs.phase >= Math.PI) {
+        fs.phase %= Math.PI
+        playStep(surfaceAt(distance, offset), input.run)
+      }
     }
     if (game.mode === 'photo') {
       j.height = 0
@@ -178,6 +206,13 @@ export function World({ terrain, trail }: Props) {
     hiker.current.group.rotation.y = heading + facing.current
     hiker.current.setCheering(game.mode !== 'hiking')
     hiker.current.setAirborne(j.height > 0)
+
+    // 산속 소리: 1초에 한 번, 높이 올라갈수록 바람이 세지고 새소리는 줄어든다
+    const now0 = performance.now()
+    if (now0 - footstep.current.ambienceAt > 1000) {
+      footstep.current.ambienceAt = now0
+      setAmbience((pos.y - terrain.minHeight) / (terrain.maxHeight - terrain.minHeight))
+    }
 
     // 그림자가 아바타 주변에서 선명하도록 태양을 따라 옮김
     sun.current.position.copy(pos).addScaledVector(SUN, 300)
