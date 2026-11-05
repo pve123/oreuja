@@ -201,12 +201,48 @@ export function standHeight(t: Terrain, x: number, z: number) {
   return y
 }
 
-/** 지형 한 장과 그 위의 코스 목록을 불러온다 */
-export async function loadData(): Promise<{ terrain: Terrain; trails: Trail[] }> {
+/** 받은 만큼 onProgress(0~1)로 알려 주며 파일을 받는다. 크기를 모르면 다 받았을 때만 알린다 */
+async function fetchWithProgress(url: string, onProgress?: (p: number) => void): Promise<ArrayBuffer> {
+  const res = await fetch(url)
+  if (!res.ok) throw new Error(`${url} 을 받지 못했다 (${res.status})`)
+  const total = Number(res.headers.get('content-length')) || 0
+  if (!res.body || !total || !onProgress) {
+    const buf = await res.arrayBuffer()
+    onProgress?.(1)
+    return buf
+  }
+  const reader = res.body.getReader()
+  const chunks: Uint8Array[] = []
+  let got = 0
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+    got += value.length
+    // 압축돼서 오면 풀린 크기가 content-length 보다 클 수 있어 1 을 넘지 않게 한다
+    onProgress(Math.min(0.99, got / total))
+  }
+  const out = new Uint8Array(got)
+  let at = 0
+  for (const c of chunks) {
+    out.set(c, at)
+    at += c.length
+  }
+  onProgress(1)
+  return out.buffer
+}
+
+/** 지형 한 장과 그 위의 코스 목록을 불러온다. onProgress 로 가장 큰 지형 파일을 받은 정도(0~1)를 알린다 */
+export async function loadData(onProgress?: (p: number) => void): Promise<{ terrain: Terrain; trails: Trail[] }> {
+  const json = async <T,>(url: string) => {
+    const r = await fetch(url)
+    if (!r.ok) throw new Error(`${url} 을 받지 못했다 (${r.status})`)
+    return (await r.json()) as T
+  }
   const [meta, buf, courses] = await Promise.all([
-    fetch('/data/terrain.json').then((r) => r.json() as Promise<TerrainMeta>),
-    fetch('/data/terrain.bin').then((r) => r.arrayBuffer()),
-    fetch('/data/courses.json').then((r) => r.json() as Promise<TrailData[]>),
+    json<TerrainMeta>('/data/terrain.json'),
+    fetchWithProgress('/data/terrain.bin', onProgress),
+    json<TrailData[]>('/data/courses.json'),
   ])
   return { terrain: { ...meta, heights: new Float32Array(buf) }, trails: courses.map((c) => new Trail(c)) }
 }

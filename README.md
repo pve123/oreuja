@@ -69,6 +69,7 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 |---|---|
 | `scripts/prepare-data.mjs` | 지형과 등산로 데이터를 만든다 (`npm run data`) |
 | `src/lib/data.ts` | 데이터를 불러오고, 등산로 위 위치와 실제 소요 시간을 계산한다 |
+| `index.html`, `src/lib/splash.ts` | 첫 화면. 새벽 북한산 그림에서 로딩 진행만큼 등산객이 정상으로 오르고 고도가 올라가며, 조작 팁이 바뀐다. 뒤에는 실제 패널 자리에 유리 스켈레톤을 깐다. JS 를 받기 전부터 보이도록 HTML 에 직접 넣었고, 장면이 그려지면 걷힌다 |
 | `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다. 이동은 Rapier 캐릭터 컨트롤러(캡슐 몸, 부딪히면 미끄러지기, 45cm 턱 오르기, 땅에 붙이기, 최대 경사 60°)로, 카메라는 스프링 암(지형·건물에 막히면 당기기)으로 움직인다 |
 | `src/scene/Colliders.tsx` | 물리 충돌체를 만든다. 등산로 둘레 40m 지형(화면 지형과 같은 삼각형), 돌계단 경사로, 나무 줄기·바위·랜드마크 원기둥 |
 | `src/lib/collider-mesh.ts` | 등산로 둘레 지형 충돌 메시 |
