@@ -10,6 +10,10 @@ export type ClimbRecord = {
 }
 
 type State = {
+  /** 고른 코스 id (브라우저에 기억). 없으면 첫 코스 */
+  courseId: string | null
+  /** 코스를 바꾸면 처음부터 다시 오른다 */
+  setCourse: (id: string) => void
   /** 등산로 위 진행 거리(m) */
   distance: number
   /** 등산로에서 옆으로 비킨 거리(m). 오른쪽이 + */
@@ -40,6 +44,35 @@ type State = {
 }
 
 const RECORDS_KEY = 'hiking-metaverse:climbs'
+const COURSE_KEY = 'hiking-metaverse:course'
+
+function loadCourse(): string | null {
+  try {
+    return localStorage.getItem(COURSE_KEY)
+  } catch {
+    return null
+  }
+}
+function saveCourse(id: string) {
+  try {
+    localStorage.setItem(COURSE_KEY, id)
+  } catch {
+    // 저장소를 못 쓰는 환경이면 무시
+  }
+}
+
+/** 처음부터 다시 오를 때 되돌리는 값 */
+const freshClimb = {
+  distance: 0,
+  offset: 0,
+  mode: 'hiking' as Mode,
+  startedAt: null,
+  finishedAt: null,
+  photo: null,
+  reachedCheckpoint: -1,
+  arrival: null,
+  returnedAt: null,
+}
 
 // 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
 function loadRecords(): ClimbRecord[] {
@@ -58,21 +91,18 @@ function saveRecords(records: ClimbRecord[]) {
 }
 
 export const useGame = create<State>((set, get) => ({
-  distance: 0,
-  offset: 0,
+  ...freshClimb,
+  courseId: loadCourse(),
+  setCourse: (courseId) => {
+    saveCourse(courseId)
+    set({ ...freshClimb, courseId })
+  },
   avatar: loadAvatar(),
   setAvatar: (avatar) => {
     saveAvatar(avatar)
     set({ avatar })
   },
-  mode: 'hiking',
-  startedAt: null,
-  finishedAt: null,
-  photo: null,
   records: loadRecords(),
-  reachedCheckpoint: -1,
-  arrival: null,
-  returnedAt: null,
   returnToTrail: () => set({ offset: 0, returnedAt: Date.now() }),
   setDistance: (distance) =>
     set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
@@ -86,18 +116,7 @@ export const useGame = create<State>((set, get) => ({
   takePhoto: () => set({ mode: 'photo' }),
   setPhoto: (photo) => set({ photo, mode: 'photoResult' }),
   closePhoto: () => set({ mode: 'summit' }),
-  restart: () =>
-    set({
-      distance: 0,
-      offset: 0,
-      mode: 'hiking',
-      startedAt: null,
-      finishedAt: null,
-      photo: null,
-      reachedCheckpoint: -1,
-      arrival: null,
-      returnedAt: null,
-    }),
+  restart: () => set(freshClimb),
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */

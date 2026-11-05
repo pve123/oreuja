@@ -1,7 +1,7 @@
-// 북한산 지형·등산로 데이터를 받아 public/data 에 정적 파일로 만든다.
+// 북한산 지형과 코스별 등산로 데이터를 받아 public/data 에 정적 파일로 만든다.
 // 실행: node scripts/prepare-data.mjs
 //  - 지형: AWS Terrain Tiles (Terrarium PNG, 키 불필요)
-//  - 등산로: OpenStreetMap Overpass API (scripts/raw/osm.json 이 있으면 재사용)
+//  - 등산로: OpenStreetMap Overpass API (scripts/raw/osm-<범위>.json 이 있으면 재사용)
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import { PNG } from 'pngjs'
@@ -15,27 +15,65 @@ const CONTOUR_SPACING = 7.5 // 정밀 지형 격자 간격(m)
 const OUT = path.join(ROOT, 'public/data')
 const UA = 'hiking-metaverse-dev'
 
-// 지형으로 만들 영역 (남, 서, 북, 동)
-const BBOX = { south: 37.638, west: 126.958, north: 37.678, east: 127.004 }
+// 지형으로 만들 영역 (남, 서, 북, 동). 모든 코스가 들어가게 잡는다
+const BBOX = { south: 37.634, west: 126.943, north: 37.678, east: 127.006 }
 const ZOOM = 13
 
-// 코스: 백운대탐방지원센터 → 백운대
-const COURSE = {
-  id: 'bukhansan-baegundae',
-  mountain: '북한산',
-  name: '백운대 코스',
-  // 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
-  start: { name: '백운대탐방지원센터', lat: 37.65815, lon: 126.99129 },
-  summit: { name: '백운대', osmId: 5515194671, elevation: 835.6 },
-  // 가는 길에 지나는 이정표. 등산로에서 MAX_CHECKPOINT_OFFSET 보다 멀면 빼고 경고한다
-  checkpoints: [
-    { name: '하루재', lat: 37.66227, lon: 126.98696, note: '코스의 첫 고개' },
-    { name: '인수암', lat: 37.66106, lon: 126.98483, note: '작은 암자. 근처에 화장실과 산악구조대가 있다' },
-    { name: '깔딱고개', lat: 37.65992, lon: 126.98475, note: '이름처럼 숨이 깔딱 넘어가는 오르막' },
-    { name: '백운산장', lat: 37.65848, lon: 126.98115, note: '정상 전 마지막 쉼터. 바로 옆에 샘터가 있다' },
-    { name: '백운봉암문(위문)', lat: 37.65765, lon: 126.97955, note: '북한산성의 암문. 여기서부터 정상까지 바위 구간이다' },
-  ],
-}
+// 코스 목록. 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
+// summit 은 봉우리 노드(osmId)나 좌표(lat, lon) 중 하나로 준다. elevation 이 없으면 지형 높이를 쓴다
+// checkpoints 는 가는 길에 지나는 이정표. 등산로에서 MAX_CHECKPOINT_OFFSET 보다 멀면 빼고 경고한다
+const COURSES = [
+  {
+    id: 'bukhansan-baegundae',
+    mountain: '북한산',
+    name: '백운대 코스',
+    level: '보통',
+    start: { name: '백운대탐방지원센터', lat: 37.65815, lon: 126.99129 },
+    summit: { name: '백운대', osmId: 5515194671, elevation: 835.6 },
+    checkpoints: [
+      { name: '하루재', lat: 37.66227, lon: 126.98696, note: '코스의 첫 고개' },
+      { name: '인수암', lat: 37.66106, lon: 126.98483, note: '작은 암자. 근처에 화장실과 산악구조대가 있다' },
+      { name: '깔딱고개', lat: 37.65992, lon: 126.98475, note: '이름처럼 숨이 깔딱 넘어가는 오르막' },
+      { name: '백운산장', lat: 37.65848, lon: 126.98115, note: '정상 전 마지막 쉼터. 바로 옆에 샘터가 있다' },
+      { name: '백운봉암문(위문)', lat: 37.65765, lon: 126.97955, note: '북한산성의 암문. 여기서부터 정상까지 바위 구간이다' },
+    ],
+  },
+  {
+    id: 'bukhansan-sanseong',
+    mountain: '북한산',
+    name: '북한산성 코스',
+    level: '어려움',
+    start: { name: '북한산성탐방지원센터', lat: 37.65508, lon: 126.94956 },
+    summit: { name: '백운대', osmId: 5515194671, elevation: 835.6 },
+    checkpoints: [
+      { name: '수문터', lat: 37.65527, lon: 126.95438, note: '북한산성 계곡 물길에 있던 수문 자리' },
+      { name: '보리사', lat: 37.65304, lon: 126.96263, note: '계곡 옆 작은 절. 여기서부터 본격적인 산길이다' },
+      { name: '개연폭포', lat: 37.65386, lon: 126.96516, note: '옥류동 계곡을 따라 오르다 만나는 폭포' },
+      { name: '대동사', lat: 37.65584, lon: 126.9702, note: '위문으로 오르기 전 마지막 절. 근처에 샘터가 있다' },
+      { name: '백운봉암문(위문)', lat: 37.65765, lon: 126.97955, note: '우이동에서 오는 백운대 코스와 여기서 만난다. 정상까지 바위 구간이다' },
+    ],
+  },
+  {
+    id: 'bukhansan-jindallae',
+    mountain: '북한산',
+    name: '진달래능선 코스',
+    level: '보통',
+    start: { name: '아카데미탐방지원센터', lat: 37.64158, lon: 127.00149 },
+    summit: { name: '대동문', lat: 37.64031, lon: 126.98607 },
+    checkpoints: [],
+  },
+  {
+    id: 'bukhansan-yeongbong',
+    mountain: '북한산',
+    name: '영봉 코스',
+    level: '쉬움',
+    start: { name: '백운대탐방지원센터', lat: 37.65815, lon: 126.99129 },
+    summit: { name: '영봉', osmId: 5515194647, elevation: 597.1 },
+    checkpoints: [
+      { name: '하루재', lat: 37.66227, lon: 126.98696, note: '백운대와 영봉으로 길이 갈리는 고개' },
+    ],
+  },
+]
 const MAX_CHECKPOINT_OFFSET = 40 // m
 
 // ── 좌표 유틸 ───────────────────────────────────────
@@ -152,24 +190,35 @@ function makeSampler(heights, width, height, ext) {
 
 // ── 2. 등산로 ──────────────────────────────────────
 async function loadOsm() {
-  const file = path.join(RAW, 'osm.json')
+  // 받는 범위나 길 종류가 바뀌면 새로 받도록 파일 이름에 버전과 범위를 넣는다
+  const file = path.join(RAW, `osm-v3-${BBOX.south}-${BBOX.west}-${BBOX.north}-${BBOX.east}.json`)
   try {
     return JSON.parse(await fs.readFile(file, 'utf8'))
   } catch {
-    const q = `[out:json][timeout:90];(way["highway"~"path|footway|track|steps"](${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east});node["natural"="peak"](${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east}););out body;>;out skel qt;`
-    const res = await fetch('https://overpass-api.de/api/interpreter', {
-      method: 'POST',
-      headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: 'data=' + encodeURIComponent(q),
-    })
-    const text = await res.text()
-    if (!text.startsWith('{')) throw new Error('Overpass 응답 오류 (잠시 뒤 다시 실행): ' + text.slice(0, 120))
-    await fs.writeFile(file, text)
-    return JSON.parse(text)
+    const box = `${BBOX.south},${BBOX.west},${BBOX.north},${BBOX.east}`
+    // 북한산성 계곡길처럼 차도(대서문길 residential 등)로 표시된 탐방로도 있어 작은 길은 함께 받는다
+    const q = `[out:json][timeout:120];(way["highway"~"^(path|footway|track|steps|pedestrian|service|unclassified|residential|living_street)$"](${box});node["natural"="peak"](${box}););out body;>;out skel qt;`
+    // Overpass 는 붐비면 502·504 를 자주 내서 몇 번 다시 시도한다
+    for (let attempt = 1; ; attempt++) {
+      const res = await fetch('https://overpass-api.de/api/interpreter', {
+        method: 'POST',
+        headers: { 'User-Agent': UA, 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: 'data=' + encodeURIComponent(q),
+      })
+      const text = await res.text()
+      if (text.startsWith('{')) {
+        await fs.writeFile(file, text)
+        return JSON.parse(text)
+      }
+      if (attempt >= 5) throw new Error('Overpass 응답 오류 (잠시 뒤 다시 실행): ' + text.slice(0, 120))
+      console.warn(`  Overpass 응답 오류, ${attempt * 10}초 뒤 다시 시도`)
+      await new Promise((r) => setTimeout(r, attempt * 10000))
+    }
   }
 }
 
-function shortestPath(osm, startCoord, goalId) {
+/** 등산로 그래프 (노드와 이웃 목록). 출입금지·비법정·암벽 구간은 뺀다 */
+function buildGraph(osm) {
   const nodes = new Map()
   const adj = new Map()
   for (const e of osm.elements) if (e.type === 'node') nodes.set(e.id, e)
@@ -193,24 +242,35 @@ function shortestPath(osm, startCoord, goalId) {
       link(b.id, a.id, w)
     }
   }
-  // 출발 좌표에서 가장 가까운 등산로 노드
-  let startId = null, best = Infinity
-  for (const id of adj.keys()) {
-    const d = haversine(nodes.get(id), startCoord)
-    if (d < best) { best = d; startId = id }
-  }
-  // 정상 봉우리 노드가 길과 이어져 있지 않으면 가장 가까운 길 노드로
-  const goalNode = nodes.get(goalId)
-  let goal = goalId
-  if (!adj.has(goalId)) {
-    let gb = Infinity
-    for (const id of adj.keys()) {
-      const d = haversine(nodes.get(id), goalNode)
-      if (d < gb) { gb = d; goal = id }
-    }
-  }
+  return { nodes, adj }
+}
 
-  // 다익스트라 (노드 수가 적어 단순 구현)
+/** 좌표에서 가장 가까운 등산로 노드. among 을 주면 그 노드들 가운데서만 고른다 */
+function nearestNode({ nodes, adj }, coord, among = adj.keys()) {
+  let id = null, best = Infinity
+  for (const k of among) {
+    const d = haversine(nodes.get(k), coord)
+    if (d < best) { best = d; id = k }
+  }
+  return id
+}
+
+/**
+ * 출발 좌표에서 목적지까지 가장 짧은 등산로 (다익스트라).
+ * 목적지 봉우리 노드가 길과 이어져 있지 않으면 가장 가까운 길 노드까지 간 뒤 봉우리를 덧붙인다.
+ */
+function shortestPath(graph, startCoord, goalCoord) {
+  const { nodes, adj } = graph
+  const goal = goalCoord.id !== undefined && adj.has(goalCoord.id) ? goalCoord.id : nearestNode(graph, goalCoord)
+  // 주차장 길처럼 등산로와 끊긴 조각에서 출발하지 않게, 목적지와 이어진 노드 가운데서 출발점을 고른다
+  const linked = new Set([goal])
+  const queue = [goal]
+  while (queue.length) for (const [nb] of adj.get(queue.pop()) ?? []) if (!linked.has(nb)) { linked.add(nb); queue.push(nb) }
+  const startId = nearestNode(graph, startCoord, linked)
+  const startGap = haversine(nodes.get(startId), startCoord)
+  if (startGap > 80) console.warn(`  ! 출발점이 이어진 길에서 ${startGap.toFixed(0)}m 떨어져 있다`)
+
+  // 노드 수가 적어 단순 구현
   const dist = new Map([[startId, 0]])
   const prev = new Map()
   const open = new Set([startId])
@@ -227,13 +287,18 @@ function shortestPath(osm, startCoord, goalId) {
   if (!dist.has(goal)) throw new Error('출발점에서 정상까지 이어진 길을 찾지 못했습니다')
   const route = []
   for (let id = goal; id !== undefined; id = prev.get(id)) route.unshift(nodes.get(id))
-  if (goal !== goalId) route.push(goalNode)
+  if (goal !== goalCoord.id && haversine(nodes.get(goal), goalCoord) > 1) route.push(goalCoord)
   return route
 }
 
-async function buildTrail(sampleHeight) {
-  const osm = await loadOsm()
-  const route = shortestPath(osm, COURSE.start, COURSE.summit.osmId)
+/** 코스 하나의 등산로 데이터를 만든다 */
+function buildTrail(course, graph, sampleHeight) {
+  console.log(`[${course.name}]`)
+  const goal = course.summit.osmId !== undefined
+    ? { id: course.summit.osmId, ...graph.nodes.get(course.summit.osmId) }
+    : { lat: course.summit.lat, lon: course.summit.lon }
+  if (goal.lat === undefined) throw new Error(`${course.summit.name} 노드(${course.summit.osmId})가 OSM 데이터에 없습니다`)
+  const route = shortestPath(graph, course.start, goal)
 
   // 로컬 좌표로 바꾸고 2m 간격으로 다시 나눠 부드럽게 만든다
   const raw = route.map((n) => toLocal(n.lat, n.lon))
@@ -258,7 +323,7 @@ async function buildTrail(sampleHeight) {
 
   // 이정표를 등산로 위 가장 가까운 점에 붙이고 출발점에서의 거리를 구한다
   const checkpoints = []
-  for (const cp of COURSE.checkpoints) {
+  for (const cp of course.checkpoints) {
     const p = toLocal(cp.lat, cp.lon)
     let best = 0, bestD = Infinity
     points.forEach(([x, , z], k) => {
@@ -273,23 +338,28 @@ async function buildTrail(sampleHeight) {
     console.log(`  이정표 ${cp.name}: 출발 ${Math.round(cumulative[best])}m, 해발 ${points[best][1].toFixed(0)}m, 길에서 ${bestD.toFixed(0)}m`)
   }
   checkpoints.sort((a, b) => a.distance - b.distance)
-  const trail = {
-    id: COURSE.id,
-    mountain: COURSE.mountain,
-    name: COURSE.name,
-    start: COURSE.start.name,
-    summit: COURSE.summit.name,
-    summitElevation: COURSE.summit.elevation,
+  const top = points[points.length - 1]
+  console.log(`  ${route.length}개 노드 → ${points.length}개 점, 길이 ${(length / 1000).toFixed(2)}km, 누적 오르막 ${gain.toFixed(0)}m, 도착 해발 ${top[1].toFixed(0)}m`)
+  return {
+    id: course.id,
+    mountain: course.mountain,
+    name: course.name,
+    level: course.level,
+    start: course.start.name,
+    summit: course.summit.name,
+    summitElevation: course.summit.elevation ?? Math.round(top[1]),
     length: Math.round(length),
     elevationGain: Math.round(gain),
     checkpoints,
     points,
   }
-  await fs.writeFile(path.join(OUT, 'trail.json'), JSON.stringify(trail))
-  console.log(`등산로 ${route.length}개 노드 → ${points.length}개 점, 길이 ${(length / 1000).toFixed(2)}km, 누적 오르막 ${gain.toFixed(0)}m`)
 }
 
 await fs.mkdir(RAW, { recursive: true })
 await fs.mkdir(OUT, { recursive: true })
 const sampleHeight = await buildTerrain()
-await buildTrail(sampleHeight)
+const graph = buildGraph(await loadOsm())
+const trails = COURSES.map((c) => buildTrail(c, graph, sampleHeight))
+await fs.writeFile(path.join(OUT, 'courses.json'), JSON.stringify(trails))
+await fs.rm(path.join(OUT, 'trail.json'), { force: true }) // 코스 하나만 있던 옛 파일
+console.log(`코스 ${trails.length}개를 courses.json 에 썼다`)
