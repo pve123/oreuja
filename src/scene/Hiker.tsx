@@ -258,12 +258,16 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
   const state = useRef({ phase: 0, swing: 0, cheering: false, airborne: false, time: 0 })
   const potato = useMemo(() => potatoGeometry(), [])
   const rig = useMemo(() => rigOf(kind, potato), [kind, potato])
-  // 오른손(캐릭터 기준, -x 쪽)에 쥔 등산 스틱. 손잡이가 주먹 위로 조금 나오고 끝은 땅에 닿는다
-  const pole = useMemo(() => {
-    const p = makeTrekkingPole(rig.shoulderY - rig.armLen + 0.05)
-    p.position.y = 0.05
-    return p
-  }, [rig])
+  // 양손에 쥔 등산 스틱. 손잡이가 주먹 위로 조금 나오고 끝은 땅에 닿는다
+  const poles = useMemo(
+    () =>
+      [0, 1].map(() => {
+        const p = makeTrekkingPole(rig.shoulderY - rig.armLen + 0.05)
+        p.position.y = 0.05
+        return p
+      }),
+    [rig],
+  )
 
   useImperativeHandle(ref, () => ({
     group: group.current,
@@ -325,9 +329,11 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
       <group ref={upper}>
         {rig.body}
         <Limb limbRef={armL} x={-rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor}>
-          <primitive object={pole} />
+          <primitive object={poles[0]} />
         </Limb>
-        <Limb limbRef={armR} x={rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor} />
+        <Limb limbRef={armR} x={rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor}>
+          <primitive object={poles[1]} />
+        </Limb>
         {rig.eyes &&
           [-1, 1].map((side, i) => (
             <group key={side} position={[side * rig.eyes!.x, rig.eyes!.y, rig.eyes!.z]}>
