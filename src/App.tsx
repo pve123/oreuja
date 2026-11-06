@@ -12,6 +12,7 @@ import { Hud, SummitModal } from './ui/Hud'
 import { Lobby } from './ui/Lobby'
 import { SoundControls } from './ui/SoundControls'
 import { startNet } from './lib/net'
+import { IS_TOUCH } from './lib/device'
 import { failSplash, hideSplash, setSplash } from './lib/splash'
 
 /** 첫 화면 진행 막대 몫: 지형 데이터 0.05~0.6, 3D 모델·텍스처 0.6~0.92, 장면 준비 나머지 */
@@ -71,8 +72,9 @@ export default function App() {
         shadows
         camera={{ fov: 55, near: 0.5, far: 20000 }}
         // 기념사진 캡처를 위해 그린 화면을 유지. 톤 매핑은 후처리 맨 끝에서 한다 (scene/World 의 PostEffects)
-        gl={{ preserveDrawingBuffer: true, toneMapping: THREE.NoToneMapping }}
-        dpr={[1, 2]}
+        gl={{ preserveDrawingBuffer: true, toneMapping: THREE.NoToneMapping, powerPreference: 'high-performance' }}
+        // 폰은 화소가 촘촘해서(3배까지) 그대로 그리면 GPU 가 벅차다. 1.5배까지만 그려도 눈에 띄지 않는다
+        dpr={IS_TOUCH ? [1, 1.5] : [1, 2]}
       >
         <World terrain={data.terrain} trail={trail} />
       </Canvas>

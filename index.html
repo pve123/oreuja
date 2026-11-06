@@ -3,9 +3,24 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- 노치·홈바까지 화면을 쓰고, 안전 영역은 CSS 의 env(safe-area-inset-*) 로 비킨다 -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#1c2c47" />
+    <meta name="color-scheme" content="dark" />
     <title>방구석 등반대</title>
+    <meta name="description" content="집에서 오르는 진짜 산. 북한산과 도봉산을 브라우저에서 걸어 올라요." />
+    <!-- 홈 화면에 추가(PWA). 설치하면 주소창 없이 앱처럼 열린다 -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="등반대" />
+    <!-- 링크를 카카오톡·슬랙에 붙였을 때 보이는 카드. 그림(og:image)은 배포 주소가 정해지면 절대 주소로 더한다 -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="방구석 등반대" />
+    <meta property="og:description" content="집에서 오르는 진짜 산. 북한산과 도봉산을 브라우저에서 걸어 올라요." />
+    <meta property="og:locale" content="ko_KR" />
     <!--
       고른 산(src/lib/mountains.ts 가 브라우저에 기억)의 지형·코스 데이터를 JS 를 받는 동안 같이 받아 둔다.
       src/lib/data.ts 의 fetch 가 이 응답을 그대로 쓴다. 기억이 없으면 북한산

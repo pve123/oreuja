@@ -155,4 +155,6 @@ export const input = {
   right: false,
   run: false,
   jump: false,
+  /** 터치 조이스틱 기울기. 화면 기준으로 x 는 오른쪽 +, y 는 위쪽 +, 길이 0~1 (src/ui/TouchControls.tsx) */
+  stick: { x: 0, y: 0 },
 }
