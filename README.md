@@ -33,7 +33,7 @@ npm run dev      # http://localhost:5173
 
 ## 같이하기 (선택)
 
-같이하기 서버를 켜면 같은 코스를 오르는 다른 사람의 아바타와 닉네임이 보인다. 서버가 없으면 혼자 오르기로 동작하고 5초마다 다시 붙어 본다. 베이스캠프에서 「혼자」를 고르면 다른 사람이 보이지 않고 나도 남에게 보이지 않는다(서버에는 `hidden` 으로 알린다). 베이스캠프에 있는 사람(`lobby`)도 산길에는 그리지 않는다.
+같이하기 서버를 켜면 같은 코스를 오르는 다른 사람의 아바타와 닉네임이 보인다. 개발 서버에서 같이하기 서버가 꺼져 있으면 혼자 오르기로 동작하고 5초마다 다시 붙어 본다. 배포본은 `VITE_MULTIPLAYER_URL` 이 비어 있으면 아예 붙어 보지 않는다. 베이스캠프에서 「혼자」를 고르면 다른 사람이 보이지 않고 나도 남에게 보이지 않는다(서버에는 `hidden` 으로 알린다). 베이스캠프에 있는 사람(`lobby`)도 산길에는 그리지 않는다.
 
 ```bash
 npm run server   # 같이하기 서버 (ws://localhost:5200)
@@ -55,6 +55,16 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 ```
 
 토큰은 빌드 결과에 들어가는 공개 토큰이라, Mapbox 계정 화면에서 쓸 주소(URL)를 제한해 둔다. 위성 타일은 Static Tiles API(`mapbox/satellite-v9` 스타일)로 받는다. 새 계정에서는 v4 Raster Tiles API가 `429` 로 막혀 있었다. 위성사진을 쓰면 화면 오른쪽 아래에 Mapbox와 Maxar 출처를 표시해야 한다.
+
+## Vercel 에 올리기
+
+정적 파일만 올리는 배포라 혼자 오르기만 된다. Vercel 에는 웹소켓 서버를 둘 수 없어서 `VITE_MULTIPLAYER_URL` 을 비워 두면 배포본은 같이하기 서버를 찾지 않고 베이스캠프의 「같이」 아래에 「서버 없음」이 보인다.
+
+1. Vercel 대시보드에서 「Add New Project」를 누르고 GitHub 의 `pve123/trailverse` 저장소를 고른다. `vercel.json` 이 Vite 프리셋과 `npm run build`, `dist` 를 알려 주니 빌드 설정은 그대로 둔다.
+2. Environment Variables 에 `VITE_MAPBOX_TOKEN` 을 넣는다. 비우면 위성사진 없이 고도 색으로 지형을 그린다. 토큰은 빌드 결과에 들어가니 Mapbox 계정 화면에서 쓸 주소를 Vercel 도메인으로 제한한다.
+3. 「Deploy」를 누른다. 이후에는 main 에 올라갈 때마다 자동으로 다시 배포하고 PR 브랜치는 미리보기 주소를 받는다.
+
+같이하기까지 열려면 `server/index.mjs` 를 Render 나 Fly.io 같은 곳에 올리고 Vercel 환경변수 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣은 뒤 다시 배포한다.
 
 ## 구성
 
