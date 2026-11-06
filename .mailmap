@@ -1,0 +1,5 @@
+# 커밋 작성자 이름을 이호성 하나로 묶어 보여 준다 (git log, git shortlog, git blame)
+# PR 병합 커밋은 병합한 GitHub 계정 이름(예전 hsl, hosunglee-dev)으로 찍혀 있었다
+이호성 <59010442+pve123@users.noreply.github.com>
+이호성 <59010442+pve123@users.noreply.github.com> <hosung.lee@dshare.co.kr>
+이호성 <59010442+pve123@users.noreply.github.com> <tkddlfdlfemd@naver.com>
