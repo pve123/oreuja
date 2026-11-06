@@ -125,6 +125,7 @@ function buildAnimations(srcDir, picks, outFile) {
 
 const kenneyGlb = path.join(kenneyDir, 'Models', 'GLB format')
 for (const name of KENNEY) copy(path.join(kenneyGlb, `${name}.glb`), path.join(OUT, 'kenney', `${name}.glb`))
+// Kenney GLB 는 이 텍스처를 바깥 파일로 읽는다. README 「모델 압축」대로 압축하면 GLB 안에 들어가므로 그 뒤 Textures 폴더는 지운다
 copy(path.join(kenneyGlb, 'Textures', 'colormap.png'), path.join(OUT, 'kenney', 'Textures', 'colormap.png'))
 
 for (const name of KAYKIT) copy(path.join(kaykitDir, 'Characters', 'gltf', `${name}.glb`), path.join(OUT, 'kaykit', `${name}.glb`))
