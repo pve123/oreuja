@@ -1,3 +1,6 @@
+import type { TrailData } from './data'
+import { AUTOSTART_STORAGE_KEY, saveCourse } from './store'
+
 /**
  * 산 목록과 고른 산. 산마다 지형 한 장과 코스들이 public/data/<산 id>/ 에 따로 있다 (scripts/prepare-data.mjs).
  * 고른 산은 브라우저에 기억해 두고, 첫 화면(index.html)이 JS 를 받기 전에 읽어 그 산의 데이터를 미리 받는다.
@@ -27,10 +30,17 @@ export function loadMountain(): Mountain {
   return DEFAULT_MOUNTAIN
 }
 
-/** 산을 바꾼다. 지형·물리·코스가 모두 바뀌므로 페이지를 새로 불러 첫 화면부터 다시 그린다 */
-export function switchMountain(m: Mountain) {
+/**
+ * 산을 바꾼다. 지형·물리·코스가 모두 바뀌므로 페이지를 새로 불러 첫 화면부터 다시 그린다.
+ * courseId 를 주면 그 코스를 고른 채로, 베이스캠프를 건너뛰고 바로 출발한다.
+ */
+export function switchMountain(m: Mountain, courseId?: string) {
   try {
     localStorage.setItem(MOUNTAIN_KEY, JSON.stringify(m))
+    if (courseId) {
+      saveCourse(courseId)
+      sessionStorage.setItem(AUTOSTART_STORAGE_KEY, '1')
+    }
   } catch {
     // 저장소를 못 쓰는 환경이면 바꿀 수 없다 (새로 불러도 기본 산이 뜬다)
     return
@@ -42,4 +52,19 @@ export async function loadMountains(): Promise<Mountain[]> {
   const r = await fetch('/data/mountains.json')
   if (!r.ok) throw new Error(`/data/mountains.json 을 받지 못했다 (${r.status})`)
   return r.json()
+}
+
+/** 다른 산의 코스 목록만 받는다 (베이스캠프에서 코스 카드를 미리 보여 줄 때. 지형은 받지 않는다) */
+const coursesCache = new Map<string, Promise<TrailData[]>>()
+export function loadCourses(mountainId: string): Promise<TrailData[]> {
+  let p = coursesCache.get(mountainId)
+  if (!p) {
+    p = fetch(`/data/${mountainId}/courses.json`).then((r) => {
+      if (!r.ok) throw new Error(`/data/${mountainId}/courses.json 을 받지 못했다 (${r.status})`)
+      return r.json() as Promise<TrailData[]>
+    })
+    p.catch(() => coursesCache.delete(mountainId))
+    coursesCache.set(mountainId, p)
+  }
+  return p
 }
