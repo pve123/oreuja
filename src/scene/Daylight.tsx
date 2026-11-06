@@ -5,6 +5,7 @@ import * as THREE from 'three'
 import type { Sky as SkyImpl } from 'three-stdlib'
 import { MOON, MOON_COLOR, SUN, applySky, daylight, kstNow, parseDebugTime, settle, useSky } from '../lib/daylight'
 import { occlusionUniforms } from '../lib/occlusion'
+import { IS_TOUCH } from '../lib/device'
 
 const STAR_COUNT = 1500
 const STAR_RADIUS = 4000
@@ -85,7 +86,8 @@ export function Daylight() {
         ref={sun}
         intensity={daylight.sunIntensity}
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        // 폰·태블릿은 그림자 지도를 절반 크기로 (GPU 를 아낀다)
+        shadow-mapSize={IS_TOUCH ? [1024, 1024] : [2048, 2048]}
         shadow-camera-left={-60}
         shadow-camera-right={60}
         shadow-camera-top={60}

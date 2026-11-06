@@ -5,6 +5,7 @@ import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
+import { TouchControls } from './TouchControls'
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
@@ -126,38 +127,37 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
           <AvatarPanel />
           <HelpPanel />
         </div>
-      </div>
-
-      {/* 걷는 동안 보는 패널: 해발 고도와 다음 이정표만 크게, 나머지는 작게 */}
-      <div className="panel progress">
-        <div className="progress-main">
-          <div>
-            <span className="progress-label">해발</span>
-            <span className="progress-alt">
-              {elevation}
-              <small>m</small>
-            </span>
+        {/* 걷는 동안 보는 패널: 해발 고도와 다음 이정표만 크게, 나머지는 작게 */}
+        <div className="panel progress">
+          <div className="progress-main">
+            <div>
+              <span className="progress-label">해발</span>
+              <span className="progress-alt">
+                {elevation}
+                <small>m</small>
+              </span>
+            </div>
+            <div className="progress-next">
+              <span className="progress-label">다음</span>
+              <span className="progress-next-name">{next.to}</span>
+              <span className="progress-next-dist">{formatDistance(Math.max(0, next.end - distance))}</span>
+            </div>
           </div>
-          <div className="progress-next">
-            <span className="progress-label">다음</span>
-            <span className="progress-next-name">{next.to}</span>
-            <span className="progress-next-dist">{formatDistance(Math.max(0, next.end - distance))}</span>
+          <div className="bar">
+            <div className="bar-fill" style={{ width: `${progress * 100}%` }} />
+            {trail.data.checkpoints.map((cp) => (
+              <i
+                key={cp.name}
+                className={distance >= cp.distance ? 'tick passed' : 'tick'}
+                style={{ left: `${(cp.distance / trail.length) * 100}%` }}
+                title={cp.name}
+              />
+            ))}
           </div>
-        </div>
-        <div className="bar">
-          <div className="bar-fill" style={{ width: `${progress * 100}%` }} />
-          {trail.data.checkpoints.map((cp) => (
-            <i
-              key={cp.name}
-              className={distance >= cp.distance ? 'tick passed' : 'tick'}
-              style={{ left: `${(cp.distance / trail.length) * 100}%` }}
-              title={cp.name}
-            />
-          ))}
-        </div>
-        <div className="progress-row">
-          <span>정상까지 {formatDistance(remaining)}</span>
-          <span>실제로는 약 {formatMinutes(leftMinutes)}</span>
+          <div className="progress-row">
+            <span>정상까지 {formatDistance(remaining)}</span>
+            <span>실제로는 약 {formatMinutes(leftMinutes)}</span>
+          </div>
         </div>
       </div>
 
@@ -165,10 +165,9 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       <RoamNotice />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
-      <HoldButton label="걷기" onHold={(on) => (input.forward = on)} />
+      {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
+      <TouchControls />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
-      <HoldButton label="◀" className="side left" onHold={(on) => (input.left = on)} />
-      <HoldButton label="▶" className="side right" onHold={(on) => (input.right = on)} />
     </>
   )
 }
