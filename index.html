@@ -30,7 +30,7 @@
     </script>
     <!--
       첫 화면: 새벽 산을 오르는 등산객 (봉우리 그림은 모든 산이 같이 쓴다). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
-      로딩 진행만큼 등산객이 등산로를 따라 정상으로 오르고 고도가 올라간다 (src/lib/splash.ts).
+      로딩 진행만큼 등산객이 등산로를 따라 정상으로 오른다 (src/lib/splash.ts).
       장면이 그려지면 걷히고, 그때 화면 패널들이 차례로 들어온다 (src/index.css 의 hud-enter).
     -->
     <style>
@@ -120,21 +120,6 @@
         font-size: 14px;
         color: var(--sub);
       }
-      .splash-alt {
-        font-variant-numeric: tabular-nums;
-        font-weight: 800;
-        color: var(--ink);
-      }
-      .splash-tip {
-        margin-top: 22px;
-        padding: 9px 16px;
-        border-radius: 999px;
-        background: rgba(20, 28, 48, 0.32);
-        backdrop-filter: blur(8px);
-        font-size: 13px;
-        color: var(--ink);
-        transition: opacity 0.35s ease;
-      }
       .splash-error {
         display: none;
         margin-top: 18px;
@@ -150,9 +135,6 @@
       }
       #splash.failed .splash-error {
         display: block;
-      }
-      #splash.failed .splash-tip {
-        display: none;
       }
       @keyframes splash-mist {
         to {
@@ -212,8 +194,7 @@
         #splash-sub::after {
           animation: none;
         }
-        #splash,
-        .splash-tip {
+        #splash {
           transition: none;
         }
       }
@@ -251,11 +232,8 @@
         <p class="splash-eyebrow">집에서 오르는 진짜 산</p>
         <h1 class="splash-title">방구석 등반대</h1>
         <div class="splash-meta">
-          <span>해발 <span class="splash-alt" id="splash-alt">0</span>m</span>
-          <span aria-hidden="true">·</span>
           <span id="splash-sub">등산화 끈 묶는 중</span>
         </div>
-        <div class="splash-tip" id="splash-tip">↑ 키로 걷고 ← → 로 몸을 돌려요</div>
         <button class="splash-error" id="splash-retry" type="button" onclick="location.reload()">다시 시도</button>
       </div>
     </div>
