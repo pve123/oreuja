@@ -488,10 +488,16 @@ function WorldScene({ terrain, trail }: Props) {
     photoFrames.current = 0
 
     // 바라보는 높이는 몸보다 느리게 따라가, 계단을 오르거나 점프할 때 화면이 덜컹거리지 않게 한다 (점프는 더 느리게)
-    const lookY = b.airTime > 0 ? Math.min(pos.y, cameraY.current + 0.02) : pos.y
+    // 처음·다시 오르기·코스 바꾸기로 자리를 옮겼으면 바로 맞춘다. 공중 높이 계산보다 먼저 해야 NaN 이 카메라에 섞이지 않는다
     if (Number.isNaN(cameraY.current) || Math.abs(cameraY.current - pos.y) > 3) cameraY.current = pos.y
+    const lookY = b.airTime > 0 ? Math.min(pos.y, cameraY.current + 0.02) : pos.y
     cameraY.current += (lookY - cameraY.current) * (1 - Math.exp(-CAMERA_Y_RATE * dt))
     const target = new THREE.Vector3(pos.x, cameraY.current + 1.5, pos.z)
+    // 안전망: 카메라 값이 한 번이라도 깨지면 다음 프레임에도 계속 깨진 채로 남아 화면이 비므로, 캐릭터 등 뒤로 다시 놓는다
+    if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z + lastTarget.current.x + lastTarget.current.y + lastTarget.current.z)) {
+      lastTarget.current.copy(target)
+      camera.position.set(target.x - Math.sin(b.yaw) * CAMERA_START_DISTANCE, target.y + 2.5, target.z - Math.cos(b.yaw) * CAMERA_START_DISTANCE)
+    }
     const delta = target.clone().sub(lastTarget.current)
     camera.position.add(delta)
 
