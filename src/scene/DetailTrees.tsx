@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { bakeGeometry } from '../lib/geometry'
 import { occlusionUniforms, withOcclusionShrink } from '../lib/occlusion'
 import type { Tree } from './Forest'
 
@@ -32,7 +33,7 @@ function useModelParts() {
         gltf.scene.updateMatrixWorld(true)
         gltf.scene.traverse((o) => {
           if (!(o instanceof THREE.Mesh)) return
-          const geometry = (o.geometry as THREE.BufferGeometry).clone().applyMatrix4(o.matrixWorld)
+          const geometry = bakeGeometry(o)
           // 아바타 가까이만 보이게(반경 밖은 숨김) + 카메라 가림 숨기기. 판정 중심은 수관 가운데
           const material = withOcclusionShrink((o.material as THREE.Material).clone(), 4, { ring: 'near' })
           const mesh = new THREE.InstancedMesh(geometry, material, CAPACITY)
