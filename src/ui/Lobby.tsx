@@ -5,9 +5,10 @@ import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
 import { isClimbing, useNet } from '../lib/net'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { playHudEnter } from '../lib/splash'
+import { SKY_PRESETS, currentPhase, useSky, type Phase } from '../lib/daylight'
 
 /**
- * 베이스캠프: 출발 전에 산·코스·혼자/같이·캐릭터를 고르는 창.
+ * 베이스캠프: 출발 전에 산·코스·하늘·캐릭터를 고르는 창. 혼자/같이 고르기는 같이하기를 열 때 다시 넣는다.
  * 게임 로비처럼 출발점 3D 장면(내 캐릭터) 위에 띄운다. 다시 온 사람은 지난번 고른 것이 그대로라 「출발」만 누르면 된다.
  * 걷는 중에도 Esc(또는 코스 패널 버튼)로 다시 연다.
  */
@@ -165,7 +166,7 @@ function LobbyPanel({
       {/* 게임 로비처럼 모드와 캐릭터를 출발 버튼 곁에 둔다 (좁은 창에서도 스크롤 없이 보인다) */}
       <div className="lobby-actions">
         <AvatarStrip />
-        <TogetherSwitch />
+        <SkySwitch />
         <div className="lobby-buttons">
           {midway && (
             <button className="btn lobby-restart" onClick={() => start(true)}>
@@ -257,28 +258,31 @@ function Profile({ points }: { points: [number, number, number][] }) {
   )
 }
 
-/** 혼자 / 같이 고르기. 같이 쪽에는 지금 산길에 있는 사람 수를 보여 준다 */
-function TogetherSwitch() {
-  const together = useNet((s) => s.together)
-  const setTogether = useNet((s) => s.setTogether)
-  const status = useNet((s) => s.status)
-  const online = useNet((s) => s.peers.filter(isClimbing).length)
-  const togetherSub =
-    status === 'online' ? (online > 0 ? `${online}명 오르는 중` : '아직 아무도 없어요') : status === 'connecting' ? '연결하는 중' : '서버 없음'
+/** 「지금」 타일에 보여 줄 미니 하늘. 실제 시간대마다 다른 그라데이션(index.css 의 .sky-swatch) */
+const PHASE_SWATCH: Record<Phase, string> = { 새벽: 'dawn', 아침: 'morning', 낮: 'day', 저녁: 'sunset', 밤: 'night' }
+
+/** 하늘 고르기. 「지금」은 실제 한국 시각을 따라가고 나머지는 그 시간대로 고정한다. 타일마다 미니 하늘을 보여 주고, 고르면 뒤의 장면이 1초쯤에 걸쳐 바뀐다 */
+function SkySwitch() {
+  const preset = useSky((s) => s.preset)
+  const setPreset = useSky((s) => s.setPreset)
+  // 「지금」이 어떤 시간대인지 보여 준다. 베이스캠프를 오래 열어 두면 바뀔 수 있어 가끔 다시 본다
+  const [phase, setPhase] = useState(currentPhase)
+  useEffect(() => {
+    const t = window.setInterval(() => setPhase(currentPhase()), 30000)
+    return () => window.clearInterval(t)
+  }, [])
   return (
-    <div className="panel lobby-together">
-      <div className="segmented" role="radiogroup" aria-label="혼자 또는 같이">
-        <button role="radio" aria-checked={!together} className={!together ? 'selected' : ''} onClick={() => setTogether(false)}>
-          <span className="segmented-title">혼자</span>
-          <span className="segmented-sub">조용히 나만의 산행</span>
-        </button>
-        <button role="radio" aria-checked={together} className={together ? 'selected' : ''} onClick={() => setTogether(true)}>
-          <span className="segmented-title">같이</span>
-          <span className="segmented-sub">
-            {status === 'online' && online > 0 && <i className="dot online" aria-hidden />}
-            {togetherSub}
-          </span>
-        </button>
+    <div className="panel lobby-sky">
+      <div className="lobby-label">
+        하늘 <b>{preset === 'now' ? `지금은 ${phase}` : SKY_PRESETS.find((p) => p.kind === preset)?.label}</b>
+      </div>
+      <div className="segmented sky-segmented" role="radiogroup" aria-label="하늘 고르기">
+        {SKY_PRESETS.map((p) => (
+          <button key={p.kind} role="radio" aria-checked={preset === p.kind} className={preset === p.kind ? 'selected' : ''} onClick={() => setPreset(p.kind)}>
+            <span className={`sky-swatch ${p.kind === 'now' ? PHASE_SWATCH[phase] : p.kind}`} aria-hidden />
+            <span className="segmented-title">{p.label}</span>
+          </button>
+        ))}
       </div>
     </div>
   )
