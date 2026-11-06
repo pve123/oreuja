@@ -2,6 +2,8 @@ import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import { OrbitControls, Sky } from '@react-three/drei'
 import { Physics, useRapier, type RapierCollider } from '@react-three/rapier'
+import { BrightnessContrast, EffectComposer, HueSaturation, SSAO, ToneMapping, Vignette } from '@react-three/postprocessing'
+import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { meshHeight, standHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
@@ -115,6 +117,34 @@ function SkyDome() {
     <group ref={group}>
       <Sky distance={5000} sunPosition={SUN.toArray()} turbidity={6} rayleigh={1.2} />
     </group>
+  )
+}
+
+/**
+ * 화면 후처리. 잘 만든 게임처럼 물체가 땅·서로 닿는 곳에 그늘을 넣어(앰비언트 오클루전) 돌·계단·나무가 떠 보이지 않게 하고,
+ * 색을 조금 다듬은 뒤 가장자리를 살짝 어둡게 한다. 톤 매핑은 렌더러 대신 맨 끝에서 한 번 한다 (App 의 Canvas 는 NoToneMapping).
+ */
+function PostEffects() {
+  return (
+    // SSAO 는 법선 버퍼가 필요하다. (N8AO 2.0.1 은 three 0.187 에서 렌더 타깃 오류가 나서 postprocessing 의 SSAO 를 쓴다)
+    <EffectComposer multisampling={4} enableNormalPass>
+      <SSAO
+        samples={16}
+        rings={4}
+        radius={0.06}
+        intensity={9}
+        luminanceInfluence={0.5}
+        // 거리는 m 단위로 잰다: 캐릭터 둘레 40m 안에서만 진하게, 0.5m 안쪽 틈에 그늘을 넣는다
+        worldDistanceThreshold={40}
+        worldDistanceFalloff={10}
+        worldProximityThreshold={0.5}
+        worldProximityFalloff={0.2}
+      />
+      <HueSaturation saturation={0.08} />
+      <BrightnessContrast contrast={0.06} />
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      <Vignette offset={0.3} darkness={0.45} />
+    </EffectComposer>
   )
 }
 
@@ -510,6 +540,7 @@ function WorldScene({ terrain, trail }: Props) {
       <Landmarks terrain={terrain} trail={trail} />
       <Avatar ref={hiker} kind={avatar} />
       <Peers terrain={terrain} trail={trail} />
+      <PostEffects />
       <OrbitControls
         ref={controls}
         makeDefault
