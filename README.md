@@ -70,12 +70,15 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `scripts/prepare-data.mjs` | 지형과 등산로 데이터를 만든다 (`npm run data`) |
 | `src/lib/data.ts` | 데이터를 불러오고, 등산로 위 위치와 실제 소요 시간을 계산한다 |
 | `index.html`, `src/lib/splash.ts` | 첫 화면. 새벽 북한산 그림에서 로딩 진행만큼 등산객이 정상으로 오르고 고도가 올라가며, 조작 팁이 바뀐다. 뒤에는 실제 패널 자리에 유리 스켈레톤을 깐다. JS 를 받기 전부터 보이도록 HTML 에 직접 넣었고, 장면이 그려지면 걷힌다 |
-| `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다. 이동은 Rapier 캐릭터 컨트롤러(캡슐 몸, 부딪히면 미끄러지기, 45cm 턱 오르기, 땅에 붙이기, 최대 경사 60°)로, 카메라는 스프링 암(지형·건물에 막히면 당기기)으로 움직인다 |
+| `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다. 이동은 Rapier 캐릭터 컨트롤러(캡슐 몸, 부딪히면 미끄러지기, 45cm 턱 오르기, 땅에 붙이기, 최대 경사 60°)로, 카메라는 스프링 암(지형·건물에 막히면 당기기)으로 움직인다. 화면 후처리로 앰비언트 오클루전(SSAO), 색 보정, 톤 매핑, 비네트를 넣는다 |
 | `src/scene/Colliders.tsx` | 물리 충돌체를 만든다. 등산로 둘레 40m 지형(화면 지형과 같은 삼각형), 돌계단 경사로, 나무 줄기·바위·랜드마크 원기둥 |
 | `src/lib/collider-mesh.ts` | 등산로 둘레 지형 충돌 메시 |
 | `src/scene/Terrain.tsx` | 지형 메시를 고도와 경사에 따라 칠한다 |
 | `src/scene/Forest.tsx` | 나무를 `InstancedMesh` 로 심는다. 멀리 있는 나무는 가벼운 도형이다 |
 | `src/scene/DetailTrees.tsx` | 아바타 둘레 70m 안의 나무만 Quaternius 나무 모델로 바꿔 그린다 |
+| `src/scene/NearModels.tsx` | 캐릭터 둘레만 정밀 모델로 그리는 공용 LOD. 바위·계단 판석·길가 자갈이 쓴다. 텍스처를 회색조 무늬로 바꿔 화강암 색으로 다시 칠할 수 있다 |
+| `src/scene/TrailDetails.tsx` | 흙길(밟아 다진 흙 질감, 가장자리는 풀밭으로 투명하게 녹아듦), 돌계단(흙빛 받침 위 화강암 판석 두 장), 길가 자갈, 위문~정상 난간 |
+| `src/scene/Rocks.tsx` | 바위. 멀리는 가벼운 도형, 캐릭터 둘레 70m 는 Quaternius 바위 모델 |
 | `src/scene/Landmarks.tsx` | 이정표마다 이름에 맞는 랜드마크를 세운다. 고개는 돌탑, 깔딱고개는 돌탑과 벤치, 절·암자는 연등 단 암자, 산장은 굴뚝 있는 산장, 문은 돌 성문, 문터는 무너진 성벽, 폭포는 절벽과 물줄기 |
 | `src/lib/landmarks.ts` | 랜드마크 종류·자리·충돌 원을 정한다. 길 위에 서는 성문은 등산로가 벽에 걸리지 않는 방향으로 돌리고, 그래도 걸리는 충돌 원은 뺀다 |
 | `src/lib/obstacles.ts` | 나무 줄기·바위·랜드마크를 바닥 원으로 모은다. `Colliders` 가 이 목록으로 충돌체를 만든다 |
@@ -155,3 +158,4 @@ node scripts/prepare-avatars.mjs ~/Downloads/kenney_mini-characters ~/Downloads/
 | 위성사진 | © Mapbox, © Maxar | 토큰이 있을 때만 쓰고 화면에 출처를 표시한다 |
 | 캐릭터 모델 | Kenney Mini Characters, KayKit Adventurers (Kay Lousberg) | CC0 1.0. 출처 표시 의무는 없다. `public/models/avatars/` |
 | 나무 모델 | Quaternius Stylized Nature MegaKit (무료판) | CC0 1.0. 출처 표시 의무는 없지만 화면에 적는다. `public/models/trees/` 에 6개만 넣었다 |
+| 바위·판석·자갈 모델 | Quaternius Stylized Nature MegaKit (무료판) | CC0 1.0. `node scripts/prepare-nature.mjs "<팩 폴더>"` 로 `public/models/nature/` 에 11개와 텍스처(1024px JPG)를 넣는다 |
