@@ -121,11 +121,13 @@ export const localPlayer = {
   mode: 'hiking' as Mode,
 }
 
-function serverUrl() {
+/** 같이하기 서버 주소. null 이면 서버 없이 혼자 오르기로만 동작한다 */
+function serverUrl(): string | null {
   const fromEnv = import.meta.env.VITE_MULTIPLAYER_URL as string | undefined
   if (fromEnv) return fromEnv
-  // 개발 서버는 /ws 를 같이하기 서버로 넘겨준다(vite.config.ts)
-  return `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws`
+  // 개발 서버만 /ws 를 같이하기 서버로 넘겨준다(vite.config.ts).
+  // Vercel 같은 정적 호스팅에는 웹소켓 서버가 없어서, 주소를 따로 주지 않은 배포본은 붙어 보지 않는다
+  return import.meta.env.DEV ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws` : null
 }
 
 let socket: WebSocket | null = null
@@ -137,14 +139,19 @@ let started = false
 export function startNet() {
   if (started) return
   started = true
-  connect()
+  const url = serverUrl()
+  if (!url) {
+    useNet.setState({ status: 'offline' })
+    return
+  }
+  connect(url)
 }
 
-function connect() {
+function connect(url: string) {
   useNet.setState({ status: 'connecting' })
   let ws: WebSocket
   try {
-    ws = new WebSocket(serverUrl())
+    ws = new WebSocket(url)
   } catch {
     scheduleRetry()
     return
@@ -175,7 +182,8 @@ function connect() {
 
 function scheduleRetry() {
   window.clearTimeout(retryTimer)
-  retryTimer = window.setTimeout(connect, RETRY_MS)
+  const url = serverUrl()
+  if (url) retryTimer = window.setTimeout(() => connect(url), RETRY_MS)
 }
 
 function sendState() {
