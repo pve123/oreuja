@@ -1,7 +1,8 @@
 import { create } from 'zustand'
 import { loadAvatar, saveAvatar, type AvatarKind } from './avatars'
 
-export type Mode = 'hiking' | 'summit' | 'photo' | 'photoResult'
+/** lobby 는 출발 전 베이스캠프(산·코스·혼자/같이·캐릭터를 고르는 화면). 걷는 중에도 Esc 로 다시 연다 */
+export type Mode = 'lobby' | 'hiking' | 'summit' | 'photo' | 'photoResult'
 
 export type ClimbRecord = {
   trailId: string
@@ -43,8 +44,13 @@ type State = {
   setPhoto: (url: string) => void
   closePhoto: () => void
   restart: () => void
+  /** 베이스캠프를 연다 (걷던 자리와 시간은 그대로 둔다) */
+  openLobby: () => void
+  /** 베이스캠프를 닫고 걷던 곳에서 이어 오른다 */
+  resume: () => void
 }
 
+export const AUTOSTART_STORAGE_KEY = 'hiking-metaverse:autostart'
 const RECORDS_KEY = 'hiking-metaverse:climbs'
 const COURSE_KEY = 'hiking-metaverse:course'
 
@@ -55,12 +61,27 @@ function loadCourse(): string | null {
     return null
   }
 }
-function saveCourse(id: string) {
+export function saveCourse(id: string) {
   try {
     localStorage.setItem(COURSE_KEY, id)
   } catch {
     // 저장소를 못 쓰는 환경이면 무시
   }
+}
+
+const AUTOSTART_KEY = AUTOSTART_STORAGE_KEY
+
+/** 다른 산을 골라 새로 불러온 직후면 베이스캠프를 건너뛰고 바로 출발한다 (src/lib/mountains.ts switchMountain) */
+function initialMode(): Mode {
+  try {
+    if (sessionStorage.getItem(AUTOSTART_KEY)) {
+      sessionStorage.removeItem(AUTOSTART_KEY)
+      return 'hiking'
+    }
+  } catch {
+    // 저장소를 못 쓰면 늘 베이스캠프에서 시작
+  }
+  return 'lobby'
 }
 
 /** 처음부터 다시 오를 때 되돌리는 값 */
@@ -94,6 +115,7 @@ function saveRecords(records: ClimbRecord[]) {
 
 export const useGame = create<State>((set, get) => ({
   ...freshClimb,
+  mode: initialMode(),
   // 첫 화면을 걷어 낼 신호. 한 번 켜지면 다시 끄지 않는다 (다시 오르기·코스 바꾸기에는 첫 화면이 없다)
   sceneReady: false,
   courseId: loadCourse(),
@@ -121,6 +143,8 @@ export const useGame = create<State>((set, get) => ({
   setPhoto: (photo) => set({ photo, mode: 'photoResult' }),
   closePhoto: () => set({ mode: 'summit' }),
   restart: () => set(freshClimb),
+  openLobby: () => set({ mode: 'lobby' }),
+  resume: () => set({ mode: 'hiking' }),
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */

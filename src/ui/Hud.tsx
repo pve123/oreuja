@@ -1,16 +1,10 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { estimateMinutes, type Trail } from '../lib/data'
+import { estimateMinutes, formatMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
-import { switchMountain, type Mountain } from '../lib/mountains'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
-
-function formatMinutes(min: number) {
-  const h = Math.floor(min / 60)
-  return h ? `${h}시간 ${min % 60}분` : `${min}분`
-}
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
@@ -62,19 +56,8 @@ function useKeyboard() {
   }, [])
 }
 
-export function Hud({
-  trail,
-  trails,
-  mountains,
-  mountain,
-}: {
-  trail: Trail
-  trails: Trail[]
-  mountains: Mountain[]
-  mountain: Mountain
-}) {
+export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   useKeyboard()
-  const [picking, setPicking] = useState(false)
   // 걷는 동안 3D 화면을 넓게 보도록 코스 정보는 처음에 접어 둔다 (이름만 보인다)
   const [courseFolded, toggleCourse] = useFolded('course')
   const distance = useGame((s) => s.distance)
@@ -100,22 +83,11 @@ export function Hud({
             <div className="eyebrow">
               {trail.data.mountain} · {trail.data.level}
             </div>
-            <button className="link-button" aria-expanded={picking} onClick={() => setPicking(!picking)}>
-              {picking ? '닫기' : '산·코스 바꾸기'}
+            <button className="link-button" title="베이스캠프 열기 (Esc)" onClick={() => useGame.getState().openLobby()}>
+              산·코스 바꾸기
             </button>
             <FoldButton label="코스 정보" collapsed={courseFolded} onToggle={toggleCourse} />
           </div>
-          {picking && mountains.length > 1 && <MountainTabs mountains={mountains} current={mountain} />}
-          {picking && (
-            <CoursePicker
-              trails={trails}
-              current={trail}
-              onPick={(id) => {
-                setPicking(false)
-                if (id !== trail.data.id) useGame.getState().setCourse(id)
-              }}
-            />
-          )}
           <h1>{trail.data.name}</h1>
           {!courseFolded && (
             <>
@@ -198,58 +170,6 @@ export function Hud({
       <HoldButton label="◀" className="side left" onHold={(on) => (input.left = on)} />
       <HoldButton label="▶" className="side right" onHold={(on) => (input.right = on)} />
     </>
-  )
-}
-
-/** 산 고르기. 다른 산을 고르면 그 산의 지형을 받으러 첫 화면부터 다시 연다 */
-function MountainTabs({ mountains, current }: { mountains: Mountain[]; current: Mountain }) {
-  return (
-    <div className="mountain-tabs" role="tablist" aria-label="산">
-      {mountains.map((m) => (
-        <button
-          key={m.id}
-          role="tab"
-          aria-selected={m.id === current.id}
-          className={m.id === current.id ? 'mountain-tab selected' : 'mountain-tab'}
-          onClick={() => m.id !== current.id && switchMountain(m)}
-        >
-          <span className="mountain-tab-name">{m.name}</span>
-          <span className="mountain-tab-meta">
-            {m.elevation}m · 코스 {m.courses}개
-          </span>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-/** 코스 목록. 고르면 그 코스 출발점에서 처음부터 오른다 */
-function CoursePicker({ trails, current, onPick }: { trails: Trail[]; current: Trail; onPick: (id: string) => void }) {
-  const records = useGame((s) => s.records)
-  return (
-    <ul className="course-list">
-      {trails.map((t) => {
-        const count = records.filter((r) => r.trailId === t.data.id).length
-        return (
-          <li key={t.data.id}>
-            <button
-              className={t === current ? 'course-item selected' : 'course-item'}
-              aria-current={t === current}
-              onClick={() => onPick(t.data.id)}
-            >
-              <span className="course-item-title">
-                {t.data.name}
-                <span className={`level level-${t.data.level}`}>{t.data.level}</span>
-              </span>
-              <span className="course-item-meta">
-                {t.data.start} → {t.data.summit} · {(t.data.length / 1000).toFixed(1)}km · 오르막 {t.data.elevationGain}m
-                {count > 0 && ` · 완등 ${count}회`}
-              </span>
-            </button>
-          </li>
-        )
-      })}
-    </ul>
   )
 }
 

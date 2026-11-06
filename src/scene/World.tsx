@@ -88,6 +88,18 @@ const CAMERA_MIN_ARM = 1.2
 const CAMERA_RELEASE_RATE = 3
 /** 첫 화면에서 카메라가 캐릭터를 내려다보는 각도 */
 const CAMERA_PITCH = THREE.MathUtils.degToRad(22)
+/**
+ * 베이스캠프 카메라: 캐릭터 앞쪽 비스듬히(정면에서 LOBBY_ANGLE 만큼 돈 곳) LOBBY_ARM 거리에서 낮게 비추고 천천히 흔든다.
+ * 왼쪽(좁은 화면은 아래쪽)에 베이스캠프 창이 있어 화면을 옮겨(view offset) 캐릭터가 남은 자리 가운데에 오게 한다.
+ */
+const LOBBY_ANGLE = 0.55
+const LOBBY_SWAY = 0.12
+const LOBBY_ARM = 6
+const LOBBY_PITCH = THREE.MathUtils.degToRad(9)
+/** 화면을 옮기는 비율. 넓은 화면은 오른쪽과 조금 위로(아래 캐릭터 줄·출발 버튼을 피해), 좁은 화면은 위쪽으로 */
+const LOBBY_SHIFT_X = 0.2
+const LOBBY_SHIFT_UP = 0.16
+const LOBBY_SHIFT_UP_NARROW = 0.3
 const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
@@ -178,6 +190,9 @@ function WorldScene({ terrain, trail }: Props) {
   const lastTarget = useRef(new THREE.Vector3())
   /** 마우스로 카메라를 돌려 둘러보는 중. 다시 걷거나 몸을 돌리면 등 뒤로 돌아간다 */
   const freeLook = useRef(false)
+  /** 베이스캠프 창을 피해 화면을 옮긴 정도 (0~1) */
+  const lobbyView = useRef({ shift: 0 })
+  const size = useThree((s) => s.size)
   /** 휠로 고른 카메라 거리(arm)와 스프링 암이 실제로 보여 주는 거리(shown) */
   const zoom = useRef({ arm: CAMERA_START_DISTANCE, shown: CAMERA_START_DISTANCE })
   const photoFrames = useRef(0)
@@ -439,7 +454,7 @@ function WorldScene({ terrain, trail }: Props) {
     const lift = Math.max(0, b.y - standHeight(terrain, b.x, b.z))
     hiker.current.group.position.copy(pos)
     hiker.current.group.rotation.y = b.yaw
-    hiker.current.setCheering(game.mode !== 'hiking')
+    hiker.current.setCheering(game.mode !== 'hiking' && game.mode !== 'lobby')
     hiker.current.setAirborne(b.airTime > AIRBORNE_AFTER)
     // 같이하기 서버로 보낼 내 상태
     Object.assign(localPlayer, {
@@ -503,21 +518,37 @@ function WorldScene({ terrain, trail }: Props) {
 
     // 스프링 암이 당겨 둔 거리를 풀어, 사용자가 고른 거리(arm) 기준으로 각도를 다룬다
     const z = zoom.current
+    const lobby = game.mode === 'lobby'
+    const arm = lobby ? LOBBY_ARM : z.arm
     const dir = camera.position.clone().sub(target)
     if (dir.lengthSq() < 1e-6) dir.set(0, 0.4, -1)
     dir.normalize()
-    camera.position.copy(target).addScaledVector(dir, z.arm)
+    camera.position.copy(target).addScaledVector(dir, arm)
 
     // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
-    if (input.forward || input.backward || input.left || input.right) freeLook.current = false
+    // 베이스캠프에서는 캐릭터 앞쪽 비스듬히 돌아가 낮게 비춘다
+    if (input.forward || input.backward || input.left || input.right || lobby) freeLook.current = false
     if (!freeLook.current) {
       const off = camera.position.clone().sub(target)
       const horizontal = Math.hypot(off.x, off.z)
       let azimuth = Math.atan2(off.x, off.z)
-      const behind = b.yaw + Math.PI
-      azimuth += Math.atan2(Math.sin(behind - azimuth), Math.cos(behind - azimuth)) * (1 - Math.exp(-FOLLOW_RATE * dt)) // 가까운 쪽으로 돈다
-      camera.position.set(target.x + Math.sin(azimuth) * horizontal, camera.position.y, target.z + Math.cos(azimuth) * horizontal)
+      const want = lobby ? b.yaw + LOBBY_ANGLE + Math.sin(performance.now() / 5000) * LOBBY_SWAY : b.yaw + Math.PI
+      const k = 1 - Math.exp(-FOLLOW_RATE * dt)
+      azimuth += Math.atan2(Math.sin(want - azimuth), Math.cos(want - azimuth)) * k // 가까운 쪽으로 돈다
+      let y = camera.position.y
+      if (lobby) y += (target.y + Math.sin(LOBBY_PITCH) * arm - y) * k
+      camera.position.set(target.x + Math.sin(azimuth) * horizontal, y, target.z + Math.cos(azimuth) * horizontal)
     }
+
+    // 베이스캠프 창에 가리지 않게 화면을 옮긴다. 열고 닫을 때 부드럽게 미끄러진다
+    const view = lobbyView.current
+    view.shift += ((lobby ? 1 : 0) - view.shift) * (1 - Math.exp(-4 * dt))
+    const persp = camera as THREE.PerspectiveCamera
+    if (view.shift > 0.002) {
+      const { width: w, height: h } = size
+      const narrow = w < 760
+      persp.setViewOffset(w, h, narrow ? 0 : -w * LOBBY_SHIFT_X * view.shift, h * (narrow ? LOBBY_SHIFT_UP_NARROW : LOBBY_SHIFT_UP) * view.shift, w, h)
+    } else if (persp.view?.enabled) persp.clearViewOffset()
 
     controls.current.target.copy(target)
     lastTarget.current.copy(target)
@@ -527,7 +558,7 @@ function WorldScene({ terrain, trail }: Props) {
     dir.copy(camera.position).sub(target).normalize()
     const hit = world.castRay(
       new rapier.Ray(target, dir),
-      z.arm,
+      arm,
       true,
       undefined,
       undefined,
@@ -535,8 +566,8 @@ function WorldScene({ terrain, trail }: Props) {
       undefined,
       (c) => cameraBlockers.has(c.handle),
     )
-    const want = hit ? Math.max(CAMERA_MIN_ARM, hit.timeOfImpact - CAMERA_PROBE_MARGIN) : z.arm
-    z.shown = want < z.shown ? want : z.shown + (want - z.shown) * (1 - Math.exp(-CAMERA_RELEASE_RATE * dt))
+    const reach = hit ? Math.max(CAMERA_MIN_ARM, hit.timeOfImpact - CAMERA_PROBE_MARGIN) : arm
+    z.shown = reach < z.shown ? reach : z.shown + (reach - z.shown) * (1 - Math.exp(-CAMERA_RELEASE_RATE * dt))
     camera.position.copy(target).addScaledVector(dir, z.shown)
     occlusionUniforms.uOccCamera.value.copy(camera.position)
     // 캐릭터와 카메라가 자리 잡고 몇 프레임 그린 뒤 첫 화면을 걷어 내게 알린다
