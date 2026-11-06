@@ -91,6 +91,8 @@ const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 /** 땅에 서 있을 때도 아래로 살짝 눌러 비탈에서 뜨지 않게 (m/s) */
 const GROUND_STICK = 2
+/** 발이 땅보다 이만큼 아래로 내려가면 바닥을 뚫은 것으로 보고 땅 위로 올린다(m) */
+const FALL_RESCUE = 0.5
 /** 이 시간보다 오래 땅에서 떨어져 있으면 공중 동작으로 바꾼다(s). 턱을 내려설 때마다 다리를 접지 않게 */
 const AIRBORNE_AFTER = 0.12
 const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
@@ -331,6 +333,18 @@ function WorldScene({ terrain, trail }: Props) {
       }
       dx = fx * speed * dt
       dz = fz * speed * dt
+      // 경계 밖으로 나갈 걸음이면 바깥쪽 성분을 빼고 컨트롤러에 넘긴다. 위치를 나중에 억지로 되돌리면
+      // 바깥이 내리막일 때 오르막 쪽 땅속으로 끌려 들어가 바닥 밑으로 빠진다
+      const nx = ox + dx
+      const nz = oz + dz
+      const next = Math.hypot(nx, nz)
+      if (next > ROAM_LIMIT) {
+        const out = (dx * nx + dz * nz) / next
+        if (out > 0) {
+          dx -= (nx / next) * out
+          dz -= (nz / next) * out
+        }
+      }
     }
     // 중력: 땅에 서 있으면 살짝 눌러 붙이고, 떠 있으면 떨어진다
     b.vy = b.grounded && b.vy <= 0 ? -GROUND_STICK : b.vy - GRAVITY * dt
@@ -354,9 +368,15 @@ function WorldScene({ terrain, trail }: Props) {
     const p = trail.positionAt(distance)
     const away = Math.hypot(b.x - p.x, b.z - p.z)
     if (away > ROAM_LIMIT) {
-      // 보이지 않는 벽: 경계 원 위로 되돌려 경계를 따라 미끄러지게 한다
+      // 굽은 길에서 기준점이 바뀌며 조금 넘친 만큼만 경계 위로 되돌리고, 그 자리 땅보다 낮으면 올린다
       b.x = p.x + ((b.x - p.x) / away) * ROAM_LIMIT
       b.z = p.z + ((b.z - p.z) / away) * ROAM_LIMIT
+      b.y = Math.max(b.y, standHeight(terrain, b.x, b.z))
+    }
+    // 안전망 (게임들의 '바닥 밑으로 떨어지면 되살리기'): 어떤 이유로든 땅보다 한참 아래면 그 자리 땅 위로 올린다
+    if (b.y < meshHeight(terrain, b.x, b.z) - FALL_RESCUE) {
+      b.y = standHeight(terrain, b.x, b.z) + 0.05
+      b.vy = 0
     }
     ch.collider.setTranslation({ x: b.x, y: b.y + BODY_CENTER, z: b.z })
     offset = (b.x - p.x) * -Math.cos(h) + (b.z - p.z) * Math.sin(h)
