@@ -12,8 +12,12 @@ import type { Obstacle } from './obstacles'
  * - ruins: 문터(수문터). 무너진 성벽 터
  * - waterfall: 폭포(개연폭포). 바위 절벽, 물줄기, 물웅덩이
  * - sign: 그 밖의 이름. 나무 표지판
+ * - trailhead: 출발점(탐방지원센터). 등산로를 가로지르는 나무 입구 문과 등산 안내도. 이정표가 아니라 코스마다 하나 세운다
  */
-export type LandmarkKind = 'cairn' | 'pass' | 'temple' | 'hut' | 'gate' | 'ruins' | 'waterfall' | 'sign'
+export type LandmarkKind = 'cairn' | 'pass' | 'temple' | 'hut' | 'gate' | 'ruins' | 'waterfall' | 'sign' | 'trailhead'
+
+/** 출발점 입구 문을 세울 거리(m). 처음 화면에서 캐릭터 앞에 보이게 */
+export const TRAILHEAD_AT = 10
 
 export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('폭포')) return 'waterfall'
@@ -65,6 +69,17 @@ const SPECS: Record<LandmarkKind, Spec> = {
     colliders: [...grid([-2.2, 0, 2.2], [-3.4], 1.8, 8), { x: 0, z: 0, r: 1.9, height: 2 }],
   },
   sign: { side: 2.5, clear: 1.5, label: 2.7, footprint: [0.3, 0.3], colliders: [{ x: 0, z: 0, r: 0.2, height: 2.2 }] },
+  trailhead: {
+    side: 0,
+    clear: 6,
+    label: 4.4,
+    footprint: [9, 1.5],
+    colliders: [
+      { x: -2.6, z: 0, r: 0.3, height: 3.6 },
+      { x: 2.6, z: 0, r: 0.3, height: 3.6 },
+      { x: 4.1, z: -0.6, r: 0.6, height: 2.2 },
+    ],
+  },
 }
 
 export type Landmark = Checkpoint & {
@@ -85,8 +100,10 @@ const cache = new WeakMap<Trail, Landmark[]>()
 export function landmarks(terrain: Terrain, trail: Trail): Landmark[] {
   const hit = cache.get(trail)
   if (hit) return hit
-  const out = trail.data.checkpoints.map((cp): Landmark => {
-    const kind = landmarkKind(cp.name)
+  // 출발점(탐방지원센터)도 이정표처럼 세운다
+  const start = { name: trail.data.start, note: '', distance: Math.min(TRAILHEAD_AT, trail.length / 2) }
+  const out = [start, ...trail.data.checkpoints].map((cp): Landmark => {
+    const kind = cp === start ? 'trailhead' : landmarkKind(cp.name)
     const spec = SPECS[kind]
     const p = trail.positionAt(cp.distance)
     const heading = trail.headingAt(cp.distance)
