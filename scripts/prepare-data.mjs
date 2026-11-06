@@ -1,5 +1,6 @@
-// 북한산 지형과 코스별 등산로 데이터를 받아 public/data 에 정적 파일로 만든다.
-// 실행: node scripts/prepare-data.mjs
+// 산마다 지형과 코스별 등산로 데이터를 받아 public/data/<산 id>/ 에 정적 파일로 만든다.
+// 실행: node scripts/prepare-data.mjs            (모든 산)
+//       node scripts/prepare-data.mjs dobongsan  (고른 산만. 산 목록 mountains.json 은 늘 새로 쓴다)
 //  - 지형: AWS Terrain Tiles (Terrarium PNG, 키 불필요)
 //  - 등산로: OpenStreetMap Overpass API (scripts/raw/osm-<범위>.json 이 있으면 재사용)
 import fs from 'node:fs/promises'
@@ -9,20 +10,22 @@ import { buildContourDem, parseDxf } from './contour-dem.mjs'
 
 const ROOT = path.resolve(import.meta.dirname, '..')
 const RAW = path.join(ROOT, 'scripts/raw')
-// 국토지리정보원 1:5,000 수치지형도 DXF 를 두는 곳 (git 제외). 있으면 등고선으로 정밀 지형을 만든다
+// 국토지리정보원 1:5,000 수치지형도 DXF 를 두는 곳 (git 제외). 산마다 sheets 에 적은 도엽이 있으면 등고선으로 정밀 지형을 만든다
 const NGII = path.join(RAW, 'ngii')
 const CONTOUR_SPACING = 7.5 // 정밀 지형 격자 간격(m)
-const OUT = path.join(ROOT, 'public/data')
+const DATA = path.join(ROOT, 'public/data')
 const UA = 'hiking-metaverse-dev'
-
-// 지형으로 만들 영역 (남, 서, 북, 동). 모든 코스가 들어가게 잡는다
-const BBOX = { south: 37.634, west: 126.943, north: 37.678, east: 127.006 }
 const ZOOM = 13
 
-// 코스 목록. 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
+// 산 목록. 산마다 지형 한 장과 그 위의 코스들을 만든다
+//  - bbox: 지형으로 만들 영역 (남, 서, 북, 동). 모든 코스가 들어가게 잡는다
+//  - elevation: 산의 가장 높은 봉우리 해발(m). 첫 화면에서 진행만큼 고도가 올라가는 데 쓴다
+//  - sheets: 정밀 지형에 쓸 1:5,000 수치지형도 도엽 번호. 파일 이름에 이 번호가 든 DXF 를 scripts/raw/ngii/ 에서 찾는다
+// 코스 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
 // summit 은 봉우리 노드(osmId)나 좌표(lat, lon) 중 하나로 준다. elevation 이 없으면 지형 높이를 쓴다
+// via 는 가장 짧은 길이 대표 코스가 아닐 때 반드시 거쳐 갈 지점들이다
 // checkpoints 는 가는 길에 지나는 이정표. 등산로에서 MAX_CHECKPOINT_OFFSET 보다 멀면 빼고 경고한다
-const COURSES = [
+const BUKHANSAN_COURSES = [
   {
     id: 'bukhansan-baegundae',
     mountain: '북한산',
@@ -74,12 +77,80 @@ const COURSES = [
     ],
   },
 ]
+
+// 도봉산 정상 자운봉(740m)은 암벽 장비가 있어야 올라서, 등산객이 오르는 바로 옆 신선대(726m)를 정상으로 삼는다
+const DOBONGSAN_COURSES = [
+  {
+    id: 'dobongsan-sinseondae',
+    mountain: '도봉산',
+    name: '신선대 코스',
+    level: '보통',
+    start: { name: '도봉산탐방지원센터', lat: 37.68611, lon: 127.03613 },
+    summit: { name: '신선대', osmId: 11377228354, elevation: 726 },
+    via: [{ lat: 37.6941, lon: 127.01713 }], // 마당바위
+    checkpoints: [
+      { name: '광륜사', lat: 37.68777, lon: 127.03551, note: '도봉산 들머리에 있는 절' },
+      { name: '도봉산대피소', lat: 37.6937, lon: 127.0225, note: '계곡길이 끝나고 본격적인 오르막이 시작되는 쉼터' },
+      { name: '마당바위', lat: 37.6941, lon: 127.01713, note: '마당처럼 넓은 바위. 선인봉과 만장봉이 올려다보인다' },
+    ],
+  },
+  {
+    id: 'dobongsan-mangwolsa',
+    mountain: '도봉산',
+    name: '망월사 코스',
+    level: '어려움',
+    start: { name: '원도봉탐방지원센터', lat: 37.7062, lon: 127.03461 },
+    summit: { name: '신선대', osmId: 11377228354, elevation: 726 },
+    via: [
+      { lat: 37.70459, lon: 127.02147 }, // 망월사
+      { lat: 37.70117, lon: 127.01603 }, // 포대능선
+    ],
+    checkpoints: [
+      { name: '망월사', lat: 37.70459, lon: 127.02147, note: '원도봉계곡 위 바위 아래 자리한 절. 샘터가 있다' },
+      { name: '포대능선', lat: 37.70117, lon: 127.01603, note: '자운봉으로 이어지는 바위 능선' },
+    ],
+  },
+  {
+    id: 'dobongsan-uiam',
+    mountain: '도봉산',
+    name: '우이암 코스',
+    level: '쉬움',
+    start: { name: '우이탐방지원센터', lat: 37.67773, lon: 127.00331 },
+    summit: { name: '우이암', lat: 37.68372, lon: 127.00908 },
+    checkpoints: [],
+  },
+]
+
+const MOUNTAINS = [
+  {
+    id: 'bukhansan',
+    name: '북한산',
+    elevation: 836,
+    bbox: { south: 37.634, west: 126.943, north: 37.678, east: 127.006 },
+    sheets: ['37608039', '37608040', '37608049', '37608050'],
+    courses: BUKHANSAN_COURSES,
+  },
+  {
+    id: 'dobongsan',
+    name: '도봉산',
+    elevation: 740,
+    bbox: { south: 37.668, west: 126.995, north: 37.716, east: 127.045 },
+    sheets: ['37705011', '37705012', '37705021', '37705022', '37705031', '37705032', '37608020', '37608030', '37608040'],
+    courses: DOBONGSAN_COURSES,
+  },
+]
 const MAX_CHECKPOINT_OFFSET = 40 // m
 
 // ── 좌표 유틸 ───────────────────────────────────────
+// 지금 만드는 산의 범위와 원점. selectMountain 이 산마다 바꾼다
+let BBOX, OUT, origin, cosLat
+function selectMountain(m) {
+  BBOX = m.bbox
+  OUT = path.join(DATA, m.id)
+  origin = { lat: (BBOX.south + BBOX.north) / 2, lon: (BBOX.west + BBOX.east) / 2 }
+  cosLat = Math.cos((origin.lat * Math.PI) / 180)
+}
 const R = 6378137
-const origin = { lat: (BBOX.south + BBOX.north) / 2, lon: (BBOX.west + BBOX.east) / 2 }
-const cosLat = Math.cos((origin.lat * Math.PI) / 180)
 // three.js 좌표: x = 동쪽(m), z = 남쪽(m) (북쪽이 -z)
 const toLocal = (lat, lon) => ({
   x: ((lon - origin.lon) * Math.PI / 180) * R * cosLat,
@@ -98,7 +169,7 @@ const lat2px = (lat) => {
 }
 
 // ── 1. 지형 ────────────────────────────────────────
-async function buildTerrain() {
+async function buildTerrain(sheetIds) {
   const px0 = Math.floor(lon2px(BBOX.west)), px1 = Math.ceil(lon2px(BBOX.east))
   const py0 = Math.floor(lat2px(BBOX.north)), py1 = Math.ceil(lat2px(BBOX.south))
   const tx0 = Math.floor(px0 / 256), tx1 = Math.floor(px1 / 256)
@@ -150,7 +221,11 @@ async function buildTerrain() {
 
   // 국토지리정보원 수치지형도(DXF)가 있으면 등고선으로 정밀 지형을 만든다
   let grid = { width, height, heights }
-  const dxfFiles = (await fs.readdir(NGII).catch(() => [])).filter((f) => f.toLowerCase().endsWith('.dxf'))
+  const dxfFiles = (await fs.readdir(NGII).catch(() => [])).filter(
+    (f) => f.toLowerCase().endsWith('.dxf') && sheetIds.some((id) => f.includes(id)),
+  )
+  const missing = sheetIds.filter((id) => !dxfFiles.some((f) => f.includes(id)))
+  if (dxfFiles.length && missing.length) console.warn(`  ! 도엽 ${missing.join(', ')} 이 없어 그 자리는 30m 지형을 쓴다`)
   if (dxfFiles.length) {
     const sheets = []
     for (const f of dxfFiles) sheets.push(parseDxf((await fs.readFile(path.join(NGII, f))).toString('latin1')))
@@ -300,7 +375,20 @@ function buildTrail(course, graph, sampleHeight) {
     ? { id: course.summit.osmId, ...graph.nodes.get(course.summit.osmId) }
     : { lat: course.summit.lat, lon: course.summit.lon }
   if (goal.lat === undefined) throw new Error(`${course.summit.name} 노드(${course.summit.osmId})가 OSM 데이터에 없습니다`)
-  const route = shortestPath(graph, course.start, goal)
+  // via 가 있으면 그 지점에서 가장 가까운 길 노드를 차례로 거쳐 간다 (가장 짧은 길이 대표 코스가 아닐 때)
+  const legs = [...(course.via ?? []).map((v) => {
+    const id = nearestNode(graph, v)
+    const gap = haversine(graph.nodes.get(id), v)
+    if (gap > MAX_CHECKPOINT_OFFSET) console.warn(`  ! 거쳐 갈 지점이 길에서 ${gap.toFixed(0)}m 떨어져 있다`)
+    return { id, ...graph.nodes.get(id) }
+  }), goal]
+  const route = []
+  let from = course.start
+  for (const leg of legs) {
+    const part = shortestPath(graph, from, leg)
+    route.push(...(route.length ? part.slice(1) : part))
+    from = leg
+  }
 
   // 로컬 좌표로 바꾸고 2m 간격으로 다시 나눠 부드럽게 만든다
   const raw = route.map((n) => toLocal(n.lat, n.lon))
@@ -357,11 +445,24 @@ function buildTrail(course, graph, sampleHeight) {
   }
 }
 
+const only = process.argv.slice(2)
+const unknown = only.filter((id) => !MOUNTAINS.some((m) => m.id === id))
+if (unknown.length) throw new Error(`모르는 산: ${unknown.join(', ')} (있는 산: ${MOUNTAINS.map((m) => m.id).join(', ')})`)
+
 await fs.mkdir(RAW, { recursive: true })
-await fs.mkdir(OUT, { recursive: true })
-const sampleHeight = await buildTerrain()
-const graph = buildGraph(await loadOsm())
-const trails = COURSES.map((c) => buildTrail(c, graph, sampleHeight))
-await fs.writeFile(path.join(OUT, 'courses.json'), JSON.stringify(trails))
-await fs.rm(path.join(OUT, 'trail.json'), { force: true }) // 코스 하나만 있던 옛 파일
-console.log(`코스 ${trails.length}개를 courses.json 에 썼다`)
+for (const m of MOUNTAINS) {
+  if (only.length && !only.includes(m.id)) continue
+  console.log(`\n=== ${m.name} (${m.id}) ===`)
+  selectMountain(m)
+  await fs.mkdir(OUT, { recursive: true })
+  const sampleHeight = await buildTerrain(m.sheets)
+  const graph = buildGraph(await loadOsm())
+  const trails = m.courses.map((c) => buildTrail(c, graph, sampleHeight))
+  await fs.writeFile(path.join(OUT, 'courses.json'), JSON.stringify(trails))
+  console.log(`코스 ${trails.length}개를 ${m.id}/courses.json 에 썼다`)
+}
+
+// 산 목록. 앱이 처음에 받아 산 고르기와 첫 화면 문구에 쓴다
+const list = MOUNTAINS.map((m) => ({ id: m.id, name: m.name, elevation: m.elevation, courses: m.courses.length }))
+await fs.writeFile(path.join(DATA, 'mountains.json'), JSON.stringify(list, null, 2))
+console.log(`\n산 ${list.length}개를 mountains.json 에 썼다`)

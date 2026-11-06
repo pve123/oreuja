@@ -1,0 +1,14 @@
+[
+  {
+    "id": "bukhansan",
+    "name": "북한산",
+    "elevation": 836,
+    "courses": 4
+  },
+  {
+    "id": "dobongsan",
+    "name": "도봉산",
+    "elevation": 740,
+    "courses": 3
+  }
+]
