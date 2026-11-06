@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { estimateMinutes, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
+import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
 
@@ -176,7 +177,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
         </div>
       </div>
 
-      <ArrivalToast trail={trail} />
+      <ArrivalTitle trail={trail} />
       <RoamNotice />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
@@ -369,30 +370,42 @@ function RoamNotice() {
   )
 }
 
-const TOAST_MS = 4500
+/** 도착 연출이 떠 있는 시간(ms). CSS 의 arrival 애니메이션 길이와 같게 */
+const ARRIVAL_MS = 4800
 
-/** 이정표에 처음 닿으면 몇 초 동안 이름과 설명, 남은 실제 시간을 띄운다 */
-function ArrivalToast({ trail }: { trail: Trail }) {
+/**
+ * 이정표에 처음 닿으면 오픈월드 게임의 지역 진입 연출처럼 화면 위쪽 가운데에 이름을 크게 띄웠다가 걷어 낸다.
+ * 상자 없이 글씨만 띄워 풍경을 가리지 않는다
+ */
+function ArrivalTitle({ trail }: { trail: Trail }) {
   const arrival = useGame((s) => s.arrival)
   // 시간이 지나 숨긴 알림의 at. 새 도착(at 이 다름)은 바로 보인다
   const [hiddenAt, setHiddenAt] = useState<number | null>(null)
 
   useEffect(() => {
     if (!arrival) return
-    const t = setTimeout(() => setHiddenAt(arrival.at), TOAST_MS)
+    const t = setTimeout(() => setHiddenAt(arrival.at), ARRIVAL_MS)
     return () => clearTimeout(t)
   }, [arrival])
 
   if (!arrival || hiddenAt === arrival.at) return null
   const cp = trail.data.checkpoints[arrival.index]
   const left = trail.statsBetween(cp.distance, trail.length)
+  const total = trail.data.checkpoints.length
   return (
-    <div className="toast" key={arrival.at} role="status">
-      <div className="toast-title">{cp.name} 도착</div>
-      <div className="toast-note">{cp.note}</div>
-      <div className="toast-meta">
-        해발 {Math.round(trail.positionAt(cp.distance).y)}m · 정상까지 {formatDistance(left.length)}, 실제로 약{' '}
-        {formatMinutes(estimateMinutes(left.length, left.gain))}
+    <div className="arrival" key={arrival.at} role="status" aria-label={`${cp.name} 도착`}>
+      <div className="arrival-eyebrow">
+        이정표 {arrival.index + 1} / {total} · 해발 {Math.round(trail.positionAt(cp.distance).y)}m
+      </div>
+      <div className="arrival-title">
+        <span className="arrival-icon" aria-hidden>
+          {LANDMARK_ICON[landmarkKind(cp.name)]}
+        </span>
+        {cp.name}
+      </div>
+      {cp.note && <div className="arrival-note">{cp.note}</div>}
+      <div className="arrival-meta">
+        정상까지 {formatDistance(left.length)} · 실제로는 약 {formatMinutes(estimateMinutes(left.length, left.gain))}
       </div>
     </div>
   )
@@ -431,6 +444,7 @@ export function SummitModal({ trail }: { trail: Trail }) {
     return (
       <div className="overlay">
         <div className="panel modal photo-modal">
+          <div className="modal-brand">방구석 등반대 · 정상 기념사진</div>
           <img src={photo} alt="정상 기념사진" />
           <div className="actions">
             <a className="btn primary" href={photo} download={`${trail.data.id}-${now.toISOString().slice(0, 10)}.png`}>
@@ -452,13 +466,16 @@ export function SummitModal({ trail }: { trail: Trail }) {
 
   return (
     <div className="overlay">
-      <div className="panel modal">
-        <Badge trail={trail} />
+      <div className="panel modal summit-modal">
+        <div className="modal-brand">방구석 등반대</div>
+        <div className="badge-wrap">
+          <Badge trail={trail} />
+        </div>
         <h2>정상 도착!</h2>
         <p className="modal-sub">
           {trail.data.mountain} {trail.data.summit} {trail.data.summitElevation}m 를 완등했어요.
         </p>
-        <dl className="stats">
+        <dl className="stats summit-stats">
           <div>
             <dt>걸린 시간</dt>
             <dd>{formatDuration(duration)}</dd>
@@ -488,11 +505,20 @@ export function SummitModal({ trail }: { trail: Trail }) {
 function Badge({ trail }: { trail: Trail }) {
   return (
     <svg className="badge" viewBox="0 0 120 120" role="img" aria-label="완등 인증 배지">
-      <circle cx="60" cy="60" r="56" fill="#1d3557" stroke="#f2c14e" strokeWidth="5" />
-      <path d="M22 84 L48 44 L60 60 L72 38 L98 84 Z" fill="#a8dadc" />
-      <path d="M72 38 L80 51 L66 51 Z" fill="#fff" />
-      <path d="M48 44 L54 53 L42 53 Z" fill="#fff" />
-      <text x="60" y="100" textAnchor="middle" fontSize="11" fontWeight="800" fill="#f2c14e">
+      <defs>
+        <linearGradient id="badge-sky" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stopColor="#1c2c47" />
+          <stop offset="0.6" stopColor="#3b4a6b" />
+          <stop offset="1" stopColor="#a7798a" />
+        </linearGradient>
+      </defs>
+      <circle cx="60" cy="60" r="56" fill="url(#badge-sky)" stroke="#ffd58a" strokeWidth="5" />
+      <circle cx="60" cy="60" r="49" fill="none" stroke="rgba(255,213,138,0.35)" strokeWidth="1" />
+      <circle cx="84" cy="44" r="7" fill="#ffb36b" />
+      <path d="M22 84 L48 44 L60 60 L72 38 L98 84 Z" fill="#4c5677" />
+      <path d="M72 38 L80 51 L66 51 Z" fill="#fdf6ec" />
+      <path d="M48 44 L54 53 L42 53 Z" fill="#fdf6ec" />
+      <text x="60" y="100" textAnchor="middle" fontSize="11" fontWeight="800" fill="#ffd58a">
         {trail.data.summit} {Math.round(trail.data.summitElevation)}m
       </text>
       <text x="60" y="28" textAnchor="middle" fontSize="9" fontWeight="700" fill="#fff" letterSpacing="2">
