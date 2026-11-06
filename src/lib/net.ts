@@ -49,12 +49,13 @@ function loadTogether() {
   }
 }
 
-const ADJECTIVES = ['날쌘', '느긋한', '배고픈', '용감한', '졸린', '신난', '수줍은', '씩씩한', '엉뚱한', '튼튼한']
-const ANIMALS = ['다람쥐', '청설모', '고라니', '멧비둘기', '딱따구리', '두꺼비', '너구리', '오소리', '산토끼', '박새']
+// 처음 붙는 닉네임: 산 오르는 모습 + 산악회 역할. 둘을 합쳐 12자(NAME_MAX)를 넘지 않게 고른 말들이다
+const MOODS = ['새벽', '숨찬', '느긋한', '씩씩한', '땀범벅', '쉬엄쉬엄', '성큼성큼', '헉헉대는', '앞서가는', '뒤처진', '길 잃은', '배고픈', '안개 속', '비 맞은', '신난', '졸린']
+const ROLES = ['산꾼', '등산객', '산악회장', '총무', '선두', '후미', '길잡이', '막내', '대장', '백패커', '종주꾼', '암벽꾼', '김밥 담당', '컵라면 담당', '막걸리 담당', '물통지기', '스틱 요정', '정상 사냥꾼']
 
 function randomName() {
   const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
-  return `${pick(ADJECTIVES)} ${pick(ANIMALS)}`
+  return `${pick(MOODS)} ${pick(ROLES)}`
 }
 
 function loadName() {
