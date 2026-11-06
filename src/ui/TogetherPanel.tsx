@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { EMOTES, sendEmote, useNet } from '../lib/net'
+import { EMOTES, isClimbing, sendEmote, useNet } from '../lib/net'
 import type { Trail } from '../lib/data'
 
 /** 왼쪽 아래 같이하기 패널: 접속 상태, 같은 코스 인원, 내 닉네임, 감정 표현 버튼 */
@@ -7,8 +7,9 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
   const status = useNet((s) => s.status)
   const name = useNet((s) => s.name)
   const setName = useNet((s) => s.setName)
-  const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id).length)
-  const total = useNet((s) => s.peers.length)
+  const together = useNet((s) => s.together)
+  const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id && isClimbing(p)).length)
+  const total = useNet((s) => s.peers.filter(isClimbing).length)
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
 
@@ -27,8 +28,10 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
   return (
     <div className="panel together" aria-label="같이하기">
       <div className="together-status">
-        <i className={`dot ${status}`} aria-hidden />
-        {status === 'online'
+        <i className={`dot ${together ? status : 'offline'}`} aria-hidden />
+        {!together
+          ? '혼자 오르는 중'
+          : status === 'online'
           ? `이 코스 ${sameCourse + 1}명${total > sameCourse ? ` · 다른 코스 ${total - sameCourse}명` : ''}`
           : status === 'connecting'
             ? '연결하는 중…'
