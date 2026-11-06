@@ -33,6 +33,8 @@ export type Terrain = TerrainMeta & { heights: Float32Array }
 export type TrailData = {
   id: string
   mountain: string
+  /** 산이 속한 국립공원 (입구 현판에 작게 쓴다). 없으면 산 이름만 쓴다 */
+  park?: string
   name: string
   /** 난이도: 쉬움·보통·어려움 */
   level: string

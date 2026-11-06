@@ -138,7 +138,7 @@ function SkyDome() {
 
 /**
  * 화면 후처리. 잘 만든 게임처럼 물체가 땅·서로 닿는 곳에 그늘을 넣어(앰비언트 오클루전) 돌·계단·나무가 떠 보이지 않게 하고,
- * 색을 조금 다듬은 뒤 가장자리를 살짝 어둡게 한다. 톤 매핑은 렌더러 대신 맨 끝에서 한 번 한다 (App 의 Canvas 는 NoToneMapping).
+ * 톤 매핑한 뒤 색을 조금 다듬고 가장자리를 살짝 어둡게 한다. 톤 매핑은 렌더러 대신 후처리에서 한 번 한다 (App 의 Canvas 는 NoToneMapping).
  */
 function PostEffects() {
   return (
@@ -156,9 +156,10 @@ function PostEffects() {
         worldProximityThreshold={0.5}
         worldProximityFalloff={0.2}
       />
+      {/* 색 보정은 톤 매핑 뒤(0~1 색)에서 한다. 앞에 두면 1을 넘는 밝은 HDR 색(햇빛 받은 노란 오리 등)에서 채도 계산이 깨져 새까맣게 된다 */}
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       <HueSaturation saturation={0.08} />
       <BrightnessContrast contrast={0.06} />
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
       <Vignette offset={0.3} darkness={0.45} />
     </EffectComposer>
   )
