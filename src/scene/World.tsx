@@ -68,8 +68,10 @@ const STAIR_UP_SPEED = 0.8
 /** 카메라 높이가 캐릭터 높이를 따라가는 빠르기. 계단에서 카메라가 덜컹거리지 않게 몸보다 느리게 */
 const CAMERA_Y_RATE = 6
 const TURN_SPEED = 3.6 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 200도
-/** 카메라와 캐릭터 가슴 사이 거리(m). 첫 화면은 가장 가까이에서 시작한다 */
+/** 카메라와 캐릭터 가슴 사이 가장 가까운 거리(m) */
 const CAMERA_MIN_DISTANCE = 4
+/** 첫 화면 카메라 거리(m). 캐릭터 온몸과 앞길이 함께 보이게 가장 가까운 거리보다 조금 떨어져 시작한다 */
+const CAMERA_START_DISTANCE = 7
 /**
  * 휠로 멀어질 수 있는 거리(m). 3인칭 게임은 보통 캐릭터 키의 몇 배 안쪽에서만 멀어지게 한다.
  * 더 멀면 캐릭터가 점이 되어 지도를 보는 느낌이 된다
@@ -177,7 +179,7 @@ function WorldScene({ terrain, trail }: Props) {
   /** 마우스로 카메라를 돌려 둘러보는 중. 다시 걷거나 몸을 돌리면 등 뒤로 돌아간다 */
   const freeLook = useRef(false)
   /** 휠로 고른 카메라 거리(arm)와 스프링 암이 실제로 보여 주는 거리(shown) */
-  const zoom = useRef({ arm: CAMERA_MIN_DISTANCE, shown: CAMERA_MIN_DISTANCE })
+  const zoom = useRef({ arm: CAMERA_START_DISTANCE, shown: CAMERA_START_DISTANCE })
   const photoFrames = useRef(0)
   /** 처음 몇 프레임을 그렸는지 (첫 화면을 걷어 낼 때를 정한다) */
   const drawnFrames = useRef(0)
@@ -264,10 +266,10 @@ function WorldScene({ terrain, trail }: Props) {
     const d = useGame.getState().distance
     const start = trail.positionAt(d)
     const h = trail.headingAt(d)
-    // 캐릭터 등 뒤 가장 가까운 거리에서, 어깨 너머로 조금 내려다보며 시작한다
-    const back = Math.cos(CAMERA_PITCH) * CAMERA_MIN_DISTANCE
-    const up = Math.sin(CAMERA_PITCH) * CAMERA_MIN_DISTANCE
-    zoom.current.arm = zoom.current.shown = CAMERA_MIN_DISTANCE
+    // 캐릭터 등 뒤 7m 에서, 어깨 너머로 조금 내려다보며 시작한다
+    const back = Math.cos(CAMERA_PITCH) * CAMERA_START_DISTANCE
+    const up = Math.sin(CAMERA_PITCH) * CAMERA_START_DISTANCE
+    zoom.current.arm = zoom.current.shown = CAMERA_START_DISTANCE
     lastTarget.current.copy(start).setY(start.y + 1.5)
     camera.position.set(start.x - Math.sin(h) * back, lastTarget.current.y + up, start.z - Math.cos(h) * back)
     controls.current.target.copy(lastTarget.current)
