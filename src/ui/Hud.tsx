@@ -63,8 +63,8 @@ function useKeyboard() {
 export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   useKeyboard()
   const [picking, setPicking] = useState(false)
-  // 좁은 화면에서는 코스 정보가 3D 화면을 많이 가려서 처음에는 접어 둔다
-  const [courseFolded, toggleCourse] = useFolded('course', true)
+  // 걷는 동안 3D 화면을 넓게 보도록 코스 정보는 처음에 접어 둔다 (이름만 보인다)
+  const [courseFolded, toggleCourse] = useFolded('course')
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
   const sections = useMemo(() => trail.sections(), [trail])
@@ -143,14 +143,21 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
         </div>
       </div>
 
+      {/* 걷는 동안 보는 패널: 해발 고도와 다음 이정표만 크게, 나머지는 작게 */}
       <div className="panel progress">
-        <div className="progress-row">
-          <span>
-            현재 고도 <b>{elevation}m</b>
-          </span>
-          <span>
-            다음 <b>{next.to}</b> {formatDistance(Math.max(0, next.end - distance))}
-          </span>
+        <div className="progress-main">
+          <div>
+            <span className="progress-label">해발</span>
+            <span className="progress-alt">
+              {elevation}
+              <small>m</small>
+            </span>
+          </div>
+          <div className="progress-next">
+            <span className="progress-label">다음</span>
+            <span className="progress-next-name">{next.to}</span>
+            <span className="progress-next-dist">{formatDistance(Math.max(0, next.end - distance))}</span>
+          </div>
         </div>
         <div className="bar">
           <div className="bar-fill" style={{ width: `${progress * 100}%` }} />
@@ -163,9 +170,9 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
             />
           ))}
         </div>
-        <div className="progress-row sub">
+        <div className="progress-row">
           <span>정상까지 {formatDistance(remaining)}</span>
-          <span>실제로는 약 {formatMinutes(leftMinutes)} 남음</span>
+          <span>실제로는 약 {formatMinutes(leftMinutes)}</span>
         </div>
       </div>
 
@@ -211,10 +218,11 @@ function CoursePicker({ trails, current, onPick }: { trails: Trail[]; current: T
   )
 }
 
-const FOLD_KEY = 'hiking-metaverse:folded:'
+/** HUD 를 새로 짜면서 패널을 모두 접어 두는 것으로 바꿔, 예전에 펼쳐 둔 기억(folded:)은 쓰지 않는다 */
+const FOLD_KEY = 'hiking-metaverse:folded2:'
 
-/** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 foldOnNarrow 에 따라 좁은 화면에서 접어 둔다 */
-function useFolded(name: string, foldOnNarrow = false): [boolean, () => void] {
+/** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 접어 둔다 (걷는 동안 3D 화면을 넓게) */
+function useFolded(name: string): [boolean, () => void] {
   const [folded, setFolded] = useState(() => {
     try {
       const saved = localStorage.getItem(FOLD_KEY + name)
@@ -222,7 +230,7 @@ function useFolded(name: string, foldOnNarrow = false): [boolean, () => void] {
     } catch {
       // 저장소를 못 쓰는 환경이면 기본값
     }
-    return foldOnNarrow && window.matchMedia('(max-width: 760px)').matches
+    return true
   })
   const toggle = () =>
     setFolded((f) => {
