@@ -1052,3 +1052,50 @@ kbd {
   animation: toast-in 0.35s ease-out;
   pointer-events: none;
 }
+
+/*
+ * 첫 화면이 걷힐 때 패널들이 차례로 들어온다 (src/lib/splash.ts 가 body 에 hud-enter 를 잠깐 붙인다).
+ * 게임처럼 장면이 먼저 드러나고 패널이 뒤따른다. 패널마다 이미 쓰는 transform 과 겹치지 않게 translate 속성으로 움직인다.
+ */
+@keyframes hud-enter {
+  from {
+    opacity: 0;
+    translate: var(--enter-from, 0 -14px);
+  }
+}
+.hud-enter .hud-top > *,
+.hud-enter .progress,
+.hud-enter .minimap,
+.hud-enter .together,
+.hud-enter .sound-toggle,
+.hud-enter .attribution {
+  animation: hud-enter 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+.hud-enter .hud-top > :nth-child(2) {
+  animation-delay: 0.08s;
+}
+.hud-enter .hud-top > :nth-child(3) {
+  animation-delay: 0.16s;
+}
+.hud-enter .progress {
+  --enter-from: 0 16px;
+  animation-delay: 0.24s;
+}
+.hud-enter .minimap {
+  --enter-from: 16px 0;
+  animation-delay: 0.36s;
+}
+.hud-enter .together,
+.hud-enter .sound-toggle {
+  --enter-from: -16px 0;
+  animation-delay: 0.36s;
+}
+.hud-enter .attribution {
+  --enter-from: 0 0;
+  animation-delay: 0.5s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .hud-enter * {
+    animation: none !important;
+  }
+}
