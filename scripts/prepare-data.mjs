@@ -19,6 +19,7 @@ const ZOOM = 13
 
 // 산 목록. 산마다 지형 한 장과 그 위의 코스들을 만든다
 //  - bbox: 지형으로 만들 영역 (남, 서, 북, 동). 모든 코스가 들어가게 잡는다
+//  - park: 산이 속한 국립공원. 출발점 입구 현판에 산 이름과 같이 쓴다
 //  - elevation: 산의 가장 높은 봉우리 해발(m). 첫 화면에서 진행만큼 고도가 올라가는 데 쓴다
 //  - sheets: 정밀 지형에 쓸 1:5,000 수치지형도 도엽 번호. 파일 이름에 이 번호가 든 DXF 를 scripts/raw/ngii/ 에서 찾는다
 // 코스 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
@@ -125,6 +126,7 @@ const MOUNTAINS = [
   {
     id: 'bukhansan',
     name: '북한산',
+    park: '북한산국립공원',
     elevation: 836,
     bbox: { south: 37.634, west: 126.943, north: 37.678, east: 127.006 },
     sheets: ['37608039', '37608040', '37608049', '37608050'],
@@ -133,6 +135,7 @@ const MOUNTAINS = [
   {
     id: 'dobongsan',
     name: '도봉산',
+    park: '북한산국립공원',
     elevation: 740,
     bbox: { south: 37.668, west: 126.995, north: 37.716, east: 127.045 },
     sheets: ['37705011', '37705012', '37705021', '37705022', '37705031', '37705032', '37608020', '37608030', '37608040'],
@@ -457,7 +460,7 @@ for (const m of MOUNTAINS) {
   await fs.mkdir(OUT, { recursive: true })
   const sampleHeight = await buildTerrain(m.sheets)
   const graph = buildGraph(await loadOsm())
-  const trails = m.courses.map((c) => buildTrail(c, graph, sampleHeight))
+  const trails = m.courses.map((c) => ({ ...buildTrail(c, graph, sampleHeight), park: m.park }))
   await fs.writeFile(path.join(OUT, 'courses.json'), JSON.stringify(trails))
   console.log(`코스 ${trails.length}개를 ${m.id}/courses.json 에 썼다`)
 }
