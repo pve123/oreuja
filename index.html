@@ -16,8 +16,7 @@
         try {
           m = JSON.parse(localStorage.getItem('hiking-metaverse:mountain') || 'null')
         } catch (e) {}
-        if (!m || !/^[a-z0-9-]+$/.test(m.id) || typeof m.name !== 'string') m = { id: 'bukhansan', name: '북한산' }
-        window.__mountain = m
+        if (!m || !/^[a-z0-9-]+$/.test(m.id)) m = { id: 'bukhansan' }
         var files = ['/data/mountains.json', '/data/' + m.id + '/terrain.bin', '/data/' + m.id + '/terrain.json', '/data/' + m.id + '/courses.json']
         files.forEach(function (href) {
           var l = document.createElement('link')
@@ -306,10 +305,7 @@
             </g>
           </g>
         </svg>
-        <p class="splash-eyebrow">오늘의 산 · <span id="splash-mountain">북한산</span></p>
-        <script>
-          document.getElementById('splash-mountain').textContent = window.__mountain.name
-        </script>
+        <p class="splash-eyebrow">집에서 오르는 진짜 산</p>
         <h1 class="splash-title">방구석 등반대</h1>
         <div class="splash-meta">
           <span>해발 <span class="splash-alt" id="splash-alt">0</span>m</span>
