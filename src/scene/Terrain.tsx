@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
-import { useThree } from '@react-three/fiber'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Terrain as TerrainData, Trail } from '../lib/data'
 import { MAPBOX_TOKEN, loadSatelliteTexture, type LocalRect } from '../lib/satellite'
 import { layerFromCanvas, usePhotos } from '../lib/photo-map'
+import { daylight } from '../lib/daylight'
 
 const GRASS_LOW = new THREE.Color('#5d7f3a')
 const FOREST = new THREE.Color('#3f6b2e')
@@ -22,6 +23,7 @@ type Props = { terrain: TerrainData; trail: Trail }
 /**
  * 위성사진에는 이미 해와 나무 그림자가 찍혀 있어서 조명을 그대로 받으면 숲이 검게 뭉개진다.
  * 사진 색의 일부를 발광색으로도 써서 조명이 어두운 곳에서도 사진 무늬가 보이게 한다.
+ * 발광 세기는 시간대에 따라 바뀐다 (새벽에는 낮춰 사진이 스스로 빛나지 않게. src/lib/daylight.ts)
  */
 const PHOTO_LIGHTING = {
   roughness: 1,
@@ -158,8 +160,17 @@ export function Terrain({ terrain, trail }: Props) {
   const baseSatellite = useSatellite(wholeRect, terrain.origin, BASE_ZOOM, 'base')
   const detailSatellite = useSatellite(detail.rect, terrain.origin, DETAIL_ZOOM, 'detail')
 
+  // 위성사진 재질의 발광 세기를 시간대에 맞춘다
+  const group = useRef<THREE.Group>(null!)
+  useFrame(() => {
+    for (const child of group.current.children) {
+      const m = (child as THREE.Mesh).material as THREE.MeshStandardMaterial
+      if (m.emissiveMap) m.emissiveIntensity = daylight.photoEmissive
+    }
+  })
+
   return (
-    <group>
+    <group ref={group}>
       <mesh geometry={geometry} receiveShadow>
         {baseSatellite ? (
           <meshStandardMaterial key="satellite" map={baseSatellite} {...PHOTO_LIGHTING} emissiveMap={baseSatellite} />

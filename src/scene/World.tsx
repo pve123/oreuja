@@ -1,6 +1,6 @@
 import { Suspense, useEffect, useMemo, useRef } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
-import { OrbitControls, Sky } from '@react-three/drei'
+import { OrbitControls } from '@react-three/drei'
 import { Physics, useRapier, type RapierCollider } from '@react-three/rapier'
 import { BrightnessContrast, EffectComposer, HueSaturation, SSAO, ToneMapping, Vignette } from '@react-three/postprocessing'
 import { ToneMappingMode } from 'postprocessing'
@@ -21,6 +21,7 @@ import type { HikerHandle } from './Hiker'
 import { composePhoto } from '../lib/photo'
 import { occlusionUniforms } from '../lib/occlusion'
 import { PHOTO_CAMERA_BACK, summitVista } from '../lib/summit'
+import { Daylight } from './Daylight'
 import { AVATARS, type AvatarKind } from '../lib/avatars'
 import { playJump, playStep, setAmbience, type Surface } from '../lib/sound'
 import { STAIR_HALF_WIDTH, groundAt, stairAt, stoneSteps, trailGround } from '../lib/steps'
@@ -109,7 +110,6 @@ const GROUND_STICK = 2
 const FALL_RESCUE = 0.5
 /** 이 시간보다 오래 땅에서 떨어져 있으면 공중 동작으로 바꾼다(s). 턱을 내려설 때마다 다리를 접지 않게 */
 const AIRBORNE_AFTER = 0.12
-const SUN = new THREE.Vector3(-0.5, 0.55, 0.65).normalize() // 남서쪽 하늘의 해
 /** Hiker 걸음 주기와 같게: 1m 에 2.2 라디안, 반 바퀴(π)마다 한 발 */
 const STEP_PHASE_PER_M = 2.2
 
@@ -123,17 +123,6 @@ function clearView(terrain: TerrainData, from: THREE.Vector3, to: THREE.Vector3)
     if (meshHeight(terrain, p.x, p.z) > p.y - 0.6) return false // 땅과 시선 사이 0.6m 여유
   }
   return true
-}
-
-/** 하늘 상자가 카메라를 따라다니게 해서 높은 곳에서도 하늘이 보이게 한다 */
-function SkyDome() {
-  const group = useRef<THREE.Group>(null!)
-  useFrame(({ camera }) => group.current.position.copy(camera.position))
-  return (
-    <group ref={group}>
-      <Sky distance={5000} sunPosition={SUN.toArray()} turbidity={6} rayleigh={1.2} />
-    </group>
-  )
 }
 
 /**
@@ -182,7 +171,6 @@ type Character = { collider: RapierCollider; controller: ReturnType<ReturnType<t
 function WorldScene({ terrain, trail }: Props) {
   const hiker = useRef<HikerHandle>(null!)
   const controls = useRef<OrbitControlsImpl>(null!)
-  const sun = useRef<THREE.DirectionalLight>(null!)
   const camera = useThree((s) => s.camera)
   const avatar = useGame((s) => s.avatar)
   const gl = useThree((s) => s.gl)
@@ -475,11 +463,6 @@ function WorldScene({ terrain, trail }: Props) {
       setAmbience((pos.y - terrain.minHeight) / (terrain.maxHeight - terrain.minHeight))
     }
 
-    // 그림자가 아바타 주변에서 선명하도록 태양을 따라 옮김
-    sun.current.position.copy(pos).addScaledVector(SUN, 300)
-    sun.current.target.position.copy(pos)
-    sun.current.target.updateMatrixWorld()
-
     // 카메라와 아바타 사이에 낀 나무·바위를 비울 기준점 (아바타 가슴 높이)
     occlusionUniforms.uOccTarget.value.copy(pos).setY(pos.y + 1.2)
 
@@ -577,21 +560,8 @@ function WorldScene({ terrain, trail }: Props) {
 
   return (
     <>
-      <SkyDome />
+      <Daylight />
       <fog attach="fog" args={['#c9d6e3', 800, 6000]} />
-      <hemisphereLight args={['#dfefff', '#4a5d3a', 0.6]} />
-      <directionalLight
-        ref={sun}
-        intensity={2.2}
-        castShadow
-        shadow-mapSize={[2048, 2048]}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-        shadow-camera-far={800}
-        shadow-bias={-0.0005}
-      />
       <Terrain terrain={terrain} trail={trail} />
       <Forest terrain={terrain} trail={trail} />
       <Rocks terrain={terrain} trail={trail} />
