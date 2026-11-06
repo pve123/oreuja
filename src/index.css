@@ -1111,6 +1111,7 @@ kbd {
 /* 캐릭터 줄이 길어도 버튼 자리를 넘지 않고 그 안에서 옆으로 스크롤된다 */
 .lobby-actions > *,
 .lobby-avatars,
+.lobby-sky,
 .lobby-together {
   min-width: 0;
 }
@@ -1266,8 +1267,91 @@ kbd {
   animation: lobby-in 0.45s 0.08s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .lobby-avatars,
+.lobby-sky,
 .lobby-together {
   padding: 10px 12px;
+}
+/* 하늘 다섯 가지는 한 줄에. 타일마다 그 하늘의 미니 그라데이션을 보여 준다 */
+.sky-segmented {
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+}
+.sky-segmented button {
+  justify-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 5px 5px 7px;
+  border-radius: 14px;
+  transition:
+    transform 0.15s ease,
+    border-color 0.15s ease,
+    background 0.15s ease,
+    box-shadow 0.15s ease;
+}
+.sky-segmented button:active {
+  transform: scale(0.96);
+}
+.sky-segmented button.selected {
+  box-shadow: 0 0 0 3px rgba(255, 213, 138, 0.16);
+}
+.sky-segmented .segmented-title {
+  font-size: 12px;
+}
+.sky-swatch {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 5 / 3;
+  border-radius: 9px;
+  overflow: hidden;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+  background: var(--swatch);
+  transition: transform 0.2s ease;
+}
+.sky-segmented button:hover .sky-swatch {
+  transform: scale(1.04);
+}
+/* 해·달·별은 ::after 로 올린다 */
+.sky-swatch::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.sky-swatch.dawn {
+  --swatch: linear-gradient(180deg, #2f3d6e 0%, #8a9ccf 55%, #f1b48d 100%);
+}
+.sky-swatch.dawn::after {
+  background: radial-gradient(circle at 50% 108%, rgba(255, 190, 120, 0.9) 0, rgba(255, 190, 120, 0) 38%);
+}
+.sky-swatch.morning {
+  --swatch: linear-gradient(180deg, #6aa7e6 0%, #b9d9f6 60%, #fde2b8 100%);
+}
+.sky-swatch.morning::after {
+  background: radial-gradient(circle at 28% 78%, #fff3c4 0, #fff3c4 11%, rgba(255, 243, 196, 0) 13%);
+}
+.sky-swatch.day {
+  --swatch: linear-gradient(180deg, #4a9ae6 0%, #a6d2f6 65%, #e6f3fc 100%);
+}
+.sky-swatch.day::after {
+  background: radial-gradient(circle at 70% 26%, #fff8dc 0, #fff8dc 12%, rgba(255, 248, 220, 0) 15%);
+}
+.sky-swatch.sunset {
+  --swatch: linear-gradient(180deg, #3c3270 0%, #c95d6e 48%, #ffb15a 100%);
+}
+.sky-swatch.sunset::after {
+  background: radial-gradient(circle at 50% 92%, #ffe3a0 0, #ffd27a 12%, rgba(255, 180, 90, 0) 30%);
+}
+.sky-swatch.night {
+  --swatch: linear-gradient(180deg, #0b1130 0%, #222c57 100%);
+}
+.sky-swatch.night::after {
+  background:
+    radial-gradient(circle at 74% 30%, #e9eeff 0, #e9eeff 9%, rgba(233, 238, 255, 0) 11%),
+    radial-gradient(circle at 18% 24%, #fff 0, #fff 2%, transparent 3%),
+    radial-gradient(circle at 38% 58%, #fff 0, #fff 2%, transparent 3%),
+    radial-gradient(circle at 56% 20%, #fff 0, #fff 2%, transparent 3%),
+    radial-gradient(circle at 30% 80%, #fff 0, #fff 1.5%, transparent 3%),
+    radial-gradient(circle at 86% 66%, #fff 0, #fff 2%, transparent 3%);
 }
 .lobby-buttons {
   display: flex;
@@ -1348,6 +1432,7 @@ kbd {
     --lobby-from: 0 24px;
   }
   .lobby-avatars,
+  .lobby-sky,
   .lobby-together {
     padding: 0;
     background: none;
@@ -1361,5 +1446,9 @@ kbd {
   .lobby-panel,
   .lobby-actions {
     animation: none;
+  }
+  .sky-segmented button,
+  .sky-swatch {
+    transition: none;
   }
 }

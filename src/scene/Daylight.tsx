@@ -3,14 +3,14 @@ import { useFrame, useThree } from '@react-three/fiber'
 import { Sky } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Sky as SkyImpl } from 'three-stdlib'
-import { MOON, MOON_COLOR, SUN, applyTime, daylight, kstNow, parseDebugTime } from '../lib/daylight'
+import { MOON, MOON_COLOR, SUN, applySky, daylight, kstNow, parseDebugTime, settle, useSky } from '../lib/daylight'
 import { occlusionUniforms } from '../lib/occlusion'
 
 const STAR_COUNT = 1500
 const STAR_RADIUS = 4000
 
 /**
- * 실제 한국 시각에 맞춘 하늘과 빛 (src/lib/daylight.ts). 하늘 상자와 별은 카메라를 따라다녀 높은 곳에서도 보인다.
+ * 실제 한국 시각 또는 베이스캠프에서 고른 시간대에 맞춘 하늘과 빛 (src/lib/daylight.ts). 하늘 상자와 별은 카메라를 따라다녀 높은 곳에서도 보인다.
  * 태양 조명은 그림자가 캐릭터 둘레에서 선명하도록 캐릭터(World 가 매 프레임 넣는 uOccTarget)를 따라 옮긴다.
  */
 export function Daylight() {
@@ -21,7 +21,7 @@ export function Daylight() {
   const hemi = useRef<THREE.HemisphereLight>(null!)
   const stars = useRef<THREE.PointsMaterial>(null!)
   const scene = useThree((s) => s.scene)
-  // 개발 중 ?time= 으로 고정한 시각 (없으면 실제 시각)
+  // 개발 중 ?time= 으로 고정한 시각 (없으면 실제 시각). 「지금」을 골랐을 때만 쓴다
   const debugTime = useMemo(() => (import.meta.env.DEV ? parseDebugTime(new URLSearchParams(location.search).get('time')) : null), [])
 
   // 별: 하늘 위쪽 반구에 흩뿌린 점. 지평선 가까이는 성기게
@@ -41,9 +41,10 @@ export function Daylight() {
     return g
   }, [])
 
-  useFrame(({ camera }) => {
+  useFrame(({ camera }, dt) => {
     group.current.position.copy(camera.position)
-    applyTime(debugTime ?? kstNow())
+    applySky(useSky.getState().preset, debugTime ?? kstNow())
+    settle(dt)
 
     const u = sky.current.material.uniforms
     u.sunPosition.value.copy(daylight.skySun)
