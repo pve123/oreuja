@@ -5,9 +5,9 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1c2c47" />
-    <title>북한산 등산 메타버스</title>
+    <title>방구석 등반대</title>
     <!--
-      첫 화면: 새벽 북한산을 오르는 등산객. JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
+      첫 화면: 새벽 산을 오르는 등산객 (지금은 북한산 세 봉우리). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
       로딩 진행만큼 등산객이 등산로를 따라 정상으로 오르고 고도가 올라간다 (src/lib/splash.ts).
       뒤에는 실제 화면 패널 자리에 유리 스켈레톤을 깔아 장면이 뜰 때 레이아웃이 튀지 않게 한다.
     -->
@@ -119,8 +119,8 @@
         margin: 6px 0 0;
         font-size: 11px;
         font-weight: 700;
-        letter-spacing: 0.42em;
-        padding-left: 0.42em;
+        letter-spacing: 0.2em;
+        padding-left: 0.2em;
         color: var(--trail);
       }
       .splash-title {
@@ -251,7 +251,7 @@
   </head>
   <body>
     <div id="root"></div>
-    <div id="splash" role="status" aria-live="polite" aria-label="북한산을 불러오는 중">
+    <div id="splash" role="status" aria-live="polite" aria-label="방구석 등반대를 불러오는 중">
       <!-- 멀리서 가까이 겹친 능선과 안개 -->
       <svg class="splash-ridges" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true">
         <path fill="#7c6a86" opacity="0.55" d="M0 210 L120 170 L230 196 L360 120 L470 176 L600 110 L720 160 L840 128 L980 180 L1100 140 L1200 170 V400 H0 Z" />
@@ -283,8 +283,8 @@
             </g>
           </g>
         </svg>
-        <p class="splash-eyebrow">TRAILVERSE</p>
-        <h1 class="splash-title">북한산</h1>
+        <p class="splash-eyebrow">오늘의 산 · 북한산</p>
+        <h1 class="splash-title">방구석 등반대</h1>
         <div class="splash-meta">
           <span>해발 <span class="splash-alt" id="splash-alt">0</span>m</span>
           <span aria-hidden="true">·</span>
