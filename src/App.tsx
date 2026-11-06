@@ -12,7 +12,7 @@ import { Hud, SummitModal } from './ui/Hud'
 import { Lobby } from './ui/Lobby'
 import { SoundControls } from './ui/SoundControls'
 import { startNet } from './lib/net'
-import { failSplash, hideSplash, setSplash, setSplashAltitude } from './lib/splash'
+import { failSplash, hideSplash, setSplash } from './lib/splash'
 
 /** 첫 화면 진행 막대 몫: 지형 데이터 0.05~0.6, 3D 모델·텍스처 0.6~0.92, 장면 준비 나머지 */
 const DATA_END = 0.6
@@ -36,7 +36,6 @@ export default function App() {
     const debugCourse = params?.get('course')
     const debugMountain = params?.get('mountain')
     const saved = debugMountain ? { ...DEFAULT_MOUNTAIN, id: debugMountain, name: debugMountain } : loadMountain()
-    setSplashAltitude(saved.elevation)
     setSplash('지형을 펼치는 중', 0.05)
     const load = (m: Mountain) =>
       Promise.all([loadMountains(), loadData(m.id, (p) => setSplash('지형을 펼치는 중', 0.05 + p * (DATA_END - 0.05)))]).then(
@@ -46,8 +45,6 @@ export default function App() {
     load(saved)
       .catch((e) => (saved.id === DEFAULT_MOUNTAIN.id ? Promise.reject(e) : load(DEFAULT_MOUNTAIN)))
       .then((d) => {
-        const { mountain } = d
-        setSplashAltitude(mountain.elevation)
         // 개발용 코스 지정이면 베이스캠프를 건너뛰고 바로 걷는다
         if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse, mode: 'hiking' })
         setSplash('숲과 길을 그리는 중', DATA_END)
