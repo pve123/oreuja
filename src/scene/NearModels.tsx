@@ -3,7 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
 import { bakeGeometry } from '../lib/geometry'
-import { occlusionUniforms, withOcclusionShrink } from '../lib/occlusion'
+import { occlusionUniforms, withOcclusionFade } from '../lib/occlusion'
 
 /** 정밀 모델로 그릴 물건 하나. model 은 urls 의 번호, color 는 텍스처에 곱할 색 */
 export type NearItem = { matrix: THREE.Matrix4; model: number; color?: THREE.Color }
@@ -89,7 +89,7 @@ export function NearModels({ urls, items, radius = 70, capacity = 800, occlusion
             material.color.set(tint).multiplyScalar(1 / NEUTRAL_MEAN_LINEAR)
           }
           const occlusion = occlusionLift !== undefined
-          if (occlusion || ring) material = withOcclusionShrink(material, occlusionLift ?? 0, { ring: ring ? 'near' : undefined, occlusion })
+          if (occlusion || ring) material = withOcclusionFade(material, occlusionLift ?? 0, { ring: ring ? 'near' : undefined, occlusion })
           const mesh = new THREE.InstancedMesh(geometry, material, capacity)
           mesh.count = 0
           mesh.castShadow = castShadow

@@ -34,7 +34,7 @@ type Options = {
  *
  * @param centerLift 판정에 쓸 중심 높이(모델 단위). 나무는 수관 가운데, 바위는 0
  */
-export function withOcclusionShrink<T extends THREE.Material>(material: T, centerLift: number, options: Options = {}): T {
+export function withOcclusionFade<T extends THREE.Material>(material: T, centerLift: number, options: Options = {}): T {
   const { ring, occlusion = true } = options
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, occlusionUniforms, { uOccLift: { value: centerLift } })
@@ -103,7 +103,7 @@ export function withOcclusionShrink<T extends THREE.Material>(material: T, cente
 
 /** 그림자 깊이 재질. 도형 나무가 정밀 반경 안에서 그림자를 겹쳐 드리우지 않게 한다 */
 export function ringDepthMaterial(centerLift: number, ring: 'far' | 'near') {
-  return withOcclusionShrink(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), centerLift, {
+  return withOcclusionFade(new THREE.MeshDepthMaterial({ depthPacking: THREE.RGBADepthPacking }), centerLift, {
     ring,
     occlusion: false,
   })

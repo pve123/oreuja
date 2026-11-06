@@ -5,7 +5,7 @@ import { sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
-import { ringDepthMaterial, withOcclusionShrink } from '../lib/occlusion'
+import { ringDepthMaterial, withOcclusionFade } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
 import { DETAIL_VARIANTS, DetailTrees } from './DetailTrees'
@@ -139,8 +139,8 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   // 아바타 가까이는 정밀 모델(DetailTrees)이 그리므로 도형 나무는 그 안에서 그림자까지 숨긴다
   const materials = useMemo(
     () => ({
-      canopy: withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 4, { ring: 'far' }),
-      trunk: withOcclusionShrink(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 }), 4, { ring: 'far' }),
+      canopy: withOcclusionFade(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 4, { ring: 'far' }),
+      trunk: withOcclusionFade(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 }), 4, { ring: 'far' }),
       depth: ringDepthMaterial(4, 'far'),
     }),
     [],
