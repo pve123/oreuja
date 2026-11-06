@@ -19,6 +19,19 @@ export type LandmarkKind = 'cairn' | 'pass' | 'temple' | 'hut' | 'gate' | 'ruins
 /** 출발점 입구 문을 세울 거리(m). 처음 화면에서 캐릭터 앞에 보이게 */
 export const TRAILHEAD_AT = 10
 
+/** 랜드마크 이름표와 이정표 도착 연출에 붙이는 그림 문자 */
+export const LANDMARK_ICON: Record<LandmarkKind, string> = {
+  cairn: '🪨',
+  pass: '😮‍💨',
+  temple: '🏮',
+  hut: '🏠',
+  gate: '🏯',
+  ruins: '🧱',
+  waterfall: '💧',
+  sign: '🪧',
+  trailhead: '🥾',
+}
+
 export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('폭포')) return 'waterfall'
   if (name.includes('산장')) return 'hut'
