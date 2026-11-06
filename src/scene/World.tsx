@@ -6,6 +6,7 @@ import { BrightnessContrast, EffectComposer, HueSaturation, SSAO, ToneMapping, V
 import { ToneMappingMode } from 'postprocessing'
 import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
+import { IS_TOUCH } from '../lib/device'
 import { meshHeight, standHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
 import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
@@ -69,6 +70,10 @@ const STAIR_UP_SPEED = 0.8
 /** 카메라 높이가 캐릭터 높이를 따라가는 빠르기. 계단에서 카메라가 덜컹거리지 않게 몸보다 느리게 */
 const CAMERA_Y_RATE = 6
 const TURN_SPEED = 3.6 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 200도
+/** 터치 조이스틱: 이보다 작게 기울이면 가만히 있고, 이보다 크게 밀면 뛴다. 몸은 기울인 쪽으로 이 빠르기(rad/s)로 돈다 */
+const STICK_DEAD = 0.14
+const STICK_RUN = 0.82
+const STICK_TURN_SPEED = 9
 /** 카메라와 캐릭터 가슴 사이 가장 가까운 거리(m) */
 const CAMERA_MIN_DISTANCE = 4
 /** 첫 화면 카메라 거리(m). 캐릭터 온몸과 앞길이 함께 보이게 가장 가까운 거리보다 조금 떨어져 시작한다 */
@@ -130,6 +135,16 @@ function clearView(terrain: TerrainData, from: THREE.Vector3, to: THREE.Vector3)
  * 톤 매핑한 뒤 색을 조금 다듬고 가장자리를 살짝 어둡게 한다. 톤 매핑은 렌더러 대신 후처리에서 한 번 한다 (App 의 Canvas 는 NoToneMapping).
  */
 function PostEffects() {
+  // 폰·태블릿은 GPU 가 약해서 가장 무거운 앰비언트 오클루전(법선 버퍼까지 그린다)과 멀티샘플링을 뺀다
+  if (IS_TOUCH)
+    return (
+      <EffectComposer multisampling={0}>
+        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+        <HueSaturation saturation={0.08} />
+        <BrightnessContrast contrast={0.06} />
+        <Vignette offset={0.3} darkness={0.45} />
+      </EffectComposer>
+    )
   return (
     // SSAO 는 법선 버퍼가 필요하다. (N8AO 2.0.1 은 three 0.187 에서 렌더 타깃 오류가 나서 postprocessing 의 SSAO 를 쓴다)
     <EffectComposer multisampling={4} enableNormalPass>
@@ -232,7 +247,42 @@ function WorldScene({ terrain, trail }: Props) {
       z.arm = THREE.MathUtils.clamp(z.arm * (e.deltaY > 0 ? ZOOM_STEP : 1 / ZOOM_STEP), CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)
     }
     el.addEventListener('wheel', onWheel, { passive: true })
-    return () => el.removeEventListener('wheel', onWheel)
+    // 터치: 두 손가락을 벌리고 오므려 확대·축소한다 (OrbitControls 의 확대는 꺼 두었다)
+    const touches = new Map<number, { x: number; y: number }>()
+    const pinch = { span: 0 }
+    const span = () => {
+      const [a, b] = [...touches.values()]
+      return Math.hypot(a.x - b.x, a.y - b.y)
+    }
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch') return
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      pinch.span = touches.size === 2 ? span() : 0
+    }
+    const onMove = (e: PointerEvent) => {
+      if (!touches.has(e.pointerId)) return
+      touches.set(e.pointerId, { x: e.clientX, y: e.clientY })
+      if (touches.size !== 2 || pinch.span <= 0) return
+      const now = span()
+      const z = zoom.current
+      z.arm = THREE.MathUtils.clamp((z.arm * pinch.span) / now, CAMERA_MIN_DISTANCE, CAMERA_MAX_DISTANCE)
+      pinch.span = now
+    }
+    const onUp = (e: PointerEvent) => {
+      touches.delete(e.pointerId)
+      pinch.span = 0
+    }
+    el.addEventListener('pointerdown', onDown)
+    el.addEventListener('pointermove', onMove)
+    el.addEventListener('pointerup', onUp)
+    el.addEventListener('pointercancel', onUp)
+    return () => {
+      el.removeEventListener('wheel', onWheel)
+      el.removeEventListener('pointerdown', onDown)
+      el.removeEventListener('pointermove', onMove)
+      el.removeEventListener('pointerup', onUp)
+      el.removeEventListener('pointercancel', onUp)
+    }
   }, [gl])
 
   // 발소리 바닥: 위문부터는 바위, 그 전 가파른 곳은 돌계단, 나머지는 흙길
@@ -305,6 +355,8 @@ function WorldScene({ terrain, trail }: Props) {
     //    등산로에서 멀어질수록 바깥쪽 걸음이 느려지다 ROAM_LIMIT 에서 멈춘다
     let move = 0
     let turn = 0
+    let running = input.run
+    let stick = false
     if (input.jump) {
       input.jump = false
       if (b.grounded && game.mode === 'hiking') {
@@ -316,11 +368,23 @@ function WorldScene({ terrain, trail }: Props) {
       turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
       move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
       b.yaw += turn * TURN_SPEED * dt
+      // 터치 조이스틱: 카메라가 보는 쪽을 앞으로 삼아 기울인 방향으로 몸을 돌리며 걷는다 (요즘 3D 게임의 카메라 기준 이동)
+      const tilt = Math.hypot(input.stick.x, input.stick.y)
+      if (tilt > STICK_DEAD && move === 0 && turn === 0) {
+        stick = true
+        // 카메라에서 캐릭터 쪽이 앞. 화면 오른쪽은 yaw 가 작아지는 쪽이다
+        const forward = Math.atan2(camera.position.x - b.x, camera.position.z - b.z) + Math.PI
+        const want = forward - Math.atan2(input.stick.x, input.stick.y)
+        const diff = Math.atan2(Math.sin(want - b.yaw), Math.cos(want - b.yaw))
+        b.yaw += THREE.MathUtils.clamp(diff, -STICK_TURN_SPEED * dt, STICK_TURN_SPEED * dt)
+        move = 1
+        running = running || tilt > STICK_RUN
+      }
     }
     let dx = 0
     let dz = 0
     if (move !== 0) {
-      let speed = move > 0 ? (input.run ? RUN_SPEED : WALK_SPEED) : input.run ? BACK_RUN_SPEED : BACK_SPEED
+      let speed = move > 0 ? (running ? RUN_SPEED : WALK_SPEED) : running ? BACK_RUN_SPEED : BACK_SPEED
       const fx = Math.sin(b.yaw) * move
       const fz = Math.cos(b.yaw) * move
       // 오르막 계단은 조금 느리게
@@ -432,7 +496,7 @@ function WorldScene({ terrain, trail }: Props) {
     st.visual += (visualTarget - st.visual) * (1 - Math.exp(-STEP_VISUAL_RATE * dt))
     if (b.grounded) {
       if (tread && tread.index >= 0) {
-        if (tread.index !== st.index) playStep('step', input.run)
+        if (tread.index !== st.index) playStep('step', running)
         footstep.current.phase = 0
       } else {
         const moved = Math.abs(distance - before.distance) + Math.abs(offset - before.offset)
@@ -440,7 +504,7 @@ function WorldScene({ terrain, trail }: Props) {
         fs.phase += moved * STEP_PHASE_PER_M
         if (fs.phase >= Math.PI) {
           fs.phase %= Math.PI
-          playStep(surfaceAt(distance, offset), input.run)
+          playStep(surfaceAt(distance, offset), running)
         }
       }
     }
@@ -520,7 +584,7 @@ function WorldScene({ terrain, trail }: Props) {
 
     // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
     // 베이스캠프에서는 캐릭터 앞쪽 비스듬히 돌아가 낮게 비춘다
-    if (input.forward || input.backward || input.left || input.right || lobby) freeLook.current = false
+    if (input.forward || input.backward || input.left || input.right || stick || lobby) freeLook.current = false
     if (!freeLook.current) {
       const off = camera.position.clone().sub(target)
       const horizontal = Math.hypot(off.x, off.z)

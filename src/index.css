@@ -9,6 +9,11 @@
   --navy: #1c2c47;
   font-family: 'Pretendard', 'Apple SD Gothic Neo', 'Noto Sans KR', system-ui, sans-serif;
   color: var(--text);
+  /* 노치·홈바 안전 영역. viewport-fit=cover 라 화면 끝까지 그리고, 고정 패널은 이만큼 비킨다 */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
 }
 
 * {
@@ -23,6 +28,21 @@ body,
   height: 100%;
   overflow: hidden;
   background: #c9d6e3;
+}
+html {
+  /* 폰: 당겨서 새로고침·튕김을 막고, 누를 때 회색 깜빡임과 가로 회전 때 글자 커짐을 없앤다 */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+  -webkit-text-size-adjust: 100%;
+}
+#root {
+  /* 주소창이 접히고 펼쳐지는 폰 브라우저에서도 화면을 꽉 채운다 */
+  height: 100dvh;
+}
+button,
+a {
+  /* 두 번 두드려 확대하지 않고 바로 반응한다 */
+  touch-action: manipulation;
 }
 
 canvas {
@@ -45,9 +65,9 @@ canvas {
 /* 위쪽 패널 줄: 왼쪽 코스, 오른쪽 캐릭터·도움말. 빈 곳은 3D 화면을 그대로 누를 수 있다 */
 .hud-top {
   position: fixed;
-  top: 16px;
-  left: 16px;
-  right: 16px;
+  top: calc(16px + var(--sat));
+  left: calc(16px + var(--sal));
+  right: calc(16px + var(--sar));
   z-index: 21;
   display: flex;
   justify-content: space-between;
@@ -372,10 +392,14 @@ kbd {
 
 .progress {
   left: 50%;
-  bottom: 16px;
+  bottom: calc(16px + var(--sab));
   transform: translateX(-50%);
   width: min(460px, calc(100vw - 32px));
   padding: 12px 18px 12px;
+}
+/* 진행 패널은 .hud-top 안에 두지만(폰에서는 코스 패널 아래로 쌓인다) 넓은 화면에서는 아래 가운데에 고정한다 */
+.hud-top .progress {
+  position: fixed;
 }
 /* 걷는 동안 보는 두 가지: 지금 해발 고도와 다음 이정표 */
 .progress-main {
@@ -459,54 +483,79 @@ kbd {
 }
 
 
+/* 터치 화면 조작: 왼쪽 아래 조이스틱(걷기)과 오른쪽 아래 점프 버튼. 마우스 기기에서는 숨긴다 */
 .hold-button {
   position: fixed;
-  right: 16px;
-  bottom: 120px;
-  width: 84px;
-  height: 84px;
+  z-index: 20;
   border-radius: 50%;
   border: none;
-  background: var(--accent);
   color: #fff;
-  font-size: 18px;
   font-weight: 800;
-  box-shadow: 0 6px 20px rgba(230, 57, 70, 0.4);
   user-select: none;
   -webkit-user-select: none;
   touch-action: none;
   cursor: pointer;
+  transition: transform 0.1s ease;
 }
 .hold-button.jump {
-  right: 112px;
-  bottom: 128px;
-  width: 64px;
-  height: 64px;
-  font-size: 15px;
-  background: var(--navy);
-  box-shadow: 0 6px 20px rgba(28, 44, 71, 0.4);
-}
-.hold-button.side {
-  bottom: 128px;
-  width: 56px;
-  height: 56px;
-  font-size: 18px;
-  background: rgba(28, 44, 71, 0.75);
-  box-shadow: 0 4px 14px rgba(28, 44, 71, 0.3);
-}
-.hold-button.side.left {
-  left: 16px;
-  right: auto;
-}
-.hold-button.side.right {
-  left: 80px;
-  right: auto;
+  right: calc(20px + var(--sar));
+  bottom: calc(204px + var(--sab));
+  width: 76px;
+  height: 76px;
+  font-size: 16px;
+  background: var(--accent);
+  box-shadow:
+    0 8px 24px rgba(255, 138, 91, 0.4),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.25);
 }
 .hold-button:active {
-  transform: scale(0.95);
+  transform: scale(0.92);
+}
+/* 조이스틱: 왼쪽 아래 넓은 영역이 조작 자리. 손을 대면 그 자리에 생기고, 떼면 제자리에 흐리게 돌아간다 */
+.stick-zone {
+  position: fixed;
+  left: 0;
+  bottom: 0;
+  width: 50vw;
+  height: 56vh;
+  z-index: 18;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.stick {
+  position: fixed;
+  left: calc(92px + var(--sal));
+  bottom: calc(132px + var(--sab));
+  width: 124px;
+  height: 124px;
+  margin: -62px 0 0 -62px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(22, 30, 52, 0.38);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  opacity: 0.5;
+  transition: opacity 0.15s ease;
+  pointer-events: none;
+}
+.stick.on {
+  opacity: 1;
+}
+.stick-knob {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 54px;
+  height: 54px;
+  margin: -27px 0 0 -27px;
+  border-radius: 50%;
+  background: rgba(253, 246, 236, 0.92);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
 }
 @media (hover: hover) and (pointer: fine) {
-  .hold-button {
+  .hold-button,
+  .stick-zone {
     display: none;
   }
 }
@@ -626,8 +675,8 @@ kbd {
 
 .minimap {
   position: fixed;
-  right: 16px;
-  bottom: 24px;
+  right: calc(16px + var(--sar));
+  bottom: calc(24px + var(--sab));
   z-index: 20;
   width: 168px;
   height: 168px;
@@ -649,8 +698,8 @@ kbd {
 }
 .sound-toggle {
   position: fixed;
-  left: 16px;
-  bottom: 24px;
+  left: calc(16px + var(--sal));
+  bottom: calc(24px + var(--sab));
   z-index: 20;
   width: 40px;
   height: 40px;
@@ -676,8 +725,8 @@ kbd {
   }
 }
 .together {
-  left: 16px;
-  bottom: 76px;
+  left: calc(16px + var(--sal));
+  bottom: calc(76px + var(--sab));
   padding: 10px 12px;
   display: grid;
   gap: 6px;
@@ -710,6 +759,8 @@ kbd {
 .together-name input {
   width: 100%;
   font: inherit;
+  /* 16px 보다 작으면 iOS 가 입력칸을 누를 때 화면을 확대한다 */
+  font-size: 16px;
   padding: 3px 6px;
   border-radius: 6px;
   border: 1.5px solid var(--accent-2);
@@ -771,22 +822,19 @@ kbd {
 .emote-bubble.mine {
   animation: none;
 }
-/* 터치 화면에서는 옆걸음 버튼 위로 올린다 */
-@media (hover: none) {
-  .together {
-    bottom: 200px;
-  }
-}
 .attribution {
   position: fixed;
-  right: 8px;
-  bottom: 4px;
+  right: calc(8px + var(--sar));
+  bottom: calc(4px + var(--sab));
+  z-index: 19;
   font-size: 10px;
   color: rgba(255, 255, 255, 0.7);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
 }
 .attribution a {
   color: inherit;
+  pointer-events: auto;
 }
 
 /*
@@ -962,26 +1010,78 @@ kbd {
   height: 52px;
 }
 /* 좁은 화면: 캐릭터·도움말을 위에, 코스 패널을 그 아래 쌓는다. 오른쪽 위 모서리는 소리 버튼 자리 */
+/* 터치 기기 공통(폰 가로·태블릿): 혼자 오르는 동안 닉네임·감정 표현 패널은 조이스틱 자리와 겹쳐 감춘다 (같이하기를 열 때 다시 둔다) */
+@media (hover: none) {
+  .together {
+    display: none;
+  }
+}
+/* 폰 가로: 높이가 낮아 캐릭터 패널을 숨기고 점프 버튼을 오른쪽 아래 구석으로 내린다 */
+@media (max-height: 500px) {
+  .side-stack {
+    display: none;
+  }
+  .course {
+    max-height: 42vh;
+  }
+  .hold-button.jump {
+    bottom: calc(34px + var(--sab));
+  }
+}
+/* 폰: 위쪽에 코스와 진행만 쌓고, 아래는 조이스틱과 점프 버튼 자리로 비운다 */
 @media (max-width: 760px) {
   .hud-top {
-    right: 64px;
+    right: calc(64px + var(--sar));
     flex-direction: column;
     align-items: stretch;
     gap: 8px;
   }
+  /* 캐릭터는 베이스캠프에서 고른다. 걷는 동안에는 3D 화면을 넓게 */
   .side-stack {
-    order: -1;
-    align-items: stretch;
+    display: none;
   }
   .course {
     width: auto;
-    max-height: calc(100vh - 340px);
+    max-height: 34vh;
+  }
+  .hud-top .progress {
+    position: relative;
+    left: auto;
+    bottom: auto;
+    transform: none;
+    width: auto;
+    padding: 10px 14px;
+  }
+  .progress-main {
+    margin-bottom: 8px;
+  }
+  .progress-alt {
+    font-size: 20px;
+  }
+  .progress-next-name {
+    font-size: 15px;
+  }
+  .progress-row {
+    margin-top: 6px;
+    font-size: 10px;
   }
   .sound-toggle {
     left: auto;
-    right: 16px;
+    right: calc(16px + var(--sar));
     bottom: auto;
-    top: 16px;
+    top: calc(16px + var(--sat));
+  }
+  .hold-button.jump {
+    bottom: calc(34px + var(--sab));
+  }
+  .attribution {
+    left: calc(8px + var(--sal));
+    right: calc(8px + var(--sar));
+    bottom: calc(3px + var(--sab));
+    text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 }
 
@@ -1425,7 +1525,7 @@ kbd {
     right: auto;
     bottom: auto;
     width: 100%;
-    padding: 8px 12px 14px;
+    padding: 8px calc(12px + var(--sar)) calc(14px + var(--sab)) calc(12px + var(--sal));
     background: var(--panel-bg);
     backdrop-filter: blur(14px);
     -webkit-backdrop-filter: blur(14px);
