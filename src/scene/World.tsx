@@ -352,17 +352,26 @@ function WorldScene({ terrain, trail }: Props) {
         }
       }
     }
-    // 중력: 땅에 서 있으면 살짝 눌러 붙이고, 떠 있으면 떨어진다
-    b.vy = b.grounded && b.vy <= 0 ? -GROUND_STICK : b.vy - GRAVITY * dt
-    ch.collider.setTranslation({ x: b.x, y: b.y + BODY_CENTER, z: b.z })
-    ch.controller.computeColliderMovement(ch.collider, { x: dx, y: b.vy * dt, z: dz })
-    const m = ch.controller.computedMovement()
+    // 베이스캠프·정상·사진에서는 물리를 돌리지 않고 제자리 땅 위에 선다. 비탈에서는 컨트롤러가 서 있는 캐릭터도 조금씩
+    // 미끄러뜨리는데, 걷기 모드가 아니면 그 걸음이 기록되지 않아 다음 프레임에 출발점으로 되돌려지며 초당 열두 번쯤 떨렸다
+    const still = game.mode !== 'hiking'
+    let m = { x: 0, y: 0, z: 0 }
+    if (still) {
+      b.y = groundAt(terrain, trail, steps, distance, offset, b.x, b.z).y
+      b.vy = 0
+    } else {
+      // 중력: 땅에 서 있으면 살짝 눌러 붙이고, 떠 있으면 떨어진다
+      b.vy = b.grounded && b.vy <= 0 ? -GROUND_STICK : b.vy - GRAVITY * dt
+      ch.collider.setTranslation({ x: b.x, y: b.y + BODY_CENTER, z: b.z })
+      ch.controller.computeColliderMovement(ch.collider, { x: dx, y: b.vy * dt, z: dz })
+      m = ch.controller.computedMovement()
+    }
     const startX = b.x
     const startZ = b.z
     b.x += m.x
     b.y += m.y
     b.z += m.z
-    b.grounded = ch.controller.computedGrounded()
+    b.grounded = still || ch.controller.computedGrounded()
     if (b.grounded && b.vy < 0) b.vy = -GROUND_STICK
     // 머리를 부딪히면 위로 가던 힘을 없앤다
     if (b.vy > 0 && m.y < b.vy * dt * 0.5) b.vy = 0
