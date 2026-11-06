@@ -1,5 +1,5 @@
 /**
- * index.html 에 박아 둔 첫 화면(새벽 산 + 유리 스켈레톤)을 다룬다.
+ * index.html 에 박아 둔 첫 화면(새벽 산)을 다룬다.
  * 로딩 진행만큼 등산객이 등산로를 따라 정상으로 오르고, 지나온 길이 채워지며, 고도가 올라간다.
  * 진행은 실제 진행만 보여 주고 뒤로 가지 않는다. 장면이 그려지면 안개가 걷히듯 사라진다.
  */
@@ -16,6 +16,8 @@ const TIPS = [
   '이정표마다 돌탑·암자·성문이 기다려요',
 ]
 const TIP_MS = 3200
+/** 화면 패널이 다 들어오는 시간(ms). src/index.css 의 hud-enter 지연과 길이를 더한 값보다 길게 */
+const HUD_ENTER_MS = 1400
 
 const $ = (id: string) => document.getElementById(id)
 let shown = 0
@@ -90,6 +92,9 @@ export function hideSplash() {
   setSplash('정상 도착! 출발해요', 1)
   setTimeout(() => {
     splash.classList.add('done')
+    // 장면이 드러나는 동안 화면 패널들을 차례로 들여보낸다. 끝나면 클래스를 떼어 다시 오르기 때 또 움직이지 않게 한다
+    document.body.classList.add('hud-enter')
+    setTimeout(() => document.body.classList.remove('hud-enter'), HUD_ENTER_MS)
     splash.addEventListener('transitionend', () => splash.remove(), { once: true })
     // 동작 줄이기 설정이면 transition 이 없어 transitionend 가 오지 않는다
     setTimeout(() => splash.remove(), 1200)
