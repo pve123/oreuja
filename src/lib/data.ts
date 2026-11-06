@@ -13,7 +13,7 @@ export type TerrainMeta = {
   origin: { lat: number; lon: number }
   /**
    * terrain.bin 의 높이 저장 방식. uint16 은 minHeight~maxHeight 를 0~65535 로 나눠 담아 float32 의 절반 크기다
-   * (북한산 800m 범위에서 한 칸 약 1.2cm). 없으면 float32
+   * (높이 차 800m 산에서 한 칸 약 1.2cm). 없으면 float32
    */
   encoding?: 'float32' | 'uint16'
 }
@@ -247,17 +247,20 @@ async function fetchWithProgress(url: string, onProgress?: (p: number) => void):
   return out.buffer
 }
 
-/** 지형 한 장과 그 위의 코스 목록을 불러온다. onProgress 로 가장 큰 지형 파일을 받은 정도(0~1)를 알린다 */
-export async function loadData(onProgress?: (p: number) => void): Promise<{ terrain: Terrain; trails: Trail[] }> {
+/** 산 하나의 지형과 그 위의 코스 목록을 불러온다. onProgress 로 가장 큰 지형 파일을 받은 정도(0~1)를 알린다 */
+export async function loadData(
+  mountainId: string,
+  onProgress?: (p: number) => void,
+): Promise<{ terrain: Terrain; trails: Trail[] }> {
   const json = async <T,>(url: string) => {
     const r = await fetch(url)
     if (!r.ok) throw new Error(`${url} 을 받지 못했다 (${r.status})`)
     return (await r.json()) as T
   }
   const [meta, buf, courses] = await Promise.all([
-    json<TerrainMeta>('/data/terrain.json'),
-    fetchWithProgress('/data/terrain.bin', onProgress),
-    json<TrailData[]>('/data/courses.json'),
+    json<TerrainMeta>(`/data/${mountainId}/terrain.json`),
+    fetchWithProgress(`/data/${mountainId}/terrain.bin`, onProgress),
+    json<TrailData[]>(`/data/${mountainId}/courses.json`),
   ])
   return { terrain: { ...meta, heights: decodeHeights(meta, buf) }, trails: courses.map((c) => new Trail(c)) }
 }

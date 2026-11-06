@@ -240,6 +240,43 @@ kbd {
   text-underline-offset: 3px;
   cursor: pointer;
 }
+/* 산 고르기: 코스 목록 위에 산 이름을 나란히 */
+.mountain-tabs {
+  display: flex;
+  gap: 6px;
+  margin: 8px 0 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.mountain-tab {
+  flex: 1 0 auto;
+  display: grid;
+  gap: 1px;
+  text-align: left;
+  font: inherit;
+  padding: 6px 10px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  cursor: pointer;
+}
+.mountain-tab:hover {
+  border-color: rgba(255, 255, 255, 0.4);
+}
+.mountain-tab.selected {
+  border-color: var(--accent-2);
+  background: rgba(255, 213, 138, 0.14);
+  cursor: default;
+}
+.mountain-tab-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+.mountain-tab-meta {
+  font-size: 11px;
+  color: var(--muted);
+}
 .course-list {
   list-style: none;
   margin: 8px 0 10px;

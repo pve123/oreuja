@@ -1,11 +1,11 @@
 /**
- * index.html 에 박아 둔 첫 화면(새벽 북한산 + 유리 스켈레톤)을 다룬다.
+ * index.html 에 박아 둔 첫 화면(새벽 산 + 유리 스켈레톤)을 다룬다.
  * 로딩 진행만큼 등산객이 등산로를 따라 정상으로 오르고, 지나온 길이 채워지며, 고도가 올라간다.
  * 진행은 실제 진행만 보여 주고 뒤로 가지 않는다. 장면이 그려지면 안개가 걷히듯 사라진다.
  */
 
-/** 정상(백운대) 해발 고도(m). 진행 100% 가 정상 도착이다 */
-const SUMMIT_ALTITUDE = 836
+/** 고른 산의 가장 높은 봉우리 해발(m). 진행 100% 가 정상 도착이다. index.html 이 기억해 둔 산으로 먼저 정하고 앱이 다시 알려 준다 */
+let summitAltitude = 836
 /** 기다리는 동안 몇 초마다 바꿔 보여 주는 조작 팁 */
 const TIPS = [
   '↑ 키로 걷고 ← → 로 몸을 돌려요',
@@ -54,7 +54,14 @@ function climbTo(p: number) {
     const at = route.getPointAtLength(len * p)
     hiker.setAttribute('transform', `translate(${at.x} ${at.y})`)
   }
-  if (alt) alt.textContent = String(Math.round(SUMMIT_ALTITUDE * p))
+  if (alt) alt.textContent = String(Math.round(summitAltitude * p))
+}
+
+/** 첫 화면에 오늘 오를 산 이름과 높이를 넣는다 */
+export function setSplashMountain(name: string, elevation: number) {
+  summitAltitude = elevation
+  const eyebrow = $('splash-mountain')
+  if (eyebrow) eyebrow.textContent = name
 }
 
 /** 지금 단계 문구와 진행률(0~1). 진행률은 앞으로만 간다 */
