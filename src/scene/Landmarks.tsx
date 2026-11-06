@@ -3,25 +3,13 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Terrain, Trail } from '../lib/data'
-import { landmarks, type Landmark, type LandmarkKind } from '../lib/landmarks'
+import { LANDMARK_ICON, landmarks, type Landmark } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
 import { seededRandom } from '../lib/random'
 import { useGame } from '../lib/store'
 
 const LABEL_RANGE = 300 // 이 거리 안의 랜드마크만 이름을 띄운다(m)
 
-/** 이름표 앞에 붙이는 그림 문자 */
-const ICON: Record<LandmarkKind, string> = {
-  cairn: '🪨',
-  pass: '😮‍💨',
-  temple: '🏮',
-  hut: '🏠',
-  gate: '🏯',
-  ruins: '🧱',
-  waterfall: '💧',
-  sign: '🪧',
-  trailhead: '🥾',
-}
 
 /** 이정표마다 이름에 맞는 랜드마크(돌탑, 암자, 산장, 성문, 폭포…)를 세우고, 가까운 것만 이름을 띄운다 */
 export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
@@ -46,7 +34,7 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
             <Html position={[0, l.label, 0]} center distanceFactor={16} zIndexRange={[10, 0]}>
               <div className="landmark-label">
                 <span className="landmark-icon" aria-hidden>
-                  {ICON[l.kind]}
+                  {LANDMARK_ICON[l.kind]}
                 </span>
                 {l.name}
               </div>
