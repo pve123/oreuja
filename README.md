@@ -104,7 +104,7 @@ npm run data
 
 | 파일 | 내용 |
 |---|---|
-| `terrain.bin` | 높이 값(Float32, 북쪽 행부터) |
+| `terrain.bin` | 높이 값(북쪽 행부터). `terrain.json` 의 `encoding` 이 `uint16` 이면 minHeight~maxHeight 를 0~65535 로 나눠 담는다(한 칸 약 1.2cm) |
 | `terrain.json` | 격자 크기와 로컬 좌표 범위 |
 | `courses.json` | 코스별 등산로 점(로컬 미터 좌표), 길이, 누적 오르막, 이정표 |
 

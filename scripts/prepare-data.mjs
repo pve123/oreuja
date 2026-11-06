@@ -166,8 +166,10 @@ async function buildTerrain() {
   let min = Infinity, max = -Infinity
   for (const h of grid.heights) { min = Math.min(min, h); max = Math.max(max, h) }
 
-  const meta = { width: grid.width, height: grid.height, ...ext, minHeight: min, maxHeight: max, origin }
-  await fs.writeFile(path.join(OUT, 'terrain.bin'), Buffer.from(grid.heights.buffer))
+  // 높이는 min~max 를 0~65535 로 나눈 uint16 으로 담는다. float32 의 절반 크기이고 한 칸은 1~2cm 다 (src/lib/data.ts decodeHeights)
+  const meta = { width: grid.width, height: grid.height, ...ext, minHeight: min, maxHeight: max, origin, encoding: 'uint16' }
+  const quantized = Uint16Array.from(grid.heights, (h) => Math.round(((h - min) / (max - min)) * 65535))
+  await fs.writeFile(path.join(OUT, 'terrain.bin'), Buffer.from(quantized.buffer))
   await fs.writeFile(path.join(OUT, 'terrain.json'), JSON.stringify(meta, null, 2))
   console.log(`지형 ${grid.width}x${grid.height}, 높이 ${min.toFixed(0)}~${max.toFixed(0)}m, 크기 ${(se.x - nw.x).toFixed(0)}x${(se.z - nw.z).toFixed(0)}m`)
 

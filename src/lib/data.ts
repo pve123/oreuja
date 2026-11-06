@@ -11,6 +11,21 @@ export type TerrainMeta = {
   maxHeight: number
   /** 로컬 좌표 (0, 0) 의 위경도 */
   origin: { lat: number; lon: number }
+  /**
+   * terrain.bin 의 높이 저장 방식. uint16 은 minHeight~maxHeight 를 0~65535 로 나눠 담아 float32 의 절반 크기다
+   * (북한산 800m 범위에서 한 칸 약 1.2cm). 없으면 float32
+   */
+  encoding?: 'float32' | 'uint16'
+}
+
+/** terrain.bin 을 높이(m) 배열로 푼다 */
+export function decodeHeights(meta: TerrainMeta, buf: ArrayBuffer): Float32Array {
+  if (meta.encoding !== 'uint16') return new Float32Array(buf)
+  const q = new Uint16Array(buf)
+  const out = new Float32Array(q.length)
+  const scale = (meta.maxHeight - meta.minHeight) / 65535
+  for (let i = 0; i < q.length; i++) out[i] = meta.minHeight + q[i] * scale
+  return out
 }
 
 export type Terrain = TerrainMeta & { heights: Float32Array }
@@ -244,7 +259,7 @@ export async function loadData(onProgress?: (p: number) => void): Promise<{ terr
     fetchWithProgress('/data/terrain.bin', onProgress),
     json<TrailData[]>('/data/courses.json'),
   ])
-  return { terrain: { ...meta, heights: new Float32Array(buf) }, trails: courses.map((c) => new Trail(c)) }
+  return { terrain: { ...meta, heights: decodeHeights(meta, buf) }, trails: courses.map((c) => new Trail(c)) }
 }
 
 /** 실제 등산 예상 시간(분): 평지 시속 4km + 오르막 600m 당 1시간 (Naismith 규칙) */
