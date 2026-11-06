@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
+import { bakeGeometry } from '../lib/geometry'
 import { occlusionUniforms, withOcclusionShrink } from '../lib/occlusion'
 
 /** 정밀 모델로 그릴 물건 하나. model 은 urls 의 번호, color 는 텍스처에 곱할 색 */
@@ -79,7 +80,7 @@ export function NearModels({ urls, items, radius = 70, capacity = 800, occlusion
         gltf.scene.updateMatrixWorld(true)
         gltf.scene.traverse((o) => {
           if (!(o instanceof THREE.Mesh)) return
-          const geometry = (o.geometry as THREE.BufferGeometry).clone().applyMatrix4(o.matrixWorld)
+          const geometry = bakeGeometry(o)
           let material = (o.material as THREE.MeshStandardMaterial).clone()
           material.roughness = 0.95
           if (tint && material.map) {

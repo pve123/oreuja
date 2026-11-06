@@ -148,6 +148,14 @@ node scripts/prepare-avatars.mjs ~/Downloads/kenney_mini-characters ~/Downloads/
 - 쓸 캐릭터는 스크립트 위쪽 `KENNEY`·`KAYKIT` 목록에, 화면 이름과 동작 이름은 `src/lib/avatars.ts` 의 `AVATARS`·`AVATAR_MODELS` 에 적는다. 같이하기 서버(`server/index.mjs`)의 `AVATARS` 에도 더해야 다른 사람에게 보인다.
 - Kenney 캐릭터는 동작이 파일 안에 들어 있다. KayKit 은 동작이 따로 있어서, 스크립트가 쓰는 동작(`Idle_A`, `Walking_A`, `Jump_Idle`, `Jump_Full_Short`)만 골라 메시를 뺀 `animations.glb`(약 160KB)로 합친다. 원본 두 파일은 마네킹 메시까지 들어 있어 1.5MB 가 넘는다.
 
+### 모델 압축 (meshopt)
+
+캐릭터와 나무 GLB 는 meshopt 로 압축해 넣는다. 13개 합계가 4.3MB 에서 1.8MB 로 줄었다. 브라우저에서 푸는 기능은 drei `useGLTF` 에 들어 있다. 압축하면 좌표를 정수로 담으므로, 모양을 월드 좌표로 굽는 곳은 `src/lib/geometry.ts` 의 `bakeGeometry` 로 실수로 푼 뒤 옮긴다. 모델을 새로 넣거나 `prepare-avatars` 를 다시 돌렸으면 아래처럼 다시 압축한다.
+
+```bash
+npx @gltf-transform/cli meshopt public/models/trees/Pine_2.glb public/models/trees/Pine_2.glb
+```
+
 ## 데이터 출처
 
 | 데이터 | 출처 | 비고 |
