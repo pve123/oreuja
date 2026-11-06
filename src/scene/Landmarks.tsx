@@ -29,7 +29,7 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
     <group>
       {list.map((l) => (
         <group key={l.name} position={l.position} rotation={[0, l.rotation, 0]}>
-          <LandmarkBody landmark={l} />
+          <LandmarkBody landmark={l} trail={trail} />
           {Math.abs(l.distance - near) < LABEL_RANGE && (
             <Html position={[0, l.label, 0]} center distanceFactor={16} zIndexRange={[10, 0]}>
               <div className="landmark-label">
@@ -46,7 +46,7 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
   )
 }
 
-function LandmarkBody({ landmark }: { landmark: Landmark }) {
+function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail }) {
   switch (landmark.kind) {
     case 'cairn':
       return <Cairn seed={landmark.distance} />
@@ -70,7 +70,7 @@ function LandmarkBody({ landmark }: { landmark: Landmark }) {
     case 'waterfall':
       return <Waterfall />
     case 'trailhead':
-      return <Trailhead />
+      return <Trailhead mountain={trail.data.mountain} park={trail.data.park} />
     default:
       return <Signpost />
   }
@@ -454,7 +454,8 @@ function canvasTexture(width: number, height: number, draw: (g: CanvasRenderingC
 }
 
 /** 현판: 짙은 나무 바탕에 흰 글씨 */
-function plaqueTexture() {
+/** 입구 현판: 산 이름을 크게, 그 산이 속한 국립공원을 작게 쓴다 (도봉산도 북한산국립공원에 속한다) */
+function plaqueTexture(mountain: string, park?: string) {
   return canvasTexture(512, 128, (g) => {
     g.fillStyle = '#4a3322'
     g.fillRect(0, 0, 512, 128)
@@ -462,10 +463,20 @@ function plaqueTexture() {
     g.lineWidth = 6
     g.strokeRect(8, 8, 496, 112)
     g.fillStyle = '#f6efe2'
-    g.font = 'bold 64px "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    const font = (px: number) => `bold ${px}px "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
-    g.fillText('북한산국립공원', 256, 68)
+    if (park) {
+      g.font = font(24)
+      g.fillStyle = '#c9a46a'
+      g.fillText(park, 256, 34)
+      g.font = font(60)
+      g.fillStyle = '#f6efe2'
+      g.fillText(mountain, 256, 80)
+    } else {
+      g.font = font(64)
+      g.fillText(mountain, 256, 68)
+    }
   })
 }
 
@@ -523,8 +534,8 @@ function guideMapTexture() {
  * 출발점 입구: 등산로를 가로지르는 통나무 문과 현판, 길옆 등산 안내도.
  * 기준 좌표 +z 가 진행 방향이라 글씨는 다가오는 쪽(-z)을 본다
  */
-function Trailhead() {
-  const plaque = useMemo(() => plaqueTexture(), [])
+function Trailhead({ mountain, park }: { mountain: string; park?: string }) {
+  const plaque = useMemo(() => plaqueTexture(mountain, park), [mountain, park])
   const map = useMemo(() => guideMapTexture(), [])
   useEffect(
     () => () => {
