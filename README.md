@@ -62,19 +62,26 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 |---|---|
 | 3D | Three.js, React Three Fiber, drei |
 | 상태 | zustand (`src/lib/store.ts`) |
-| 지형 | AWS Terrain Tiles(Terrarium, 약 30m 해상도)로 만든 `public/data/<산 id>/terrain.bin` |
+| 지형 | 국토지리정보원 1:5,000 수치지형도 등고선으로 만든 7.5m 격자. 도엽 밖은 AWS Terrain Tiles(약 30m). 산마다 `public/data/<산 id>/terrain.bin` |
 | 등산로 | OpenStreetMap 데이터로 만든 `public/data/<산 id>/courses.json` |
 | 기록 | 지금은 `localStorage` 에 저장하고, 다음 단계에서 Supabase로 옮긴다 |
 
 | 파일 | 하는 일 |
 |---|---|
-| `scripts/prepare-data.mjs` | 지형과 등산로 데이터를 만든다 (`npm run data`) |
+| `scripts/prepare-data.mjs` | 산마다 지형과 등산로 데이터를 만든다 (`npm run data`) |
+| `scripts/contour-dem.mjs` | 수치지형도 DXF 의 등고선·표고점으로 높이 격자를 만든다. `prepare-data` 가 부른다 |
+| `scripts/prepare-nature.mjs` | 바위·판석·자갈 모델(Quaternius)을 `public/models/nature/` 에 준비하고 텍스처를 1024px JPG 로 줄인다 |
+| `src/lib/mountains.ts` | 산 목록과 고른 산. 산을 바꾸면 고른 산을 기억하고 다시 불러온다 |
 | `src/lib/data.ts` | 데이터를 불러오고, 등산로 위 위치와 실제 소요 시간을 계산한다 |
 | `index.html`, `src/lib/splash.ts` | 첫 화면. 새벽 산 그림에서 로딩 진행만큼 등산객이 정상으로 오르고 고도가 올라가며, 조작 팁이 바뀐다. JS 를 받기 전부터 보이도록 HTML 에 직접 넣었고, 장면이 그려지면 걷힌다. 걷힐 때 화면 패널들이 위·아래·옆에서 차례로 들어온다. 산 이름 대신 「집에서 오르는 진짜 산」을 띄우고, 기억해 둔 산의 데이터를 미리 받는다 |
 | `src/scene/World.tsx` | 이동, 카메라, 정상 판정, 사진 촬영을 맡는다. 이동은 Rapier 캐릭터 컨트롤러(캡슐 몸, 부딪히면 미끄러지기, 45cm 턱 오르기, 땅에 붙이기, 최대 경사 60°)로, 카메라는 스프링 암(지형·건물에 막히면 당기기)으로 움직인다. 화면 후처리로 앰비언트 오클루전(SSAO), 색 보정, 톤 매핑, 비네트를 넣는다 |
 | `src/scene/Colliders.tsx` | 물리 충돌체를 만든다. 등산로 둘레 40m 지형(화면 지형과 같은 삼각형), 돌계단 경사로, 나무 줄기·바위·랜드마크 원기둥 |
 | `src/lib/collider-mesh.ts` | 등산로 둘레 지형 충돌 메시 |
 | `src/scene/Terrain.tsx` | 지형 메시를 고도와 경사에 따라 칠한다 |
+| `src/lib/satellite.ts`, `src/lib/photo-map.ts` | Mapbox 위성 타일을 이어 붙여 지형에 입히고, 그 픽셀로 숲·바위 자리와 색을 정한다 |
+| `src/lib/placement.ts`, `src/lib/random.ts` | 숲·바위 배치 도우미. 등산로에서 떨어진 거리 판정, 매번 같은 자리가 나오는 시드 난수 |
+| `src/lib/occlusion.ts` | 카메라와 캐릭터 사이에 낀 나무·바위를 점무늬로 비치게 하고, 정밀 모델과 가벼운 도형이 겹쳐 그려지지 않게 나눈다 |
+| `src/lib/geometry.ts` | 압축한 glTF 모양을 월드 좌표로 굽는다 (아래 「모델 압축」) |
 | `src/scene/Forest.tsx` | 나무를 `InstancedMesh` 로 심는다. 멀리 있는 나무는 가벼운 도형이다 |
 | `src/scene/DetailTrees.tsx` | 아바타 둘레 70m 안의 나무만 Quaternius 나무 모델로 바꿔 그린다 |
 | `src/scene/NearModels.tsx` | 캐릭터 둘레만 정밀 모델로 그리는 공용 LOD. 바위·계단 판석·길가 자갈이 쓴다. 텍스처를 회색조 무늬로 바꿔 화강암 색으로 다시 칠할 수 있다 |
@@ -85,12 +92,17 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/lib/obstacles.ts` | 나무 줄기·바위·랜드마크를 바닥 원으로 모은다. `Colliders` 가 이 목록으로 충돌체를 만든다 |
 | `src/lib/steps.ts` | 돌계단 자리와 높이. 물리는 칸 사이를 곧게 이은 보이지 않는 경사로를 걷고(가장자리는 땅속에 묻어 걸리지 않게), 몸 그림만 칸마다 평평하게 딛는 높이로 얹는다. 같이하기 친구 캐릭터는 `groundAt` 으로 같은 높이에 선다 |
 | `src/lib/sound.ts` | 발소리, 바람·새소리, 도착음을 음원 파일 없이 Web Audio 로 만든다 |
+| `src/ui/SoundControls.tsx` | 소리 켜기·끄기 버튼과 이정표 도착·정상·기념사진 소리 |
+| `src/lib/summit.ts`, `src/scene/SummitFlag.tsx` | 정상에서 가장 트인 풍경 방향을 찾아 기념사진 구도를 정하고, 그쪽에 깃발을 세운다 |
+| `src/lib/photo.ts` | 화면을 복사하고 기념 문구 띠와 서비스 이름을 얹어 기념사진을 만든다 |
 | `server/index.mjs` | 같이하기 서버. 접속한 사람들 상태를 1초에 10번 모두에게 나눠 준다 (`npm run server`) |
-| `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현 |
+| `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현, 혼자/같이 |
+| `src/ui/TogetherPanel.tsx` | 왼쪽 아래 같이하기 패널. 접속 상태, 같은 코스 인원, 닉네임, 감정 표현 버튼 |
 | `src/scene/Peers.tsx` | 같은 코스 다른 사람의 아바타와 이름표를 그린다 |
 | `src/ui/MiniMap.tsx` | 오른쪽 아래 미니맵. 위성사진 위에 코스와 지금 위치를 그린다. 화면이 좁으면 숨긴다 |
 | `src/scene/Avatar.tsx` | 캐릭터 종류에 따라 도형 아바타나 GLB 캐릭터를 그린다. GLB 캐릭터는 쉬기·걷기·공중·만세 동작을 섞고, 걷기는 걸은 거리에 맞춰 돌린다 |
 | `src/scene/Hiker.tsx` | 도형으로 만든 병맛 아바타 5종 |
+| `src/lib/avatars.ts`, `src/ui/AvatarThumbnails.tsx` | 고를 수 있는 캐릭터 목록과 GLB 동작 이름. 캐릭터 고르기 칸의 그림은 화면 밖에서 한 번 그려 찍는다 |
 | `src/scene/TrekkingPole.ts` | 모든 아바타가 양손에 쥐는 등산 스틱. GLB 캐릭터는 걸을 때 두 손이 번갈아 땅을 짚고(짚은 동안 끝이 땅에 고정된다), 쉬거나 만세·점프할 때는 손에 들고 따라 움직인다 |
 | `scripts/prepare-avatars.mjs` | GLB 캐릭터 파일을 `public/models/avatars/` 에 준비한다. 아래 「GLB 캐릭터」 참고 |
 | `src/ui/Hud.tsx` | 코스 정보, 진행률, 정상 배지와 사진 창을 그린다 |
@@ -167,7 +179,7 @@ node scripts/prepare-avatars.mjs ~/Downloads/kenney_mini-characters ~/Downloads/
 
 ### 모델 압축 (meshopt)
 
-캐릭터와 나무 GLB 는 meshopt 로 압축해 넣는다. 13개 합계가 4.3MB 에서 1.8MB 로 줄었다. 브라우저에서 푸는 기능은 drei `useGLTF` 에 들어 있다. 압축하면 좌표를 정수로 담으므로, 모양을 월드 좌표로 굽는 곳은 `src/lib/geometry.ts` 의 `bakeGeometry` 로 실수로 푼 뒤 옮긴다. 모델을 새로 넣거나 `prepare-avatars` 를 다시 돌렸으면 아래처럼 다시 압축한다.
+캐릭터와 나무 GLB 는 meshopt 로 압축해 넣는다. 13개 합계가 4.3MB 에서 1.8MB 로 줄었다. 브라우저에서 푸는 기능은 drei `useGLTF` 에 들어 있다. 압축하면 좌표를 정수로 담으므로, 모양을 월드 좌표로 굽는 곳은 `src/lib/geometry.ts` 의 `bakeGeometry` 로 실수로 푼 뒤 옮긴다. 모델을 새로 넣거나 `prepare-avatars` 를 다시 돌렸으면 아래처럼 다시 압축한다. Kenney 캐릭터는 압축할 때 텍스처(`Textures/colormap.png`)가 GLB 안에 들어가므로, 압축한 뒤 `public/models/avatars/kenney/Textures/` 는 지운다.
 
 ```bash
 npx @gltf-transform/cli meshopt public/models/trees/Pine_2.glb public/models/trees/Pine_2.glb

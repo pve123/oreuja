@@ -4,7 +4,7 @@ import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
 import { makeNearTrail, usePhotoLayers } from '../lib/placement'
-import { withOcclusionShrink } from '../lib/occlusion'
+import { withOcclusionFade } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles, type Obstacle } from '../lib/obstacles'
 import { NearModels, type NearItem } from './NearModels'
@@ -57,7 +57,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   const { settled, layers } = usePhotoLayers()
   // 카메라와 아바타 사이에 들어온 바위는 통째로 줄여 아바타를 가리지 않게 한다
   // 캐릭터 둘레(정밀 반경)는 바위 모델이 그리므로, 도형 바위는 반경 밖만 그린다
-  const material = useMemo(() => withOcclusionShrink(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), 0, { ring: 'far' }), [])
+  const material = useMemo(() => withOcclusionFade(new THREE.MeshStandardMaterial({ roughness: 0.9, flatShading: true }), 0, { ring: 'far' }), [])
 
   const { instances, obstacles, models } = useMemo(() => {
     if (!settled) return { instances: [], obstacles: [], models: [] }
