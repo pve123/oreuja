@@ -3,6 +3,7 @@ import { useProgress } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
+import { DEFAULT_MOUNTAIN, loadMountain, loadMountains, type Mountain } from './lib/mountains'
 import { useGame } from './lib/store'
 import { World } from './scene/World'
 import { MAPBOX_TOKEN } from './lib/satellite'
@@ -10,7 +11,7 @@ import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 import { SoundControls } from './ui/SoundControls'
 import { startNet } from './lib/net'
-import { failSplash, hideSplash, setSplash } from './lib/splash'
+import { failSplash, hideSplash, setSplash, setSplashMountain } from './lib/splash'
 
 /** 첫 화면 진행 막대 몫: 지형 데이터 0.05~0.6, 3D 모델·텍스처 0.6~0.92, 장면 준비 나머지 */
 const DATA_END = 0.6
@@ -19,7 +20,9 @@ const ASSETS_END = 0.92
 const SPLASH_TIMEOUT = 25000
 
 export default function App() {
-  const [data, setData] = useState<{ terrain: Terrain; trails: Trail[] } | null>(null)
+  const [data, setData] = useState<{ terrain: Terrain; trails: Trail[]; mountains: Mountain[]; mountain: Mountain } | null>(
+    null,
+  )
   const [error, setError] = useState<string | null>(null)
   const courseId = useGame((s) => s.courseId)
 
@@ -27,11 +30,23 @@ export default function App() {
   useEffect(() => startNet(), [])
 
   useEffect(() => {
-    // 개발 중에는 ?course=bukhansan-sanseong 처럼 코스를 골라 시작할 수 있다
-    const debugCourse = import.meta.env.DEV ? new URLSearchParams(location.search).get('course') : null
+    // 개발 중에는 ?mountain=dobongsan&course=dobongsan-uiam 처럼 산과 코스를 골라 시작할 수 있다
+    const params = import.meta.env.DEV ? new URLSearchParams(location.search) : null
+    const debugCourse = params?.get('course')
+    const debugMountain = params?.get('mountain')
+    const saved = debugMountain ? { ...DEFAULT_MOUNTAIN, id: debugMountain, name: debugMountain } : loadMountain()
+    setSplashMountain(saved.name, saved.elevation)
     setSplash('지형을 펼치는 중', 0.05)
-    loadData((p) => setSplash('지형을 펼치는 중', 0.05 + p * (DATA_END - 0.05)))
+    const load = (m: Mountain) =>
+      Promise.all([loadMountains(), loadData(m.id, (p) => setSplash('지형을 펼치는 중', 0.05 + p * (DATA_END - 0.05)))]).then(
+        ([mountains, d]) => ({ ...d, mountains, mountain: mountains.find((x) => x.id === m.id) ?? m }),
+      )
+    // 기억해 둔 산이 없어졌으면(데이터를 받지 못하면) 기본 산으로 연다
+    load(saved)
+      .catch((e) => (saved.id === DEFAULT_MOUNTAIN.id ? Promise.reject(e) : load(DEFAULT_MOUNTAIN)))
       .then((d) => {
+        const { mountain } = d
+        setSplashMountain(mountain.name, mountain.elevation)
         if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse })
         setSplash('숲과 길을 그리는 중', DATA_END)
         setData(d)
@@ -63,7 +78,7 @@ export default function App() {
         <World terrain={data.terrain} trail={trail} />
       </Canvas>
       <SplashProgress />
-      <Hud trail={trail} trails={data.trails} />
+      <Hud trail={trail} trails={data.trails} mountains={data.mountains} mountain={data.mountain} />
       <AvatarThumbnails />
       <SoundControls />
       <SummitModal trail={trail} />

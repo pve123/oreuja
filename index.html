@@ -6,12 +6,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#1c2c47" />
     <title>방구석 등반대</title>
-    <!-- 지형·코스 데이터는 JS 를 받는 동안 같이 받아 둔다 (src/lib/data.ts 의 fetch 가 이 응답을 그대로 쓴다) -->
-    <link rel="preload" href="/data/terrain.bin" as="fetch" crossorigin />
-    <link rel="preload" href="/data/terrain.json" as="fetch" crossorigin />
-    <link rel="preload" href="/data/courses.json" as="fetch" crossorigin />
     <!--
-      첫 화면: 새벽 산을 오르는 등산객 (지금은 북한산 세 봉우리). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
+      고른 산(src/lib/mountains.ts 가 브라우저에 기억)의 지형·코스 데이터를 JS 를 받는 동안 같이 받아 둔다.
+      src/lib/data.ts 의 fetch 가 이 응답을 그대로 쓴다. 기억이 없으면 북한산
+    -->
+    <script>
+      ;(function () {
+        var m = null
+        try {
+          m = JSON.parse(localStorage.getItem('hiking-metaverse:mountain') || 'null')
+        } catch (e) {}
+        if (!m || !/^[a-z0-9-]+$/.test(m.id) || typeof m.name !== 'string') m = { id: 'bukhansan', name: '북한산' }
+        window.__mountain = m
+        var files = ['/data/mountains.json', '/data/' + m.id + '/terrain.bin', '/data/' + m.id + '/terrain.json', '/data/' + m.id + '/courses.json']
+        files.forEach(function (href) {
+          var l = document.createElement('link')
+          l.rel = 'preload'
+          l.as = 'fetch'
+          l.crossOrigin = 'anonymous'
+          l.href = href
+          document.head.appendChild(l)
+        })
+      })()
+    </script>
+    <!--
+      첫 화면: 새벽 산을 오르는 등산객 (봉우리 그림은 모든 산이 같이 쓴다). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
       로딩 진행만큼 등산객이 등산로를 따라 정상으로 오르고 고도가 올라간다 (src/lib/splash.ts).
       뒤에는 실제 화면 패널 자리에 유리 스켈레톤을 깔아 장면이 뜰 때 레이아웃이 튀지 않게 한다.
     -->
@@ -287,7 +306,10 @@
             </g>
           </g>
         </svg>
-        <p class="splash-eyebrow">오늘의 산 · 북한산</p>
+        <p class="splash-eyebrow">오늘의 산 · <span id="splash-mountain">북한산</span></p>
+        <script>
+          document.getElementById('splash-mountain').textContent = window.__mountain.name
+        </script>
         <h1 class="splash-title">방구석 등반대</h1>
         <div class="splash-meta">
           <span>해발 <span class="splash-alt" id="splash-alt">0</span>m</span>
