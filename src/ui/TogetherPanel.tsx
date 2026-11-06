@@ -35,7 +35,7 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
           ? `이 코스 ${sameCourse + 1}명${total > sameCourse ? ` · 다른 코스 ${total - sameCourse}명` : ''}`
           : status === 'connecting'
             ? '연결하는 중…'
-            : '혼자 오르는 중 (서버 없음)'}
+            : '혼자 오르는 중'}
       </div>
       {editing ? (
         <form
