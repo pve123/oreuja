@@ -74,7 +74,6 @@ const freshClimb = {
   reachedCheckpoint: -1,
   arrival: null,
   roam: 0,
-  sceneReady: false,
 }
 
 // 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
@@ -95,6 +94,8 @@ function saveRecords(records: ClimbRecord[]) {
 
 export const useGame = create<State>((set, get) => ({
   ...freshClimb,
+  // 첫 화면을 걷어 낼 신호. 한 번 켜지면 다시 끄지 않는다 (다시 오르기·코스 바꾸기에는 첫 화면이 없다)
+  sceneReady: false,
   courseId: loadCourse(),
   setCourse: (courseId) => {
     saveCourse(courseId)
