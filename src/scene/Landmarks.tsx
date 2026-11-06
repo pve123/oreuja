@@ -20,6 +20,7 @@ const ICON: Record<LandmarkKind, string> = {
   ruins: '🧱',
   waterfall: '💧',
   sign: '🪧',
+  trailhead: '🥾',
 }
 
 /** 이정표마다 이름에 맞는 랜드마크(돌탑, 암자, 산장, 성문, 폭포…)를 세우고, 가까운 것만 이름을 띄운다 */
@@ -80,6 +81,8 @@ function LandmarkBody({ landmark }: { landmark: Landmark }) {
       return <Ruins seed={landmark.distance} />
     case 'waterfall':
       return <Waterfall />
+    case 'trailhead':
+      return <Trailhead />
     default:
       return <Signpost />
   }
@@ -446,6 +449,151 @@ function Signpost(): ReactNode {
         <boxGeometry args={[1.3, 0.38, 0.06]} />
         <Std color="#a0794f" />
       </mesh>
+    </group>
+  )
+}
+
+/** 글씨나 그림을 캔버스에 그려 텍스처로 만든다 */
+function canvasTexture(width: number, height: number, draw: (g: CanvasRenderingContext2D) => void) {
+  const c = document.createElement('canvas')
+  c.width = width
+  c.height = height
+  draw(c.getContext('2d')!)
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  tex.anisotropy = 8
+  return tex
+}
+
+/** 현판: 짙은 나무 바탕에 흰 글씨 */
+function plaqueTexture() {
+  return canvasTexture(512, 128, (g) => {
+    g.fillStyle = '#4a3322'
+    g.fillRect(0, 0, 512, 128)
+    g.strokeStyle = '#c9a46a'
+    g.lineWidth = 6
+    g.strokeRect(8, 8, 496, 112)
+    g.fillStyle = '#f6efe2'
+    g.font = 'bold 64px "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('북한산국립공원', 256, 68)
+  })
+}
+
+/** 등산 안내도: 초록 지도 위에 능선과 등산로, 정상 표시 */
+function guideMapTexture() {
+  return canvasTexture(320, 224, (g) => {
+    g.fillStyle = '#f4f1e8'
+    g.fillRect(0, 0, 320, 224)
+    g.fillStyle = '#2f5d3a'
+    g.fillRect(0, 0, 320, 40)
+    g.fillStyle = '#ffffff'
+    g.font = 'bold 24px "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.fillText('등산 안내도', 160, 21)
+    // 산 모양 등고선
+    g.fillStyle = '#cfe3c4'
+    g.beginPath()
+    g.ellipse(190, 135, 120, 72, 0, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#a9cf98'
+    g.beginPath()
+    g.ellipse(205, 120, 72, 42, 0, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#7fb56d'
+    g.beginPath()
+    g.ellipse(215, 110, 32, 20, 0, 0, Math.PI * 2)
+    g.fill()
+    // 등산로
+    g.strokeStyle = '#e4572e'
+    g.lineWidth = 5
+    g.setLineDash([10, 6])
+    g.beginPath()
+    g.moveTo(30, 205)
+    g.bezierCurveTo(90, 190, 110, 150, 150, 150)
+    g.bezierCurveTo(185, 150, 190, 118, 215, 108)
+    g.stroke()
+    g.setLineDash([])
+    // 지금 여기, 정상
+    g.fillStyle = '#e4572e'
+    g.beginPath()
+    g.arc(30, 205, 8, 0, Math.PI * 2)
+    g.fill()
+    g.fillStyle = '#1f2a36'
+    g.beginPath()
+    g.moveTo(215, 92)
+    g.lineTo(225, 108)
+    g.lineTo(205, 108)
+    g.closePath()
+    g.fill()
+  })
+}
+
+/**
+ * 출발점 입구: 등산로를 가로지르는 통나무 문과 현판, 길옆 등산 안내도.
+ * 기준 좌표 +z 가 진행 방향이라 글씨는 다가오는 쪽(-z)을 본다
+ */
+function Trailhead() {
+  const plaque = useMemo(() => plaqueTexture(), [])
+  const map = useMemo(() => guideMapTexture(), [])
+  useEffect(
+    () => () => {
+      plaque.dispose()
+      map.dispose()
+    },
+    [plaque, map],
+  )
+  const wood = '#7a5232'
+  return (
+    <group>
+      {/* 기둥: 비탈에서도 뜨지 않게 땅속까지 내린다 */}
+      {[-2.6, 2.6].map((x) => (
+        <mesh key={x} position={[x, 1.1, 0]} castShadow receiveShadow>
+          <cylinderGeometry args={[0.17, 0.2, 4.6, 10]} />
+          <Std color={wood} />
+        </mesh>
+      ))}
+      {/* 가로대와 작은 지붕 */}
+      <mesh position={[0, 3.35, 0]} castShadow>
+        <boxGeometry args={[6.2, 0.28, 0.32]} />
+        <Std color={wood} />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[0, 3.62, side * 0.32]} rotation={[side * 0.5, 0, 0]} castShadow>
+          <boxGeometry args={[6.8, 0.06, 0.75]} />
+          <Std color="#4f5b4a" />
+        </mesh>
+      ))}
+      {/* 현판 */}
+      <mesh position={[0, 2.85, 0]} castShadow>
+        <boxGeometry args={[3, 0.75, 0.08]} />
+        <Std color="#4a3322" />
+      </mesh>
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[0, 2.85, side * 0.045]} rotation={[0, side < 0 ? Math.PI : 0, 0]}>
+          <planeGeometry args={[2.9, 0.68]} />
+          <meshStandardMaterial map={plaque} roughness={0.8} />
+        </mesh>
+      ))}
+      {/* 길옆 등산 안내도: 다가오는 쪽으로 비스듬히 */}
+      <group position={[4.1, 0, -0.6]} rotation={[0, Math.PI + 0.5, 0]}>
+        {[-0.75, 0.75].map((x) => (
+          <mesh key={x} position={[x, 0.2, 0]} castShadow>
+            <boxGeometry args={[0.1, 3, 0.1]} />
+            <Std color={wood} />
+          </mesh>
+        ))}
+        <mesh position={[0, 1.45, 0]} castShadow>
+          <boxGeometry args={[1.75, 1.25, 0.08]} />
+          <Std color={wood} />
+        </mesh>
+        <mesh position={[0, 1.45, 0.045]}>
+          <planeGeometry args={[1.6, 1.12]} />
+          <meshStandardMaterial map={map} roughness={0.8} />
+        </mesh>
+      </group>
     </group>
   )
 }
