@@ -269,3 +269,9 @@ export async function loadData(
 export function estimateMinutes(lengthM: number, gainM: number) {
   return Math.round((lengthM / 4000) * 60 + (gainM / 600) * 60)
 }
+
+/** 분을 「1시간 20분」·「40분」으로 */
+export function formatMinutes(min: number) {
+  const h = Math.floor(min / 60)
+  return h ? `${h}시간 ${min % 60}분` : `${min}분`
+}

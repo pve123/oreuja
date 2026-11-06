@@ -84,6 +84,19 @@ export function failSplash(text: string) {
   $('splash')?.classList.add('failed')
 }
 
+/**
+ * 화면 패널들을 차례로 들여보낸다 (src/index.css 의 hud-enter). 첫 화면이 걷힐 때와 베이스캠프를 닫고 걷기 시작할 때 부른다.
+ * 끝나면 클래스를 떼어 다시 그릴 때 또 움직이지 않게 한다
+ */
+let hudEnterTimer: ReturnType<typeof setTimeout> | undefined
+export function playHudEnter() {
+  document.body.classList.remove('hud-enter')
+  void document.body.offsetWidth // 클래스를 뗐다 붙여 애니메이션을 처음부터 다시 돌린다
+  document.body.classList.add('hud-enter')
+  clearTimeout(hudEnterTimer)
+  hudEnterTimer = setTimeout(() => document.body.classList.remove('hud-enter'), HUD_ENTER_MS)
+}
+
 /** 정상까지 오르는 모습을 보여 준 뒤 안개가 걷히듯 사라지고, 다 사라지면 DOM 에서 뺀다 */
 export function hideSplash() {
   const splash = $('splash')
@@ -92,9 +105,7 @@ export function hideSplash() {
   setSplash('정상 도착! 출발해요', 1)
   setTimeout(() => {
     splash.classList.add('done')
-    // 장면이 드러나는 동안 화면 패널들을 차례로 들여보낸다. 끝나면 클래스를 떼어 다시 오르기 때 또 움직이지 않게 한다
-    document.body.classList.add('hud-enter')
-    setTimeout(() => document.body.classList.remove('hud-enter'), HUD_ENTER_MS)
+    playHudEnter()
     splash.addEventListener('transitionend', () => splash.remove(), { once: true })
     // 동작 줄이기 설정이면 transition 이 없어 transitionend 가 오지 않는다
     setTimeout(() => splash.remove(), 1200)

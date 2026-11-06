@@ -9,6 +9,7 @@ import { World } from './scene/World'
 import { MAPBOX_TOKEN } from './lib/satellite'
 import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
+import { Lobby } from './ui/Lobby'
 import { SoundControls } from './ui/SoundControls'
 import { startNet } from './lib/net'
 import { failSplash, hideSplash, setSplash, setSplashAltitude } from './lib/splash'
@@ -47,7 +48,8 @@ export default function App() {
       .then((d) => {
         const { mountain } = d
         setSplashAltitude(mountain.elevation)
-        if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse })
+        // 개발용 코스 지정이면 베이스캠프를 건너뛰고 바로 걷는다
+        if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse, mode: 'hiking' })
         setSplash('숲과 길을 그리는 중', DATA_END)
         setData(d)
       })
@@ -78,7 +80,8 @@ export default function App() {
         <World terrain={data.terrain} trail={trail} />
       </Canvas>
       <SplashProgress />
-      <Hud trail={trail} trails={data.trails} mountains={data.mountains} mountain={data.mountain} />
+      <Hud trail={trail} trails={data.trails} />
+      <Lobby trail={trail} trails={data.trails} mountains={data.mountains} mountain={data.mountain} />
       <AvatarThumbnails />
       <SoundControls />
       <SummitModal trail={trail} />
