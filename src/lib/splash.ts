@@ -4,7 +4,7 @@
  * 진행은 실제 진행만 보여 주고 뒤로 가지 않는다. 장면이 그려지면 안개가 걷히듯 사라진다.
  */
 
-/** 고른 산의 가장 높은 봉우리 해발(m). 진행 100% 가 정상 도착이다. index.html 이 기억해 둔 산으로 먼저 정하고 앱이 다시 알려 준다 */
+/** 고른 산의 가장 높은 봉우리 해발(m). 진행 100% 가 정상 도착이다. 앱이 고른 산으로 정해 준다 */
 let summitAltitude = 836
 /** 기다리는 동안 몇 초마다 바꿔 보여 주는 조작 팁 */
 const TIPS = [
@@ -57,11 +57,9 @@ function climbTo(p: number) {
   if (alt) alt.textContent = String(Math.round(summitAltitude * p))
 }
 
-/** 첫 화면에 오늘 오를 산 이름과 높이를 넣는다 */
-export function setSplashMountain(name: string, elevation: number) {
+/** 첫 화면 고도를 오늘 오를 산의 가장 높은 봉우리에 맞춘다 */
+export function setSplashAltitude(elevation: number) {
   summitAltitude = elevation
-  const eyebrow = $('splash-mountain')
-  if (eyebrow) eyebrow.textContent = name
 }
 
 /** 지금 단계 문구와 진행률(0~1). 진행률은 앞으로만 간다 */
