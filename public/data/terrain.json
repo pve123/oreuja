@@ -10,5 +10,6 @@
   "origin": {
     "lat": 37.656,
     "lon": 126.9745
-  }
+  },
+  "encoding": "uint16"
 }
