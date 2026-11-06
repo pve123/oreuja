@@ -11,7 +11,7 @@ import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 import { SoundControls } from './ui/SoundControls'
 import { startNet } from './lib/net'
-import { failSplash, hideSplash, setSplash, setSplashMountain } from './lib/splash'
+import { failSplash, hideSplash, setSplash, setSplashAltitude } from './lib/splash'
 
 /** 첫 화면 진행 막대 몫: 지형 데이터 0.05~0.6, 3D 모델·텍스처 0.6~0.92, 장면 준비 나머지 */
 const DATA_END = 0.6
@@ -35,7 +35,7 @@ export default function App() {
     const debugCourse = params?.get('course')
     const debugMountain = params?.get('mountain')
     const saved = debugMountain ? { ...DEFAULT_MOUNTAIN, id: debugMountain, name: debugMountain } : loadMountain()
-    setSplashMountain(saved.name, saved.elevation)
+    setSplashAltitude(saved.elevation)
     setSplash('지형을 펼치는 중', 0.05)
     const load = (m: Mountain) =>
       Promise.all([loadMountains(), loadData(m.id, (p) => setSplash('지형을 펼치는 중', 0.05 + p * (DATA_END - 0.05)))]).then(
@@ -46,7 +46,7 @@ export default function App() {
       .catch((e) => (saved.id === DEFAULT_MOUNTAIN.id ? Promise.reject(e) : load(DEFAULT_MOUNTAIN)))
       .then((d) => {
         const { mountain } = d
-        setSplashMountain(mountain.name, mountain.elevation)
+        setSplashAltitude(mountain.elevation)
         if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse })
         setSplash('숲과 길을 그리는 중', DATA_END)
         setData(d)

@@ -1,6 +1,6 @@
 /**
  * 산 목록과 고른 산. 산마다 지형 한 장과 코스들이 public/data/<산 id>/ 에 따로 있다 (scripts/prepare-data.mjs).
- * 고른 산은 브라우저에 기억해 두고, 첫 화면(index.html)이 JS 를 받기 전에 읽어 그 산의 데이터를 미리 받고 문구를 바꾼다.
+ * 고른 산은 브라우저에 기억해 두고, 첫 화면(index.html)이 JS 를 받기 전에 읽어 그 산의 데이터를 미리 받는다.
  */
 
 export type Mountain = {

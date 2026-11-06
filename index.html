@@ -16,8 +16,7 @@
         try {
           m = JSON.parse(localStorage.getItem('hiking-metaverse:mountain') || 'null')
         } catch (e) {}
-        if (!m || !/^[a-z0-9-]+$/.test(m.id) || typeof m.name !== 'string') m = { id: 'bukhansan', name: '북한산' }
-        window.__mountain = m
+        if (!m || !/^[a-z0-9-]+$/.test(m.id)) m = { id: 'bukhansan' }
         var files = ['/data/mountains.json', '/data/' + m.id + '/terrain.bin', '/data/' + m.id + '/terrain.json', '/data/' + m.id + '/courses.json']
         files.forEach(function (href) {
           var l = document.createElement('link')
@@ -32,14 +31,13 @@
     <!--
       첫 화면: 새벽 산을 오르는 등산객 (봉우리 그림은 모든 산이 같이 쓴다). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
       로딩 진행만큼 등산객이 등산로를 따라 정상으로 오르고 고도가 올라간다 (src/lib/splash.ts).
-      뒤에는 실제 화면 패널 자리에 유리 스켈레톤을 깔아 장면이 뜰 때 레이아웃이 튀지 않게 한다.
+      장면이 그려지면 걷히고, 그때 화면 패널들이 차례로 들어온다 (src/index.css 의 hud-enter).
     -->
     <style>
       #splash {
         --ink: #fdf6ec;
         --sub: rgba(253, 246, 236, 0.72);
         --trail: #ffd58a;
-        --glass: rgba(255, 255, 255, 0.1);
         position: fixed;
         inset: 0;
         z-index: 100;
@@ -82,46 +80,6 @@
         bottom: 10vh;
         animation-duration: 18s;
         animation-direction: alternate-reverse;
-      }
-      /* 실제 화면 패널 자리의 유리 스켈레톤 */
-      .sk {
-        position: absolute;
-        border-radius: 14px;
-        background: var(--glass);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        backdrop-filter: blur(6px);
-        overflow: hidden;
-      }
-      .sk::after {
-        content: '';
-        position: absolute;
-        inset: 0;
-        transform: translateX(-100%);
-        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.16), transparent);
-        animation: sk-shine 1.8s ease-in-out infinite;
-      }
-      .sk-course {
-        top: 16px;
-        left: 16px;
-        width: min(300px, calc(100vw - 32px));
-        height: 74px;
-      }
-      .sk-chip {
-        top: 16px;
-        right: 16px;
-        width: 148px;
-        height: 34px;
-        border-radius: 999px;
-      }
-      .sk-chip.second {
-        top: 59px;
-      }
-      .sk-progress {
-        left: 50%;
-        bottom: 16px;
-        width: min(520px, calc(100vw - 32px));
-        height: 72px;
-        transform: translateX(-50%);
       }
       .splash-center {
         position: absolute;
@@ -196,11 +154,6 @@
       #splash.failed .splash-tip {
         display: none;
       }
-      @keyframes sk-shine {
-        to {
-          transform: translateX(100%);
-        }
-      }
       @keyframes splash-mist {
         to {
           transform: translateX(12%);
@@ -252,13 +205,7 @@
         text-align: left;
         animation: splash-ellipsis 1.2s steps(4) infinite;
       }
-      @media (max-width: 760px) {
-        .sk-chip {
-          display: none;
-        }
-      }
       @media (prefers-reduced-motion: reduce) {
-        .sk::after,
         .splash-mist,
         .splash-bob,
         .splash-glow,
@@ -284,11 +231,6 @@
       <div class="splash-mist m1" aria-hidden="true"></div>
       <div class="splash-mist m2" aria-hidden="true"></div>
 
-      <div class="sk sk-course" aria-hidden="true"></div>
-      <div class="sk sk-chip" aria-hidden="true"></div>
-      <div class="sk sk-chip second" aria-hidden="true"></div>
-      <div class="sk sk-progress" aria-hidden="true"></div>
-
       <div class="splash-center">
         <!-- 백운대·인수봉·만경대 세 봉우리와 정상까지 지그재그 등산로. 진행만큼 등산객이 오르고 길이 채워진다 -->
         <svg class="splash-climb" viewBox="0 0 320 170" aria-hidden="true">
@@ -306,10 +248,7 @@
             </g>
           </g>
         </svg>
-        <p class="splash-eyebrow">오늘의 산 · <span id="splash-mountain">북한산</span></p>
-        <script>
-          document.getElementById('splash-mountain').textContent = window.__mountain.name
-        </script>
+        <p class="splash-eyebrow">집에서 오르는 진짜 산</p>
         <h1 class="splash-title">방구석 등반대</h1>
         <div class="splash-meta">
           <span>해발 <span class="splash-alt" id="splash-alt">0</span>m</span>
