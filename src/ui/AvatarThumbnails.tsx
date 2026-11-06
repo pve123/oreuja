@@ -9,7 +9,11 @@ const SIZE = 160 // 그림 한 장 크기(px)
 const FRAME_HEIGHT = 2.6 // 그림 한 장에 담을 높이(m)
 // 캐릭터 사이 간격(m). 한 칸이 그림 한 장이 되므로 높이와 같아야 정사각형으로 찌그러짐 없이 잘린다
 const SPACING = FRAME_HEIGHT
-const SETTLE_FRAMES = 4 // 몇 프레임 그린 뒤(만세 자세가 잡힌 뒤) 찍는다
+/**
+ * 몇 프레임 그린 뒤 찍는다. 모두 쉬는 자세로 찍는다: 만세는 GLB 캐릭터가 동작을 섞는 동안
+ * 팔을 옆으로 벌린 어중간한 자세로 찍혀 도형 캐릭터와 자세가 달라 보였다
+ */
+const SETTLE_FRAMES = 4
 /** 첫 화면(지형·내 캐릭터)을 먼저 받도록 이만큼 기다렸다가 나머지 캐릭터 파일을 받아 찍는다 (ms) */
 const START_DELAY = 2000
 
@@ -21,7 +25,6 @@ function Studio() {
 
   useFrame(() => {
     if (useAvatarThumbs.getState().done) return
-    handles.current.forEach((h) => h?.setCheering(true))
     // GLB 캐릭터 파일을 다 받은 뒤부터 센다
     if (!handles.current.every((h) => h?.ready())) return
     if (++frames.current < SETTLE_FRAMES) return
