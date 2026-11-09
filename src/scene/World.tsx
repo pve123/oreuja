@@ -78,6 +78,11 @@ const STICK_DEAD = 0.14
 const STICK_RUN = 0.82
 /** 조이스틱을 옆으로 끝까지 밀었을 때 몸을 돌리는 빠르기(rad/s). 키보드(TURN_SPEED)보다 조금 느리게 해 엄지로 섬세하게 꺾는다 */
 const STICK_TURN_SPEED = 2.6
+/**
+ * 조이스틱 좌우 반응 곡선의 지수. 1 이면 기울기에 정비례하고 2 면 제곱이라, 조금 기울이면 아주 천천히 돌고 끝으로 갈수록 빨라진다.
+ * 끝까지 밀었을 때 빠르기(STICK_TURN_SPEED)는 그대로다. 콘솔 게임 스틱의 응답 곡선과 같은 방식
+ */
+const STICK_TURN_CURVE = 2
 /** 조이스틱을 조금만 기울였을 때 걷는 빠르기 비율. 여기서부터 STICK_RUN 까지 기울일수록 빨라진다 */
 const STICK_WALK_MIN = 0.4
 /** 점프 중 카메라가 바라보는 높이를 발밑 땅보다 이만큼 아래로는 내리지 않는다(m). 오르막에서 기준점이 땅속에 들어가 땅 밑이 보이지 않게 */
@@ -89,6 +94,13 @@ const CAMERA_GROUND_CLEARANCE = 0.4
  * 높이와 상관없이 같게 맞춘다. 세로 폰 화면 너비만큼 끌면 약 60° 돈다
  */
 const TOUCH_LOOK_DEG_PER_PX = 0.15
+/**
+ * 터치 둘러보기 가속: 손가락이 이 빠르기(px/ms)로 움직이면 기본 배율(TOUCH_LOOK_DEG_PER_PX)로 돌고, 느리면 덜 빠르면 더 돈다.
+ * 회전량이 손가락 빠르기의 제곱을 따르므로 천천히 끌면 세밀하게 맞추고 휙 쓸면 크게 돈다. 배율은 MIN~MAX 안에 둔다
+ */
+const TOUCH_LOOK_REF_SPEED = 0.6
+const TOUCH_LOOK_MIN_GAIN = 0.5
+const TOUCH_LOOK_MAX_GAIN = 1.8
 /** 터치 둘러보기 관성. 손가락을 떼면 잠깐 미끄러지다 멈춘다 (drei 와 World 가 프레임마다 한 번씩 update 하므로 두 번 적용된다) */
 const TOUCH_LOOK_DAMPING = 0.08
 /** 카메라와 캐릭터 가슴 사이 가장 가까운 거리(m) */
@@ -256,6 +268,45 @@ function WorldScene({ terrain, trail }: Props) {
     }
   }, [world, rapier])
 
+  // 터치 둘러보기 가속. OrbitControls 는 손가락 움직임을 document 에서 받으므로 window capture 단계에서 먼저 빠르기를 재 회전 배율을 바꾼다
+  useEffect(() => {
+    if (!IS_TOUCH) return
+    const el = gl.domElement
+    const fingers = new Map<number, { x: number; y: number; t: number }>()
+    const look = { speed: TOUCH_LOOK_REF_SPEED }
+    const base = () => (TOUCH_LOOK_DEG_PER_PX * el.clientHeight) / 360
+    const onDown = (e: PointerEvent) => {
+      if (e.pointerType !== 'touch' || e.target !== el) return
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp })
+      look.speed = TOUCH_LOOK_REF_SPEED
+      controls.current.rotateSpeed = base()
+    }
+    const onMove = (e: PointerEvent) => {
+      const f = fingers.get(e.pointerId)
+      if (!f) return
+      const dt = Math.max(e.timeStamp - f.t, 1)
+      const v = Math.hypot(e.clientX - f.x, e.clientY - f.y) / dt
+      // 이벤트마다 튀는 값을 고르게 한다
+      look.speed += (v - look.speed) * 0.5
+      fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp })
+      const gain = THREE.MathUtils.clamp(look.speed / TOUCH_LOOK_REF_SPEED, TOUCH_LOOK_MIN_GAIN, TOUCH_LOOK_MAX_GAIN)
+      controls.current.rotateSpeed = base() * gain
+    }
+    const onUp = (e: PointerEvent) => {
+      fingers.delete(e.pointerId)
+    }
+    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('pointermove', onMove, true)
+    window.addEventListener('pointerup', onUp, true)
+    window.addEventListener('pointercancel', onUp, true)
+    return () => {
+      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('pointermove', onMove, true)
+      window.removeEventListener('pointerup', onUp, true)
+      window.removeEventListener('pointercancel', onUp, true)
+    }
+  }, [gl])
+
   // 휠 확대·축소는 직접 맡는다 (스프링 암이 당긴 거리를 OrbitControls 가 사용자가 고른 거리로 착각하지 않게)
   useEffect(() => {
     const el = gl.domElement
@@ -390,7 +441,8 @@ function WorldScene({ terrain, trail }: Props) {
       if (Math.hypot(sx, sy) > STICK_DEAD && move === 0 && turn === 0) {
         stick = true
         const axis = (v: number) => Math.sign(v) * THREE.MathUtils.clamp((Math.abs(v) - STICK_DEAD) / (1 - STICK_DEAD), 0, 1)
-        const steer = -axis(sx) // 오른쪽으로 밀면 yaw 가 작아진다
+        const ax = axis(sx)
+        const steer = -Math.sign(ax) * Math.abs(ax) ** STICK_TURN_CURVE // 오른쪽으로 밀면 yaw 가 작아진다
         b.yaw += steer * STICK_TURN_SPEED * dt
         if (steer !== 0) turn = steer
         if (sy > STICK_DEAD) {
