@@ -7,10 +7,10 @@ import type { Obstacle } from './obstacles'
  * - cairn: 고개·재(하루재)에 쌓은 돌탑
  * - pass: 깔딱고개. 돌탑 옆에 숨 고르는 나무 벤치
  * - temple: 절·암자(인수암, 보리사, 대동사). 붉은 기둥, 기와지붕, 연등
- * - hut: 산장(백운산장). 굴뚝 있는 나무 산장
+ * - hut: 산장(백운산장). 막돌 벽에 처마가 넓은 낮은 지붕을 얹은 돌 산장
  * - gate: 성문(백운봉암문 위문). 이름에 암문·성문이 든 곳. 등산로가 위가 평평한 네모 문 사이로 지나간다
  * - ruins: 문터(수문터). 무너진 성벽 터
- * - waterfall: 폭포(개연폭포). 바위 절벽, 물줄기, 물웅덩이
+ * - waterfall: 폭포(개연폭포). 비스듬한 너럭바위를 타고 미끄러져 내리는 물줄기와 얕은 물웅덩이
  * - sign: 그 밖의 이름. 나무 표지판
  * - trailhead: 출발점(탐방지원센터). 등산로를 가로지르는 나무 입구 문과 등산 안내도. 이정표가 아니라 코스마다 하나 세운다
  */
@@ -93,7 +93,8 @@ const SPECS: Record<LandmarkKind, Spec> = {
     clear: 9,
     label: 8.4,
     footprint: [3.6, 3.6],
-    colliders: [...grid([-2.2, 0, 2.2], [-3.4], 1.8, 8), { x: 0, z: 0, r: 1.9, height: 2 }],
+    // 비스듬한 너럭바위와 둘레 바위(src/scene/Landmarks.tsx 의 FALL_ROCKS), 물웅덩이
+    colliders: [...grid([-2.8, -0.9, 0.9, 2.8], [-2.6, -5], 1.3, 5), { x: 0, z: 0.6, r: 2.2, height: 1 }],
   },
   sign: { side: 2.5, clear: 1.5, label: 2.7, footprint: [0.3, 0.3], colliders: [{ x: 0, z: 0, r: 0.2, height: 2.2 }] },
   trailhead: {
