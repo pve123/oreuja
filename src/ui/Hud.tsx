@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
-import { estimateMinutes, formatMinutes, type Trail } from '../lib/data'
+import { estimateMinutes, formatDuration, formatMinutes, type Trail } from '../lib/data'
 import { input, releaseInput, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
@@ -14,11 +14,6 @@ import { readStored, writeStored } from '../lib/storage'
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
-}
-
-function formatDuration(sec: number) {
-  const m = Math.floor(sec / 60)
-  return `${m}분 ${String(sec % 60).padStart(2, '0')}초`
 }
 
 /** 키보드 입력 연결 */
@@ -462,8 +457,14 @@ export function SummitModal({ trail }: { trail: Trail }) {
 
   if (mode !== 'summit') return null
 
-  const count = records.filter((r) => r.trailId === trail.data.id).length
+  const mine = records.filter((r) => r.trailId === trail.data.id)
+  const count = mine.length
   const duration = startedAt && finishedAt ? Math.round((finishedAt - startedAt) / 1000) : 0
+  // 방금 저장한 기록(맨 끝)을 뺀 예전 기록 가운데 가장 빠른 것과 비교한다. 첫 완등이면 비교하지 않는다
+  const before = mine.slice(0, -1).map((r) => r.durationSec)
+  const prevBest = before.length ? Math.min(...before) : null
+  const best = Math.min(duration, prevBest ?? duration)
+  const faster = prevBest !== null && duration < prevBest ? prevBest - duration : 0
 
   return (
     <div className="overlay">
@@ -482,6 +483,10 @@ export function SummitModal({ trail }: { trail: Trail }) {
             <dd>{formatDuration(duration)}</dd>
           </div>
           <div>
+            <dt>최고 기록</dt>
+            <dd>{formatDuration(best)}</dd>
+          </div>
+          <div>
             <dt>실제라면</dt>
             <dd>약 {formatMinutes(estimateMinutes(trail.data.length, trail.data.elevationGain))}</dd>
           </div>
@@ -490,6 +495,11 @@ export function SummitModal({ trail }: { trail: Trail }) {
             <dd>{count}회</dd>
           </div>
         </dl>
+        {faster > 0 && (
+          <p className="summit-best" role="status">
+            🎉 새 최고 기록이에요! {faster >= 60 ? `${Math.floor(faster / 60)}분 ${faster % 60}초` : `${faster}초`} 빨라졌어요
+          </p>
+        )}
         <div className="actions">
           <button className="btn primary" onClick={takePhoto}>
             기념사진 찍기

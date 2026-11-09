@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { estimateMinutes, formatMinutes, type Trail, type TrailData } from '../lib/data'
-import { useGame, type ControlMode } from '../lib/store'
+import { estimateMinutes, formatDuration, formatMinutes, type Trail, type TrailData } from '../lib/data'
+import { useGame, type ClimbRecord, type ControlMode } from '../lib/store'
 import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
 import { isClimbing, useNet } from '../lib/net'
 import { AVATARS } from '../lib/avatars'
@@ -122,7 +122,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
               >
                 <span className="mountain-tab-name">{m.name}</span>
                 <span className="mountain-tab-meta">
-                  {m.elevation}m · 코스 {m.courses}개
+                  {m.elevation}m · {doneIn(records, m) > 0 ? `${doneIn(records, m)}/${m.courses} 완등` : `코스 ${m.courses}개`}
                 </span>
               </button>
             ))}
@@ -140,6 +140,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
                 selected={c.id === courseId}
                 current={here && c.id === trail.data.id && distance > 0}
                 climbs={records.filter((r) => r.trailId === c.id).length}
+                best={bestOf(records, c.id)}
                 onPick={() => setCourseId(c.id)}
               />
             ))}
@@ -169,18 +170,33 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
   )
 }
 
+/** 그 코스의 가장 빠른 완등 시간(초). 오른 적이 없으면 null */
+function bestOf(records: ClimbRecord[], courseId: string) {
+  const times = records.filter((r) => r.trailId === courseId).map((r) => r.durationSec)
+  return times.length ? Math.min(...times) : null
+}
+
+/** 그 산에서 한 번이라도 오른 코스 수. 코스 id 가 「산 id-」로 시작한다 (예: bukhansan-baegundae) */
+function doneIn(records: ClimbRecord[], m: Mountain) {
+  const ids = new Set(records.filter((r) => r.trailId.startsWith(`${m.id}-`)).map((r) => r.trailId))
+  return Math.min(ids.size, m.courses)
+}
+
 /** 코스 카드: 이름·난이도, 출발→도착, 거리·오르막·실제 예상 시간, 고도 그래프, 완등 횟수와 지금 오르는 사람 수 */
 function CourseCard({
   course,
   selected,
   current,
   climbs,
+  best,
   onPick,
 }: {
   course: TrailData
   selected: boolean
   current: boolean
   climbs: number
+  /** 가장 빠른 완등 시간(초). 오른 적이 없으면 null */
+  best: number | null
   onPick: () => void
 }) {
   const climbing = useNet((s) => (s.status === 'online' ? s.peers.filter((p) => p.course === course.id && isClimbing(p)).length : 0))
@@ -200,7 +216,11 @@ function CourseCard({
         <span>{(course.length / 1000).toFixed(1)}km</span>
         <span>↗ {course.elevationGain}m</span>
         <span>약 {formatMinutes(minutes)}</span>
-        {climbs > 0 && <span className="course-card-done">완등 {climbs}회</span>}
+        {climbs > 0 && (
+          <span className="course-card-done">
+            ✓ 완등 {climbs}회{best !== null && ` · 최고 ${formatDuration(best)}`}
+          </span>
+        )}
         {climbing > 0 && <span className="course-card-live">● {climbing}명 오르는 중</span>}
       </span>
     </button>

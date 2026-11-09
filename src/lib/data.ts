@@ -271,6 +271,12 @@ export function estimateMinutes(lengthM: number, gainM: number) {
 }
 
 /** 분을 「1시간 20분」·「40분」으로 */
+/** 앱에서 걸린 시간(초)을 「12분 05초」처럼 */
+export function formatDuration(sec: number) {
+  const m = Math.floor(sec / 60)
+  return `${m}분 ${String(sec % 60).padStart(2, '0')}초`
+}
+
 export function formatMinutes(min: number) {
   const h = Math.floor(min / 60)
   return h ? `${h}시간 ${min % 60}분` : `${min}분`
