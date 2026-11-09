@@ -918,6 +918,14 @@ kbd {
   gap: 8px;
   margin-top: 16px;
 }
+/* 아이폰 기념사진 저장 안내 */
+.photo-hint {
+  margin: 10px 0 0;
+  font-size: 14px;
+  line-height: 1.45;
+  color: var(--muted);
+  text-align: center;
+}
 .btn {
   flex: 1;
   padding: 12px;

@@ -8,7 +8,7 @@ import { TogetherPanel } from './TogetherPanel'
 import { TouchControls, TouchGuide } from './TouchControls'
 import { EmoteDial } from './EmoteDial'
 import { useWakeLock } from '../lib/wakeLock'
-import { IS_TOUCH } from '../lib/device'
+import { IS_IOS, IS_TOUCH } from '../lib/device'
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
@@ -436,6 +436,7 @@ export function SummitModal({ trail }: { trail: Trail }) {
   const [now] = useState(() => new Date())
   const photoName = `${trail.data.id}-${now.toISOString().slice(0, 10)}.png`
   const shareFile = useShareFile(mode === 'photoResult' ? photo : null, photoName)
+  const saveViaShare = IS_IOS && shareFile !== null
 
   if (mode === 'photo') return <div className="flash" />
 
@@ -462,13 +463,29 @@ export function SummitModal({ trail }: { trail: Trail }) {
                 사진 공유
               </button>
             )}
-            <a className={shareFile ? 'btn' : 'btn primary'} href={photo} download={photoName}>
-              사진 저장
-            </a>
+            {saveViaShare ? (
+              // 아이폰: 내려받으면 파일 앱에 들어가므로 공유 창을 열어 「이미지 저장」으로 사진 앱에 넣게 한다.
+              // 글을 같이 넘기면 공유 창에 「이미지 저장」이 빠지기도 해서 사진 파일만 넘긴다
+              <button
+                className="btn"
+                onClick={() => {
+                  navigator.share({ files: [shareFile] }).catch(() => {
+                    // 공유 창을 닫은 것(AbortError)은 그냥 둔다
+                  })
+                }}
+              >
+                사진 저장
+              </button>
+            ) : (
+              <a className={shareFile ? 'btn' : 'btn primary'} href={photo} download={photoName}>
+                사진 저장
+              </a>
+            )}
             <button className="btn" onClick={closePhoto}>
               닫기
             </button>
           </div>
+          {saveViaShare && <p className="photo-hint">공유 창에서 「이미지 저장」을 누르면 사진 앱에 들어가요.</p>}
         </div>
       </div>
     )
