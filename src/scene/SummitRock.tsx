@@ -5,7 +5,8 @@ import { setObstacles, type Obstacle } from '../lib/obstacles'
 import { seededRandom } from '../lib/random'
 import { summitVista } from '../lib/summit'
 import { FORTRESS_COLLIDERS } from '../lib/landmarks'
-import { FortressGate } from './Landmarks'
+import { DRAW_RANGE, FortressGate } from './Landmarks'
+import { useGame } from '../lib/store'
 import { Blobs, Flagpole, Rope, type Blob } from './NamedRocks'
 
 /**
@@ -72,7 +73,10 @@ export function SummitRock({ terrain, trail }: { terrain: Terrain; trail: Trail 
     return () => setObstacles('summit', [])
   }, [obstacles])
 
-  if (!decor) return null
+  // 정상에서 멀면 꾸밈을 그리지 않는다 (충돌은 그대로). 50m 단위로만 다시 그린다
+  const near = useGame((s) => Math.floor(s.distance / 50)) * 50
+  const far = useMemo(() => trail.positionAt(near).distanceTo(top) > DRAW_RANGE + 50, [trail, near, top])
+  if (!decor || far) return null
   const at = (v: number, s: number) => ground(top.clone().addScaledVector(vista, v).addScaledVector(side, s))
   const facing = Math.atan2(-vista.x, -vista.z) // 카메라 쪽을 본다
 

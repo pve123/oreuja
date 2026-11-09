@@ -10,6 +10,8 @@ import { useGame } from '../lib/store'
 import { Boulder, Pavilion, Peak, RockGate, TrailSlab } from './NamedRocks'
 
 const LABEL_RANGE = 300 // 이 거리 안의 랜드마크만 이름을 띄운다(m)
+/** 캐릭터에서 이 직선거리(m) 안의 랜드마크만 모형을 그린다. 폰에서 그리기 횟수를 줄인다 (충돌은 거리와 상관없이 둔다) */
+export const DRAW_RANGE = 350
 
 
 /** 이정표마다 이름에 맞는 랜드마크(돌탑, 암자, 산장, 성문, 폭포…)를 세우고, 가까운 것만 이름을 띄운다 */
@@ -17,6 +19,9 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
   const list = useMemo(() => landmarks(terrain, trail), [terrain, trail])
   // 50m 단위로만 다시 그려서 걸을 때마다 렌더링하지 않게 한다
   const near = useGame((s) => Math.floor(s.distance / 50)) * 50
+  // 그릴지는 등산로 거리가 아니라 직선거리로 정한다. 갈지자 길에서 가까이 보이는 모형이 갑자기 나타나지 않게
+  const here = useMemo(() => trail.positionAt(near), [trail, near])
+  const drawn = (p: THREE.Vector3) => p.distanceTo(here) < DRAW_RANGE + 50
 
   useEffect(() => {
     setObstacles(
@@ -30,7 +35,7 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
     <group>
       {/* 마당바위·기차바위·능선은 등산로를 따라 지형 위에 까는 바위라 세계 좌표로 그린다 */}
       {list
-        .filter((l) => l.kind === 'slab' || l.kind === 'ropes' || l.kind === 'ridge')
+        .filter((l) => (l.kind === 'slab' || l.kind === 'ropes' || l.kind === 'ridge') && drawn(l.position))
         .map((l) => (
           <TrailSlab
             key={`${l.name}-slab`}
@@ -43,7 +48,7 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
         ))}
       {list.map((l) => (
         <group key={l.name} position={l.position} rotation={[0, l.rotation, 0]}>
-          <LandmarkBody landmark={l} trail={trail} />
+          {drawn(l.position) && <LandmarkBody landmark={l} trail={trail} />}
           {Math.abs(l.distance - near) < LABEL_RANGE && (
             <Html position={[0, l.label, 0]} center distanceFactor={16} zIndexRange={[10, 0]}>
               <div className="landmark-label">
