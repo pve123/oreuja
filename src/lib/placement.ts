@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
-import type * as THREE from 'three'
-import type { Trail } from './data'
+import * as THREE from 'three'
+import type { Terrain, Trail } from './data'
 import { usePhotos, type PhotoLayer } from './photo-map'
 
 /** 등산로에서 r 미터 안인지 빠르게 판정하는 함수를 만든다 (20m 격자로 나눠 둔다) */
@@ -21,6 +21,17 @@ export function makeNearTrail(trail: Trail) {
         for (const p of grid.get(`${cx + a},${cz + b}`) ?? []) if ((p.x - x) ** 2 + (p.z - z) ** 2 < r * r) return true
     return false
   }
+}
+
+/**
+ * 숲·바위를 놓을 후보 자리. share 비율만큼은 등산로 점 둘레 range 미터 안에서(걸으며 보이게), 나머지는 지형 전체에서 고른다
+ */
+export function scatterPoint(rand: () => number, trail: Trail, terrain: Terrain, share: number, range: number) {
+  if (rand() < share) {
+    const p = trail.points[Math.floor(rand() * trail.points.length)]
+    return { x: p.x + (rand() * 2 - 1) * range, z: p.z + (rand() * 2 - 1) * range }
+  }
+  return { x: THREE.MathUtils.lerp(terrain.minX, terrain.maxX, rand()), z: THREE.MathUtils.lerp(terrain.minZ, terrain.maxZ, rand()) }
 }
 
 /**

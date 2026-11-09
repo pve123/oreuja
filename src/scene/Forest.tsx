@@ -3,8 +3,9 @@ import * as THREE from 'three'
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js'
 import { sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
+import { jitterVertices } from '../lib/geometry'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
-import { makeNearTrail, usePhotoLayers } from '../lib/placement'
+import { makeNearTrail, scatterPoint, usePhotoLayers } from '../lib/placement'
 import { ringDepthMaterial, withOcclusionFade } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
@@ -27,18 +28,7 @@ export type Tree = { matrix: THREE.Matrix4; color: THREE.Color; pine: boolean; v
 
 /** 꼭짓점을 조금씩 흔들어 울퉁불퉁한 둥근 수관을 만든다 */
 function broadleafCanopy() {
-  const geo = new THREE.IcosahedronGeometry(1, 1)
-  const rand = seededRandom(11)
-  const pos = geo.attributes.position as THREE.BufferAttribute
-  const v = new THREE.Vector3()
-  const moved = new Map<string, number>()
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i)
-    const key = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`
-    if (!moved.has(key)) moved.set(key, 0.8 + rand() * 0.35)
-    v.multiplyScalar(moved.get(key)!)
-    pos.setXYZ(i, v.x * 2.6, v.y * 2.1 + 5.2, v.z * 2.6)
-  }
+  const geo = jitterVertices(new THREE.IcosahedronGeometry(1, 1), seededRandom(11), 0.8, 0.35).scale(2.6, 2.1, 2.6).translate(0, 5.2, 0)
   geo.computeVertexNormals()
   return geo
 }
@@ -72,16 +62,7 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     const up = new THREE.Vector3(0, 1, 0)
 
     for (let tries = 0; out.length < COUNT && tries < COUNT * 8; tries++) {
-      let x: number
-      let z: number
-      if (rand() < NEAR_TRAIL_SHARE) {
-        const p = trail.points[Math.floor(rand() * trail.points.length)]
-        x = p.x + (rand() * 2 - 1) * NEAR_TRAIL_RANGE
-        z = p.z + (rand() * 2 - 1) * NEAR_TRAIL_RANGE
-      } else {
-        x = THREE.MathUtils.lerp(terrain.minX, terrain.maxX, rand())
-        z = THREE.MathUtils.lerp(terrain.minZ, terrain.maxZ, rand())
-      }
+      const { x, z } = scatterPoint(rand, trail, terrain, NEAR_TRAIL_SHARE, NEAR_TRAIL_RANGE)
       if (x < terrain.minX || x > terrain.maxX || z < terrain.minZ || z > terrain.maxZ) continue
       const y = sampleHeight(terrain, x, z)
       // 절벽 같은 급사면은 건너뜀
