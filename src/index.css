@@ -927,8 +927,11 @@ kbd {
   padding: 4px 8px;
   border-radius: 12px;
   background: #fff;
+  color: #1c2c47;
   font-size: 22px;
+  font-weight: 800;
   line-height: 1;
+  white-space: nowrap;
   box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
   animation: emote-pop 0.3s ease-out;
 }
