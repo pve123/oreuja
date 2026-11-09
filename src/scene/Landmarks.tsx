@@ -326,7 +326,7 @@ function ashlarTexture() {
 
 /**
  * 돌 성문 (북한산성 백운봉암문). 마름돌 벽에 위가 평평한 네모 문이 뚫려 있고, 문 둘레에 큰 문설주와 상인방 돌을 댄다.
- * 문 안쪽에는 한 단 좁은 문틀이 한 번 더 있다. 벽 양옆은 큰 자연 바위에 기대어 있고, 문 앞 왼쪽에 안내판이 선다
+ * 문 안쪽에는 한 단 좁은 문틀이 한 번 더 있다. 벽 양옆은 큰 자연 바위에 기대어 있고, 문 앞에 안내판이 선다
  */
 function Gate() {
   const wall = useMemo(() => gateShape(), [])
@@ -376,8 +376,8 @@ function Gate() {
           <Std color={GRANITE[(i + 2) % GRANITE.length]} flatShading />
         </mesh>
       ))}
-      {/* 문 앞 왼쪽 안내판 */}
-      <mesh position={[-2.1, 0.9, 1.9]} rotation={[0, 0.35, 0]} castShadow>
+      {/* 문 앞 안내판. 북한산 위문은 등산로가 벽을 따라 왼쪽에서 와서 꺾여 들어오므로 오른쪽에 세운다 */}
+      <mesh position={[2.1, 0.9, -1.9]} rotation={[0, -0.35, 0]} castShadow>
         <boxGeometry args={[0.55, 1.9, 0.08]} />
         <Std color="#4a4a48" />
       </mesh>

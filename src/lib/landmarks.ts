@@ -139,9 +139,24 @@ export function landmarks(terrain: Terrain, trail: Trail): Landmark[] {
     let position: THREE.Vector3
     let rotation: number
     if (spec.side === 0) {
-      // 길 위에 걸쳐 선다. 기준 좌표 +z 가 진행 방향. 등산로가 꺾이는 곳이면 길이 벽에 덜 걸리는 방향으로 돌린다
-      position = p.clone()
-      rotation = bestRotation(trail, cp.distance, position, heading, spec.colliders)
+      // 길 위에 걸쳐 선다. 기준 좌표 +z 가 진행 방향. 등산로가 꺾이는 곳이면 길이 벽에 덜 걸리는 방향으로 돌린다.
+      // 이정표가 갈지자 길의 꺾이는 곳에 있으면 어느 쪽으로 돌려도 벽이 길에 걸리므로(북한산 위문),
+      // 앞뒤 SHIFT_RANGE 안에서 길이 문 사이로 곧게 지나는 가장 가까운 자리로 옮긴다. 출발점 입구는 처음 화면에 보이게 그대로 둔다
+      let best = { hits: Infinity, at: cp.distance, rotation: heading }
+      const range = kind === 'trailhead' ? 0 : SHIFT_RANGE
+      for (let k = 0; k <= range / SHIFT_STEP && best.hits > 0; k++) {
+        for (const sign of k === 0 ? [1] : [1, -1]) {
+          const at = THREE.MathUtils.clamp(cp.distance + sign * k * SHIFT_STEP, 0, trail.length)
+          // 문 앞뒤에서 길이 꺾이면 문으로 들어가 벽 끝을 돌아 나가게 되므로 곧은 곳만 고른다
+          if (range > 0 && turnAt(trail, at) > MAX_THROUGH_TURN) continue
+          const q = trail.positionAt(at)
+          const r = bestRotation(trail, at, q, trail.headingAt(at), spec.colliders)
+          const hits = trailHits(trail, at, place(spec.colliders, q, r))
+          if (hits < best.hits) best = { hits, at, rotation: r }
+        }
+      }
+      position = trail.positionAt(best.at)
+      rotation = best.rotation
     } else {
       // 등산로 양옆 가운데 땅이 등산로 높이와 덜 차이 나는(덜 가파른) 쪽에 세운다
       const flatness = (s: number) => {
@@ -170,6 +185,19 @@ export function landmarks(terrain: Terrain, trail: Trail): Landmark[] {
   })
   cache.set(trail, out)
   return out
+}
+
+/** 길 위에 걸치는 랜드마크를 이정표에서 앞뒤로 옮겨 볼 수 있는 거리와 간격(m) */
+const SHIFT_RANGE = 12
+const SHIFT_STEP = 0.5
+/** 길 위에 걸치는 랜드마크 앞뒤 3m 에서 길이 꺾여도 되는 각도 */
+const MAX_THROUGH_TURN = THREE.MathUtils.degToRad(20)
+
+/** at 앞 3m 와 뒤 3m 의 진행 방향 차이(라디안) */
+function turnAt(trail: Trail, at: number) {
+  const [a, b, c] = [at - 3, at, at + 3].map((d) => trail.positionAt(d))
+  const d = Math.atan2(c.x - b.x, c.z - b.z) - Math.atan2(b.x - a.x, b.z - a.z)
+  return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))
 }
 
 /** 몸 반지름(m). World 의 BODY_RADIUS 와 같게 */
