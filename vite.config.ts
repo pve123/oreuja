@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Plugin } from 'vite'
 
@@ -13,10 +15,13 @@ function socialMeta(): Plugin {
       const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL
       const site = (process.env.SITE_URL ?? (vercel ? `https://${vercel}` : '')).replace(/\/$/, '')
       if (!site) return
+      // 카카오톡·슬랙은 미리보기 그림을 주소 단위로 오래 기억해서, 그림을 바꿔도 같은 주소면 예전 그림이 뜬다.
+      // 그림 파일 지문을 주소 뒤에 붙여 그림이 바뀌면 주소도 바뀌게 한다
+      const version = createHash('sha256').update(readFileSync('public/og-image.jpg')).digest('hex').slice(0, 8)
       const meta = (attrs: Record<string, string>) => ({ tag: 'meta', attrs, injectTo: 'head' as const })
       return [
         meta({ property: 'og:url', content: `${site}/` }),
-        meta({ property: 'og:image', content: `${site}/og-image.jpg` }),
+        meta({ property: 'og:image', content: `${site}/og-image.jpg?v=${version}` }),
         meta({ property: 'og:image:width', content: '1200' }),
         meta({ property: 'og:image:height', content: '630' }),
         meta({ property: 'og:image:alt', content: '북한산 백운대 정상에서 만세를 부르는 등산객과 「정상이다」 말풍선' }),
