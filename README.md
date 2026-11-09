@@ -61,6 +61,19 @@ npm run dev      # 다른 터미널에서. 개발 서버가 /ws 를 같이하기
 
 서버(`server/index.mjs`)는 닉네임, 아바타, 코스, 등산로 위 거리와 옆으로 비킨 거리, 감정 표현만 주고받고 아무것도 저장하지 않는다. 메시지 크기(512바이트)와 빈도(초당 30개), 접속 수(50명)를 제한하고, 받은 값은 범위를 잘라 쓴다. 로그인이 없어서 닉네임은 누구나 아무렇게나 정할 수 있다.
 
+밖에 올릴 때를 위해 다음도 막는다. `npm run test:server` 가 빈 포트에 서버를 따로 띄워 이 동작을 시험한다(CI 의 check 에서도 돈다).
+
+- 접속 출처: 브라우저가 붙이는 Origin 이 배포 주소(`ALLOWED_ORIGINS`, 기본 `https://trailverse-seven.vercel.app`), Vercel 미리보기 주소(`trailverse-…-hsl-labs.vercel.app`), localhost 일 때만 받는다.
+- 같은 IP 접속 수: 셋까지. 내 컴퓨터(localhost)에서 온 접속은 개발 중 창을 여러 개 띄울 수 있게 뺀다.
+- 끊긴 연결: 15초마다 ping 을 보내 답이 없으면 끊는다. 폰이 잠들거나 와이파이가 끊긴 사람이 남의 화면에 남지 않는다.
+- 상태 확인: `GET /health` 가 `{ ok, players }` 를 돌려준다. 호스팅 서비스의 상태 확인 주소로 쓴다.
+
+| 서버 환경변수 | 뜻 |
+|---|---|
+| `PORT` | 듣는 포트. 호스팅 서비스가 정해 주면 그 값을 쓴다 (기본 5200) |
+| `ALLOWED_ORIGINS` | 접속을 받을 페이지 주소, 쉼표로 여럿. 배포 주소를 바꾸면 여기에 넣는다 |
+| `TRUST_PROXY` | `1` 이면 `X-Forwarded-For` 첫 주소를 접속한 사람 IP 로 본다. 호스팅 프록시 뒤에 둘 때(Railway, Fly.io, Render 모두 그렇다) 반드시 켠다. 안 켜면 모두가 프록시 IP 하나로 보여 전체가 세 명으로 막히고, 서버가 경고를 남긴다. 프록시 없이 켜면 누구나 머리글을 꾸며 IP 제한을 피한다 |
+
 ## 위성사진 (선택)
 
 `.env.example` 을 `.env.local` 로 복사하고 Mapbox 공개 토큰(`pk.` 로 시작)을 넣으면 지형에 위성사진을 입힌다. 토큰이 없거나 타일을 받지 못하면 고도와 경사로 칠한 색을 쓴다. Vite는 서버를 켤 때 이 파일을 읽으니 바꾼 뒤에는 `npm run dev` 를 다시 실행한다.
@@ -79,7 +92,7 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 2. Environment Variables 에 `VITE_MAPBOX_TOKEN` 을 넣는다. 비우면 위성사진 없이 고도 색으로 지형을 그린다. 토큰은 빌드 결과에 들어가니 Mapbox 계정 화면에서 쓸 주소를 Vercel 도메인으로 제한한다.
 3. 「Deploy」를 누른다. 이후에는 main 에 올라갈 때마다 자동으로 다시 배포하고 PR 브랜치는 미리보기 주소를 받는다.
 
-같이하기까지 열려면 `server/index.mjs` 를 Render 나 Fly.io 같은 곳에 올리고 Vercel 환경변수 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣은 뒤 다시 배포한다.
+같이하기까지 열려면 `server/index.mjs` 를 Railway·Fly.io·Render 같은 곳에 올리고(시작 명령 `npm run server`, 상태 확인 `/health`, 환경변수 `TRUST_PROXY=1`) Vercel 환경변수 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣은 뒤 다시 배포한다. 환경변수는 빌드할 때 들어가므로 넣은 뒤 꼭 다시 배포해야 한다.
 
 링크를 카카오톡이나 슬랙에 붙였을 때 보이는 미리보기 그림은 `public/og-image.jpg`(1200x630)다. og:image 는 절대 주소여야 해서 빌드할 때 `vite.config.ts` 의 `socialMeta` 가 넣는다. Vercel 이 빌드 중에 알려 주는 운영 주소(`VERCEL_PROJECT_PRODUCTION_URL`)를 쓰고, 다른 주소를 쓰려면 Vercel 환경변수 `SITE_URL` 에 `https://` 로 시작하는 주소를 넣는다. 로컬 빌드에는 넣지 않는다.
 
@@ -141,7 +154,8 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/ui/SoundControls.tsx` | 소리 켜기·끄기 버튼과 이정표 도착·정상·기념사진 소리 |
 | `src/lib/summit.ts`, `src/scene/SummitFlag.tsx` | 정상에서 가장 트인 풍경 방향을 찾아 기념사진 구도를 정하고, 그쪽에 깃발을 세운다 |
 | `src/lib/photo.ts` | 화면을 복사하고 기념 문구 띠와 서비스 이름을 얹어 기념사진을 만든다 |
-| `server/index.mjs` | 같이하기 서버. 접속한 사람들 상태를 1초에 10번 모두에게 나눠 준다 (`npm run server`) |
+| `server/index.mjs` | 같이하기 서버. 접속한 사람들 상태를 1초에 10번 모두에게 나눠 준다 (`npm run server`). 접속 출처·IP 당 접속 수를 거르고, 끊긴 연결을 정리하고, `/health` 로 상태를 알린다 |
+| `tests/server.mjs` | 같이하기 서버 시험 (`npm run test:server`) |
 | `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현 |
 | `src/lib/storage.ts` | 브라우저 저장소 읽기·쓰기. 저장소를 못 쓰는 환경에서도 오류 없이 넘어간다 |
 | `src/ui/TogetherPanel.tsx` | 왼쪽 아래 같이하기 패널. 접속 상태, 같은 코스 인원, 닉네임, 감정 표현 버튼 |

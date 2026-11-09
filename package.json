@@ -11,7 +11,8 @@
     "data": "node scripts/prepare-data.mjs",
     "server": "node server/index.mjs",
     "test:courses": "node tests/check-courses.mjs",
-    "test:e2e": "node tests/e2e.mjs"
+    "test:e2e": "node tests/e2e.mjs",
+    "test:server": "node tests/server.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
