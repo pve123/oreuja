@@ -1,8 +1,15 @@
 import { create } from 'zustand'
 import { loadAvatar, saveAvatar, type AvatarKind } from './avatars'
+import { IS_TOUCH } from './device'
 
 /** lobby 는 출발 전 베이스캠프(산·코스·혼자/같이·캐릭터를 고르는 화면). 걷는 중에도 Esc 로 다시 연다 */
 export type Mode = 'lobby' | 'hiking' | 'summit' | 'photo' | 'photoResult'
+
+/**
+ * 조작 방식. easy 는 큰 「걷기」 버튼 하나로 등산로를 따라 저절로 걷는다 (어르신·아이·3D 게임이 낯선 사람).
+ * free 는 조이스틱(폰)이나 방향키(컴퓨터)로 길 밖까지 자유롭게 걷는다
+ */
+export type ControlMode = 'easy' | 'free'
 
 export type ClimbRecord = {
   trailId: string
@@ -48,11 +55,28 @@ type State = {
   openLobby: () => void
   /** 베이스캠프를 닫고 걷던 곳에서 이어 오른다 */
   resume: () => void
+  /** 조작 방식 (브라우저에 기억). 폰은 쉬운 조작, 컴퓨터는 자유 조작이 기본 */
+  controlMode: ControlMode
+  setControlMode: (mode: ControlMode) => void
+  /** 쉬운 조작에서 등산로를 따라 저절로 걷는 중인지 */
+  autoWalk: boolean
+  setAutoWalk: (on: boolean) => void
 }
 
 export const AUTOSTART_STORAGE_KEY = 'hiking-metaverse:autostart'
 const RECORDS_KEY = 'hiking-metaverse:climbs'
 const COURSE_KEY = 'hiking-metaverse:course'
+const CONTROL_KEY = 'hiking-metaverse:control'
+
+function loadControl(): ControlMode {
+  try {
+    const saved = localStorage.getItem(CONTROL_KEY)
+    if (saved === 'easy' || saved === 'free') return saved
+  } catch {
+    // 저장소를 못 쓰면 기기에 맞는 기본값
+  }
+  return IS_TOUCH ? 'easy' : 'free'
+}
 
 function loadCourse(): string | null {
   try {
@@ -95,6 +119,7 @@ const freshClimb = {
   reachedCheckpoint: -1,
   arrival: null,
   roam: 0,
+  autoWalk: false,
 }
 
 // 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
@@ -137,14 +162,25 @@ export const useGame = create<State>((set, get) => ({
   reachSummit: (record) => {
     const records = [...get().records, record]
     saveRecords(records)
-    set({ mode: 'summit', finishedAt: Date.now(), records })
+    set({ mode: 'summit', finishedAt: Date.now(), records, autoWalk: false })
   },
   takePhoto: () => set({ mode: 'photo' }),
   setPhoto: (photo) => set({ photo, mode: 'photoResult' }),
   closePhoto: () => set({ mode: 'summit' }),
   restart: () => set(freshClimb),
-  openLobby: () => set({ mode: 'lobby' }),
+  // 베이스캠프를 열면 저절로 걷기를 멈춘다 (닫았을 때 모르는 새 걸어가 있지 않게)
+  openLobby: () => set({ mode: 'lobby', autoWalk: false }),
   resume: () => set({ mode: 'hiking' }),
+  controlMode: loadControl(),
+  setControlMode: (controlMode) => {
+    try {
+      localStorage.setItem(CONTROL_KEY, controlMode)
+    } catch {
+      // 저장소를 못 쓰면 기억하지 않는다
+    }
+    set({ controlMode, autoWalk: false })
+  },
+  setAutoWalk: (autoWalk) => set({ autoWalk }),
 }))
 
 /** 키보드·화면 버튼 입력 (매 프레임 읽으므로 React 상태가 아닌 일반 객체) */
