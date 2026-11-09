@@ -19,7 +19,7 @@ export type TerrainMeta = {
 }
 
 /** terrain.bin 을 높이(m) 배열로 푼다 */
-export function decodeHeights(meta: TerrainMeta, buf: ArrayBuffer): Float32Array {
+function decodeHeights(meta: TerrainMeta, buf: ArrayBuffer): Float32Array {
   if (meta.encoding !== 'uint16') return new Float32Array(buf)
   const q = new Uint16Array(buf)
   const out = new Float32Array(q.length)

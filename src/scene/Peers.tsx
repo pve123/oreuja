@@ -18,7 +18,7 @@ const LABEL_RANGE = 120 // 이 거리 안의 사람만 이름표를 띄운다(m)
 export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   // 사람이 들고 나거나 아바타를 바꿀 때만 다시 그린다 (위치는 매 프레임 직접 읽는다)
   const key = useNet((s) =>
-    (s.together ? s.peers : [])
+    s.peers
       .filter((p) => p.course === trail.data.id && isClimbing(p))
       .map((p) => `${p.id}:${p.avatar}`)
       .join(','),
