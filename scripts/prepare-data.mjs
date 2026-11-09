@@ -137,6 +137,45 @@ const DOBONGSAN_COURSES = [
   },
 ]
 
+// 관악산 정상(연주대 옆 632m 봉우리). 수치지형도 없이 30m 지형으로 만든다 (sheets 가 비어 있다)
+const GWANAKSAN_COURSES = [
+  // 사당 쪽 능선: 관음사에서 국기봉 둘과 하마바위, 마당바위, 관악문을 지나 연주대에 오른다. 사람이 가장 많이 다니는 길이다.
+  // 사당역에서 관음사까지는 1km 가까이 도시 길이라 관음사에서 출발한다
+  {
+    id: 'gwanaksan-sadang',
+    mountain: '관악산',
+    name: '사당 코스',
+    level: '보통',
+    start: { name: '관음사', lat: 37.46732, lon: 126.9771 },
+    summit: { name: '연주대', osmId: 442878166, elevation: 632 },
+    // 가장 짧은 길은 1.5km 쯤에서 동쪽 파이프능선으로 빠지고 마당바위 뒤에서도 능선을 벗어나서, 능선 위 세 곳을 거쳐 가게 한다
+    via: [
+      { lat: 37.45859, lon: 126.9679 }, // 하마바위
+      { lat: 37.45672, lon: 126.96618 }, // 마당바위
+      { lat: 37.44646, lon: 126.96763 }, // 관악문
+    ],
+    checkpoints: [
+      { name: '관음사 국기봉', lat: 37.46458, lon: 126.97425, note: '사당 능선에 올라서면 처음 만나는 태극기 봉우리' },
+      { name: '선유천 국기봉', lat: 37.46283, lon: 126.97071, note: '두 번째 국기봉. 능선 너머로 서울 시내가 보인다' },
+      { name: '하마바위', lat: 37.45859, lon: 126.9679, note: '두꺼비(하마)를 닮은 너럭바위' },
+      { name: '마당바위', lat: 37.45672, lon: 126.96618, note: '마당처럼 넓은 바위. 쉬어 가는 사람이 많다' },
+      { name: '관악문', lat: 37.44646, lon: 126.96763, note: '바위 사이로 난 문 같은 길. 정상이 코앞이다' },
+    ],
+  },
+  // 과천 쪽: 과천향교에서 자하능선(OSM 정식 등산로)을 타고 연주암을 거쳐 연주대에 오른다
+  {
+    id: 'gwanaksan-gwacheon',
+    mountain: '관악산',
+    name: '과천 코스',
+    level: '보통',
+    start: { name: '과천향교', lat: 37.43387, lon: 126.98739 },
+    summit: { name: '연주대', osmId: 442878166, elevation: 632 },
+    checkpoints: [
+      { name: '연주암', lat: 37.4417, lon: 126.96533, note: '연주대 바로 아래 절. 정상까지 마지막 오르막이 남았다' },
+    ],
+  },
+]
+
 const MOUNTAINS = [
   {
     id: 'bukhansan',
@@ -155,6 +194,14 @@ const MOUNTAINS = [
     bbox: { south: 37.668, west: 126.995, north: 37.716, east: 127.045 },
     sheets: ['37705011', '37705012', '37705021', '37705022', '37705031', '37705032', '37608020', '37608030', '37608040'],
     courses: DOBONGSAN_COURSES,
+  },
+  {
+    id: 'gwanaksan',
+    name: '관악산',
+    elevation: 632,
+    bbox: { south: 37.425, west: 126.945, north: 37.475, east: 127.0 },
+    sheets: [],
+    courses: GWANAKSAN_COURSES,
   },
 ]
 const MAX_CHECKPOINT_OFFSET = 40 // m

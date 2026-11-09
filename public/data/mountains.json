@@ -10,5 +10,11 @@
     "name": "도봉산",
     "elevation": 740,
     "courses": 3
+  },
+  {
+    "id": "gwanaksan",
+    "name": "관악산",
+    "elevation": 632,
+    "courses": 2
   }
 ]
