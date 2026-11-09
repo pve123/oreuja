@@ -242,8 +242,9 @@ kbd {
   font-weight: 400;
   color: var(--muted);
 }
-/* 터치 화면에는 키보드가 없고, 좁은 화면은 위쪽 자리가 모자라다 */
-@media (hover: none), (max-width: 760px) {
+/* 터치 화면에는 키보드가 없고, 좁은 화면은 위쪽 자리가 모자라다.
+   터치 기기는 hover 만 보지 않고 포인터 굵기도 본다. 삼성 인터넷은 폰에서도 hover: hover 를 알려 src/lib/device.ts 의 IS_TOUCH 와 어긋난다 */
+@media (hover: none), (pointer: coarse), (pointer: none), (max-width: 760px) {
   .help-panel {
     display: none;
   }
@@ -1304,8 +1305,8 @@ kbd {
   height: 52px;
 }
 /* 좁은 화면: 캐릭터·도움말을 위에, 코스 패널을 그 아래 쌓는다. 오른쪽 위 모서리는 소리 버튼 자리 */
-/* 터치 기기 공통(폰 가로·태블릿): 혼자 오르는 동안 닉네임·감정 표현 패널은 조이스틱 자리와 겹쳐 감춘다 (같이하기를 열 때 다시 둔다) */
-@media (hover: none) {
+/* 터치 기기 공통: 혼자 오르는 동안 닉네임·감정 표현 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다 (감정 표현은 💬 버튼으로 보낸다) */
+@media (hover: none), (pointer: coarse), (pointer: none) {
   .together {
     display: none;
   }
@@ -1801,7 +1802,7 @@ kbd {
   border: 1px solid rgba(42, 22, 8, 0.3);
   opacity: 0.7;
 }
-@media (hover: none) {
+@media (hover: none), (pointer: coarse), (pointer: none) {
   .lobby-key {
     display: none;
   }
