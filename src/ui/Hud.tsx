@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { estimateMinutes, formatMinutes, type Trail } from '../lib/data'
-import { input, useGame } from '../lib/store'
+import { input, releaseInput, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
 import { TouchControls, TouchGuide } from './TouchControls'
+import { AvatarChips } from './AvatarChips'
 import { EmoteDial } from './EmoteDial'
 import { useWakeLock } from '../lib/wakeLock'
 import { IS_IOS, IS_TOUCH } from '../lib/device'
+import { readStored, writeStored } from '../lib/storage'
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
@@ -40,22 +42,13 @@ function useKeyboard() {
       set(e, true)
     }
     const up = (e: KeyboardEvent) => set(e, false)
-    const blur = () =>
-      Object.assign(input, {
-        forward: false,
-        backward: false,
-        left: false,
-        right: false,
-        run: false,
-        jump: false,
-      })
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
-    window.addEventListener('blur', blur)
+    window.addEventListener('blur', releaseInput)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
-      window.removeEventListener('blur', blur)
+      window.removeEventListener('blur', releaseInput)
     }
   }, [])
 }
@@ -189,21 +182,12 @@ const OPEN_BY_DEFAULT = !IS_TOUCH
 /** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 foldedByDefault 를 따른다 */
 function useFolded(name: string, foldedByDefault = true): [boolean, () => void] {
   const [folded, setFolded] = useState(() => {
-    try {
-      const saved = localStorage.getItem(FOLD_KEY + name)
-      if (saved !== null) return saved === '1'
-    } catch {
-      // 저장소를 못 쓰는 환경이면 기본값
-    }
-    return foldedByDefault
+    const saved = readStored(FOLD_KEY + name)
+    return saved === null ? foldedByDefault : saved === '1'
   })
   const toggle = () =>
     setFolded((f) => {
-      try {
-        localStorage.setItem(FOLD_KEY + name, f ? '0' : '1')
-      } catch {
-        // 저장소를 못 쓰는 환경이면 기억하지 않는다
-      }
+      writeStored(FOLD_KEY + name, f ? '0' : '1')
       return !f
     })
   return [folded, toggle]
@@ -259,7 +243,6 @@ function SidePanel({
 /** 캐릭터 고르기. 모습 그림을 누르면 바로 바뀐다 (그림을 만들기 전에는 이름) */
 function AvatarPanel() {
   const avatar = useGame((s) => s.avatar)
-  const setAvatar = useGame((s) => s.setAvatar)
   const thumbs = useAvatarThumbs((s) => s.thumbs)
   const current = AVATARS.find((a) => a.kind === avatar)
 
@@ -276,21 +259,7 @@ function AvatarPanel() {
         </>
       }
     >
-      <div className="avatar-bar" role="radiogroup" aria-label="캐릭터 고르기">
-        {AVATARS.map((a) => (
-          <button
-            key={a.kind}
-            role="radio"
-            aria-checked={a.kind === avatar}
-            className={a.kind === avatar ? 'avatar-chip selected' : 'avatar-chip'}
-            title={`${a.name} · ${a.desc}`}
-            aria-label={a.name}
-            onClick={() => setAvatar(a.kind)}
-          >
-            {thumbs[a.kind] ? <img src={thumbs[a.kind]} alt="" className="avatar-thumb" /> : a.name}
-          </button>
-        ))}
-      </div>
+      <AvatarChips />
     </SidePanel>
   )
 }

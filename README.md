@@ -34,7 +34,7 @@ npm run dev      # http://localhost:5173
 
 ## 같이하기 (선택)
 
-같이하기 서버를 켜면 같은 코스를 오르는 다른 사람의 아바타와 닉네임이 보인다. 개발 서버에서 같이하기 서버가 꺼져 있으면 혼자 오르기로 동작하고 5초마다 다시 붙어 본다. 배포본은 `VITE_MULTIPLAYER_URL` 이 비어 있으면 아예 붙어 보지 않는다. 혼자/같이 고르기 버튼은 같이하기를 열 때 다시 넣기로 하고 지금은 베이스캠프에서 뺐다. 「혼자」를 고르면 다른 사람이 보이지 않고 나도 남에게 보이지 않는 동작(서버에는 `hidden` 으로 알린다)은 `useNet` 의 `together` 에 남아 있다. 베이스캠프에 있는 사람(`lobby`)도 산길에는 그리지 않는다.
+같이하기 서버를 켜면 같은 코스를 오르는 다른 사람의 아바타와 닉네임이 보인다. 개발 서버에서 같이하기 서버가 꺼져 있으면 혼자 오르기로 동작하고 5초마다 다시 붙어 본다. 배포본은 `VITE_MULTIPLAYER_URL` 이 비어 있으면 아예 붙어 보지 않는다. 혼자/같이 고르기는 같이하기를 열 때 다시 만든다. 서버는 지금도 `hidden` 으로 알린 사람을 남의 화면에 그리지 않으니, 「혼자」를 고르면 `hidden` 을 보내게 하면 된다. 베이스캠프에 있는 사람(`lobby`)도 산길에는 그리지 않는다.
 
 ```bash
 npm run server   # 같이하기 서버 (ws://localhost:5200)
@@ -126,7 +126,8 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/lib/summit.ts`, `src/scene/SummitFlag.tsx` | 정상에서 가장 트인 풍경 방향을 찾아 기념사진 구도를 정하고, 그쪽에 깃발을 세운다 |
 | `src/lib/photo.ts` | 화면을 복사하고 기념 문구 띠와 서비스 이름을 얹어 기념사진을 만든다 |
 | `server/index.mjs` | 같이하기 서버. 접속한 사람들 상태를 1초에 10번 모두에게 나눠 준다 (`npm run server`) |
-| `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현, 혼자/같이 |
+| `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현 |
+| `src/lib/storage.ts` | 브라우저 저장소 읽기·쓰기. 저장소를 못 쓰는 환경에서도 오류 없이 넘어간다 |
 | `src/ui/TogetherPanel.tsx` | 왼쪽 아래 같이하기 패널. 접속 상태, 같은 코스 인원, 닉네임, 감정 표현 버튼 |
 | `src/scene/Peers.tsx` | 같은 코스 다른 사람의 아바타와 이름표를 그린다 |
 | `src/ui/MiniMap.tsx` | 오른쪽 아래 미니맵. 위성사진 위에 코스와 지금 위치를 그린다. 화면이 좁으면 숨긴다 |
@@ -136,6 +137,7 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/scene/TrekkingPole.ts` | 모든 아바타가 양손에 쥐는 등산 스틱. GLB 캐릭터는 걸을 때 두 손이 번갈아 땅을 짚고(짚은 동안 끝이 땅에 고정된다), 쉬거나 만세·점프할 때는 손에 들고 따라 움직인다 |
 | `scripts/prepare-avatars.mjs` | GLB 캐릭터 파일을 `public/models/avatars/` 에 준비한다. 아래 「GLB 캐릭터」 참고 |
 | `src/ui/Hud.tsx` | 코스 정보, 진행률, 정상 배지와 사진 창을 그린다 |
+| `src/ui/AvatarChips.tsx` | 캐릭터 고르기 버튼 줄. 베이스캠프와 걷는 화면 캐릭터 패널이 같이 쓴다 |
 | `src/ui/Lobby.tsx` | 베이스캠프. 걷는 동안에는 숨고 `Esc` 로 연다. 다른 산 탭을 누르면 그 산의 `courses.json` 만 받아 카드를 보여 준다. 열려 있는 동안 카메라는 캐릭터 앞쪽 비스듬히 낮게 돌아가 천천히 흔들리고(`src/scene/World.tsx` 의 `LOBBY_*`), 창에 가리지 않게 화면을 옮긴다 |
 
 ## 지형과 등산로 데이터

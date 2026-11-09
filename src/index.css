@@ -1515,7 +1515,7 @@ kbd {
 .lobby-actions > *,
 .lobby-avatars,
 .lobby-sky,
-.lobby-together {
+.lobby-control {
   min-width: 0;
 }
 .lobby-head h2 {
@@ -1545,18 +1545,22 @@ kbd {
   display: grid;
   gap: 8px;
 }
-.course-card {
-  width: 100%;
+/* 베이스캠프의 고르는 타일(코스 카드, 고르기 버튼)이 같이 쓰는 기본 모양 */
+.course-card,
+.segmented button {
   display: grid;
-  gap: 5px;
   text-align: left;
   font: inherit;
-  padding: 11px 12px 10px;
   border-radius: 12px;
   border: 1.5px solid rgba(255, 255, 255, 0.14);
   background: rgba(255, 255, 255, 0.04);
   color: var(--text);
   cursor: pointer;
+}
+.course-card {
+  width: 100%;
+  gap: 5px;
+  padding: 11px 12px 10px;
   transition:
     border-color 0.15s,
     background 0.15s,
@@ -1629,16 +1633,8 @@ kbd {
   gap: 6px;
 }
 .segmented button {
-  display: grid;
   gap: 1px;
-  text-align: left;
-  font: inherit;
   padding: 9px 12px;
-  border-radius: 12px;
-  border: 1.5px solid rgba(255, 255, 255, 0.14);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  cursor: pointer;
 }
 .segmented button:hover {
   border-color: rgba(255, 255, 255, 0.38);
@@ -1671,12 +1667,8 @@ kbd {
 }
 .lobby-avatars,
 .lobby-sky,
-.lobby-together {
-  padding: 10px 12px;
-}
 .lobby-control {
   padding: 10px 12px;
-  min-width: 0;
 }
 /* 조작 방식 두 가지. 어르신도 읽기 쉽게 글자를 조금 크게 */
 .control-segmented .segmented-title {
@@ -1847,7 +1839,7 @@ kbd {
   }
   .lobby-avatars,
   .lobby-sky,
-  .lobby-together {
+  .lobby-control {
     padding: 0;
     background: none;
     border: 0;
