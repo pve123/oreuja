@@ -16,5 +16,11 @@
     "name": "관악산",
     "elevation": 632,
     "courses": 2
+  },
+  {
+    "id": "suraksan",
+    "name": "수락산",
+    "elevation": 638,
+    "courses": 3
   }
 ]
