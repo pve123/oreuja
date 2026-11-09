@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { readStored, writeStored } from './storage'
 import type { AvatarKind } from './avatars'
 import type { Mode } from './store'
 
@@ -60,15 +61,11 @@ function randomName() {
 }
 
 function loadName() {
-  try {
-    const saved = localStorage.getItem(NAME_KEY)
-    if (saved) return saved
-    const name = randomName()
-    localStorage.setItem(NAME_KEY, name)
-    return name
-  } catch {
-    return randomName()
-  }
+  const saved = readStored(NAME_KEY)
+  if (saved) return saved
+  const name = randomName()
+  writeStored(NAME_KEY, name)
+  return name
 }
 
 /** 화면에 보일 만큼만 바뀌는 값(React 가 다시 그린다). 위치는 useFrame 에서 peers 를 직접 읽는다 */
@@ -91,11 +88,7 @@ export const useNet = create<{
     // oxlint-disable-next-line no-control-regex
     const clean = name.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 12)
     if (!clean) return
-    try {
-      localStorage.setItem(NAME_KEY, clean)
-    } catch {
-      // 저장소를 못 쓰는 환경이면 이번 접속에만 쓴다
-    }
+    writeStored(NAME_KEY, clean)
     set({ name: clean })
   },
 }))

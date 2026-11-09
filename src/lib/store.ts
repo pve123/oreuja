@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { loadAvatar, saveAvatar, type AvatarKind } from './avatars'
 import { IS_TOUCH } from './device'
+import { readStored, removeStored, writeStored } from './storage'
 
 /** lobby 는 출발 전 베이스캠프(산·코스·혼자/같이·캐릭터를 고르는 화면). 걷는 중에도 Esc 로 다시 연다 */
 export type Mode = 'lobby' | 'hiking' | 'summit' | 'photo' | 'photoResult'
@@ -69,41 +70,19 @@ const COURSE_KEY = 'hiking-metaverse:course'
 const CONTROL_KEY = 'hiking-metaverse:control'
 
 function loadControl(): ControlMode {
-  try {
-    const saved = localStorage.getItem(CONTROL_KEY)
-    if (saved === 'easy' || saved === 'free') return saved
-  } catch {
-    // 저장소를 못 쓰면 기기에 맞는 기본값
-  }
-  return IS_TOUCH ? 'easy' : 'free'
+  const saved = readStored(CONTROL_KEY)
+  return saved === 'easy' || saved === 'free' ? saved : IS_TOUCH ? 'easy' : 'free'
 }
 
-function loadCourse(): string | null {
-  try {
-    return localStorage.getItem(COURSE_KEY)
-  } catch {
-    return null
-  }
-}
 export function saveCourse(id: string) {
-  try {
-    localStorage.setItem(COURSE_KEY, id)
-  } catch {
-    // 저장소를 못 쓰는 환경이면 무시
-  }
+  writeStored(COURSE_KEY, id)
 }
-
-const AUTOSTART_KEY = AUTOSTART_STORAGE_KEY
 
 /** 다른 산을 골라 새로 불러온 직후면 베이스캠프를 건너뛰고 바로 출발한다 (src/lib/mountains.ts switchMountain) */
 function initialMode(): Mode {
-  try {
-    if (sessionStorage.getItem(AUTOSTART_KEY)) {
-      sessionStorage.removeItem(AUTOSTART_KEY)
-      return 'hiking'
-    }
-  } catch {
-    // 저장소를 못 쓰면 늘 베이스캠프에서 시작
+  if (readStored(AUTOSTART_STORAGE_KEY, 'session')) {
+    removeStored(AUTOSTART_STORAGE_KEY, 'session')
+    return 'hiking'
   }
   return 'lobby'
 }
@@ -125,16 +104,9 @@ const freshClimb = {
 // 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
 function loadRecords(): ClimbRecord[] {
   try {
-    return JSON.parse(localStorage.getItem(RECORDS_KEY) ?? '[]')
+    return JSON.parse(readStored(RECORDS_KEY) ?? '[]')
   } catch {
-    return []
-  }
-}
-function saveRecords(records: ClimbRecord[]) {
-  try {
-    localStorage.setItem(RECORDS_KEY, JSON.stringify(records))
-  } catch {
-    // 저장소를 못 쓰는 환경이면 무시
+    return [] // 값이 깨졌으면 비운다
   }
 }
 
@@ -143,7 +115,7 @@ export const useGame = create<State>((set, get) => ({
   mode: initialMode(),
   // 첫 화면을 걷어 낼 신호. 한 번 켜지면 다시 끄지 않는다 (다시 오르기·코스 바꾸기에는 첫 화면이 없다)
   sceneReady: false,
-  courseId: loadCourse(),
+  courseId: readStored(COURSE_KEY),
   setCourse: (courseId) => {
     saveCourse(courseId)
     set({ ...freshClimb, courseId })
@@ -161,7 +133,7 @@ export const useGame = create<State>((set, get) => ({
   reachCheckpoint: (index) => set({ reachedCheckpoint: index, arrival: { index, at: Date.now() } }),
   reachSummit: (record) => {
     const records = [...get().records, record]
-    saveRecords(records)
+    writeStored(RECORDS_KEY, JSON.stringify(records))
     set({ mode: 'summit', finishedAt: Date.now(), records, autoWalk: false })
   },
   takePhoto: () => set({ mode: 'photo' }),
@@ -173,11 +145,7 @@ export const useGame = create<State>((set, get) => ({
   resume: () => set({ mode: 'hiking' }),
   controlMode: loadControl(),
   setControlMode: (controlMode) => {
-    try {
-      localStorage.setItem(CONTROL_KEY, controlMode)
-    } catch {
-      // 저장소를 못 쓰면 기억하지 않는다
-    }
+    writeStored(CONTROL_KEY, controlMode)
     set({ controlMode, autoWalk: false })
   },
   setAutoWalk: (autoWalk) => set({ autoWalk }),

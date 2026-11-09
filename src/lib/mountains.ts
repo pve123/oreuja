@@ -1,4 +1,5 @@
 import type { TrailData } from './data'
+import { readStored, writeStored } from './storage'
 import { AUTOSTART_STORAGE_KEY, saveCourse } from './store'
 
 /**
@@ -22,10 +23,10 @@ export const DEFAULT_MOUNTAIN: Mountain = { id: 'bukhansan', name: '북한산', 
 /** 기억해 둔 산. 없거나 읽지 못하면 북한산 */
 export function loadMountain(): Mountain {
   try {
-    const saved = JSON.parse(localStorage.getItem(MOUNTAIN_KEY) ?? 'null')
+    const saved = JSON.parse(readStored(MOUNTAIN_KEY) ?? 'null')
     if (saved && /^[a-z0-9-]+$/.test(saved.id) && typeof saved.name === 'string' && saved.elevation > 0) return saved
   } catch {
-    // 저장소를 못 쓰거나 값이 깨졌으면 기본값
+    // 값이 깨졌으면 기본값
   }
   return DEFAULT_MOUNTAIN
 }
@@ -35,15 +36,11 @@ export function loadMountain(): Mountain {
  * courseId 를 주면 그 코스를 고른 채로, 베이스캠프를 건너뛰고 바로 출발한다.
  */
 export function switchMountain(m: Mountain, courseId?: string) {
-  try {
-    localStorage.setItem(MOUNTAIN_KEY, JSON.stringify(m))
-    if (courseId) {
-      saveCourse(courseId)
-      sessionStorage.setItem(AUTOSTART_STORAGE_KEY, '1')
-    }
-  } catch {
-    // 저장소를 못 쓰는 환경이면 바꿀 수 없다 (새로 불러도 기본 산이 뜬다)
-    return
+  // 저장소를 못 쓰는 환경이면 바꿀 수 없다 (새로 불러도 기본 산이 뜬다)
+  if (!writeStored(MOUNTAIN_KEY, JSON.stringify(m))) return
+  if (courseId) {
+    saveCourse(courseId)
+    writeStored(AUTOSTART_STORAGE_KEY, '1', 'session')
   }
   location.reload()
 }
