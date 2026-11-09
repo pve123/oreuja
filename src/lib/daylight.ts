@@ -107,7 +107,7 @@ export function parseDebugTime(value: string | null): Date | null {
 }
 
 /** KST 시각의 해 높이와 방위(°). NOAA 근사식 */
-export function solarPosition(kst: Date) {
+function solarPosition(kst: Date) {
   const rad = THREE.MathUtils.degToRad
   const start = Date.UTC(kst.getUTCFullYear(), 0, 1)
   const dayOfYear = Math.floor((kst.getTime() - start) / 86400000) + 1
@@ -126,7 +126,7 @@ export function solarPosition(kst: Date) {
 }
 
 /** 해 높이와 시각(오전·오후)으로 시간대 이름을 정한다 */
-export function phaseOf(elevation: number, morning: boolean): Phase {
+function phaseOf(elevation: number, morning: boolean): Phase {
   if (elevation < -8) return '밤'
   if (elevation < 10) return morning ? (elevation < 0 ? '새벽' : '아침') : '저녁'
   return '낮'
@@ -152,7 +152,7 @@ const HIGH_SUN = new THREE.Color('#fff1dc')
 export const MOON_COLOR = new THREE.Color('#8fa3d9')
 
 /** 해 높이(°)와 방위(°)로 조명·하늘·안개 목표값을 채운다 */
-export function applyDaylight(elevation: number, azimuth: number, morning: boolean) {
+function applyDaylight(elevation: number, azimuth: number, morning: boolean) {
   const d = target
   d.elevation = elevation
   d.azimuth = azimuth
@@ -191,7 +191,7 @@ export function applyDaylight(elevation: number, azimuth: number, morning: boole
 }
 
 /** 시각으로 바로 채운다 */
-export function applyTime(kst: Date) {
+function applyTime(kst: Date) {
   const { elevation, azimuth } = solarPosition(kst)
   applyDaylight(elevation, azimuth, kst.getUTCHours() < 12)
 }

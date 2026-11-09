@@ -1507,7 +1507,7 @@ kbd {
 .lobby-actions > *,
 .lobby-avatars,
 .lobby-sky,
-.lobby-together {
+.lobby-control {
   min-width: 0;
 }
 .lobby-head h2 {
@@ -1663,12 +1663,8 @@ kbd {
 }
 .lobby-avatars,
 .lobby-sky,
-.lobby-together {
-  padding: 10px 12px;
-}
 .lobby-control {
   padding: 10px 12px;
-  min-width: 0;
 }
 /* 조작 방식 두 가지. 어르신도 읽기 쉽게 글자를 조금 크게 */
 .control-segmented .segmented-title {
@@ -1839,7 +1835,7 @@ kbd {
   }
   .lobby-avatars,
   .lobby-sky,
-  .lobby-together {
+  .lobby-control {
     padding: 0;
     background: none;
     border: 0;
