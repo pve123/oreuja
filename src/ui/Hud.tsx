@@ -66,6 +66,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   const [courseFolded, toggleCourse] = useFolded('course', !OPEN_BY_DEFAULT)
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
+  const controlMode = useGame((s) => s.controlMode)
   const sections = useMemo(() => trail.sections(), [trail])
   const progress = distance / trail.length
   const elevation = Math.round(trail.positionAt(distance).y)
@@ -171,7 +172,8 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
       {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
-      <TouchControls />
+      {/* 쉬운 조작은 조이스틱 대신 큰 「걷기」 버튼 하나로 등산로를 따라 걷는다 */}
+      {controlMode === 'free' ? <TouchControls /> : <WalkButton />}
       <TouchGuide />
       <EmoteDial />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
@@ -386,6 +388,23 @@ function ArrivalTitle({ trail }: { trail: Trail }) {
         정상까지 {formatDistance(left.length)} · 실제로는 약 {formatMinutes(estimateMinutes(left.length, left.gain))}
       </div>
     </div>
+  )
+}
+
+/**
+ * 쉬운 조작의 「걷기」 버튼. 한 번 누르면 등산로를 따라 저절로 걷고, 다시 누르면 멈춘다 (src/scene/World.tsx).
+ * 어르신·아이도 누를 수 있게 크게 두고 지금 상태를 글자로 보여 준다
+ */
+function WalkButton() {
+  const autoWalk = useGame((s) => s.autoWalk)
+  const setAutoWalk = useGame((s) => s.setAutoWalk)
+  return (
+    <button className={autoWalk ? 'walk-button on' : 'walk-button'} aria-pressed={autoWalk} onClick={() => setAutoWalk(!autoWalk)}>
+      <svg className="walk-icon" viewBox="0 0 24 24" aria-hidden>
+        {autoWalk ? <path d="M7 5h3.5v14H7zM13.5 5H17v14h-3.5z" fill="currentColor" /> : <path d="M8 4.5v15l12-7.5z" fill="currentColor" />}
+      </svg>
+      <span>{autoWalk ? '멈추기' : '걷기'}</span>
+    </button>
   )
 }
 

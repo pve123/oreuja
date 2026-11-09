@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { estimateMinutes, formatMinutes, type Trail, type TrailData } from '../lib/data'
-import { useGame } from '../lib/store'
+import { useGame, type ControlMode } from '../lib/store'
 import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
 import { isClimbing, useNet } from '../lib/net'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
@@ -166,6 +166,7 @@ function LobbyPanel({
       {/* 게임 로비처럼 모드와 캐릭터를 출발 버튼 곁에 둔다 (좁은 창에서도 스크롤 없이 보인다) */}
       <div className="lobby-actions">
         <AvatarStrip />
+        <ControlSwitch />
         <SkySwitch />
         <div className="lobby-buttons">
           {midway && (
@@ -281,6 +282,33 @@ function SkySwitch() {
           <button key={p.kind} role="radio" aria-checked={preset === p.kind} className={preset === p.kind ? 'selected' : ''} onClick={() => setPreset(p.kind)}>
             <span className={`sky-swatch ${p.kind === 'now' ? PHASE_SWATCH[phase] : p.kind}`} aria-hidden />
             <span className="segmented-title">{p.label}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/** 조작 방식 [값, 이름, 설명] */
+const CONTROL_MODES: [ControlMode, string, string][] = [
+  ['easy', '쉬운 조작', '버튼 하나로 길 따라 걸어요'],
+  ['free', '자유 조작', '길 밖까지 마음대로 걸어요'],
+]
+
+/** 조작 방식 고르기. 쉬운 조작은 큰 「걷기」 버튼 하나로 등산로를 따라 저절로 걷는다 */
+function ControlSwitch() {
+  const controlMode = useGame((s) => s.controlMode)
+  const setControlMode = useGame((s) => s.setControlMode)
+  return (
+    <div className="panel lobby-control">
+      <div className="lobby-label">
+        조작 <b>{CONTROL_MODES.find(([m]) => m === controlMode)?.[1]}</b>
+      </div>
+      <div className="segmented control-segmented" role="radiogroup" aria-label="조작 방식 고르기">
+        {CONTROL_MODES.map(([mode, title, desc]) => (
+          <button key={mode} role="radio" aria-checked={controlMode === mode} className={controlMode === mode ? 'selected' : ''} onClick={() => setControlMode(mode)}>
+            <span className="segmented-title">{title}</span>
+            <span className="segmented-sub">{desc}</span>
           </button>
         ))}
       </div>

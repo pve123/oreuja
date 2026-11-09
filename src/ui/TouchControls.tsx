@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { input } from '../lib/store'
+import { input, useGame } from '../lib/store'
 import { IS_TOUCH } from '../lib/device'
 
 /** 손잡이가 움직이는 반지름(px). 이만큼 밀면 기울기 1. 작으면 엄지를 조금만 움직여도 뛰어 버려 민감하다 */
@@ -101,6 +101,8 @@ function guideSeen() {
  */
 export function TouchGuide() {
   const [show, setShow] = useState(() => IS_TOUCH && !guideSeen())
+  // 쉬운 조작은 조이스틱 자리에 「걷기」 버튼이 있어 누르는 모습으로 안내한다
+  const easy = useGame((s) => s.controlMode === 'easy')
 
   useEffect(() => {
     if (!show) return
@@ -128,8 +130,8 @@ export function TouchGuide() {
   return (
     <div className="touch-guide" role="note" aria-label="조작 안내">
       <div className="guide-item guide-stick">
-        <span className="guide-finger guide-finger-stick" aria-hidden />
-        <p>엄지를 대고 밀면 걸어요</p>
+        <span className={easy ? 'guide-finger guide-finger-tap' : 'guide-finger guide-finger-stick'} aria-hidden />
+        <p>{easy ? '누르면 길 따라 걸어요' : '엄지를 대고 밀면 걸어요'}</p>
       </div>
       <div className="guide-item guide-look">
         <span className="guide-finger guide-finger-look" aria-hidden />

@@ -650,6 +650,70 @@ kbd {
   }
 }
 
+/* 쉬운 조작의 「걷기」 버튼. 폰은 조이스틱 자리(왼쪽 아래)에, 컴퓨터는 미니맵 위에 크게 둔다 */
+.walk-button {
+  position: fixed;
+  left: calc(100px - 48px + var(--sal));
+  bottom: calc(136px - 48px + var(--sab));
+  z-index: 20;
+  width: 96px;
+  height: 96px;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 2px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  background: #2fa84f;
+  color: #fff;
+  font: inherit;
+  font-size: 19px;
+  font-weight: 800;
+  box-shadow:
+    0 10px 26px rgba(47, 168, 79, 0.45),
+    inset 0 0 0 1.5px rgba(255, 255, 255, 0.2);
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  cursor: pointer;
+  transition:
+    transform 0.1s ease,
+    background 0.15s ease;
+}
+.walk-button:active {
+  transform: scale(0.93);
+}
+/* 걷는 중에는 멈추기 버튼: 밝은 크림색으로 바꿔 지금 걷고 있다는 걸 알린다. 주황 점프 버튼과 헷갈리지 않게 색을 나눈다 */
+.walk-button.on {
+  background: #fdf6ec;
+  color: #1c2c47;
+  border-color: rgba(28, 44, 71, 0.15);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.3);
+}
+.walk-icon {
+  width: 30px;
+  height: 30px;
+}
+@media (hover: hover) and (pointer: fine) {
+  .walk-button {
+    left: auto;
+    right: calc(16px + (168px - 96px) / 2 + var(--sar));
+    bottom: calc(24px + 168px + 16px + var(--sab));
+  }
+}
+.guide-finger-tap {
+  animation: guide-tap 1.2s ease-in-out infinite;
+}
+@keyframes guide-tap {
+  0%,
+  100% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(0.82);
+  }
+}
+
 /* 처음 걸을 때 한 번 보여 주는 조작 안내. 터치를 막지 않는다 */
 .touch-guide {
   position: fixed;
@@ -1591,6 +1655,17 @@ kbd {
 .lobby-sky,
 .lobby-together {
   padding: 10px 12px;
+}
+.lobby-control {
+  padding: 10px 12px;
+  min-width: 0;
+}
+/* 조작 방식 두 가지. 어르신도 읽기 쉽게 글자를 조금 크게 */
+.control-segmented .segmented-title {
+  font-size: 15px;
+}
+.control-segmented .segmented-sub {
+  font-size: 12px;
 }
 /* 하늘 다섯 가지는 한 줄에. 타일마다 그 하늘의 미니 그라데이션을 보여 준다 */
 .sky-segmented {
