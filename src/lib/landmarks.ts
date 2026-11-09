@@ -12,9 +12,28 @@ import type { Obstacle } from './obstacles'
  * - ruins: 문터(수문터). 무너진 성벽 터
  * - waterfall: 폭포(개연폭포). 비스듬한 너럭바위를 타고 미끄러져 내리는 물줄기와 얕은 물웅덩이
  * - sign: 그 밖의 이름. 나무 표지판
+ * - boulder: 이름 붙은 바위(코끼리바위, 하마바위, 철모바위, 치마바위). 둥근 화강암 덩어리를 이름에 맞게 짜 맞춘다
+ * - peak: 봉우리(도솔봉, 관음사 국기봉). 둥근 바위 무더기와 검은 정상석
+ * - slab: 마당바위. 등산로를 따라 넓은 화강암 너럭바위를 지형 위에 깔고 표지판을 세운다
+ * - ropes: 기차바위. 등산로를 따라 가파른 맨바위를 깔고, 바위 틈과 양쪽 밧줄을 놓는다
+ * - pavilion: 정자(매월정). 육각 정자에 붉은 기둥, 초록 단청, 기와지붕
  * - trailhead: 출발점(탐방지원센터). 등산로를 가로지르는 나무 입구 문과 등산 안내도. 이정표가 아니라 코스마다 하나 세운다
  */
-export type LandmarkKind = 'cairn' | 'pass' | 'temple' | 'hut' | 'gate' | 'ruins' | 'waterfall' | 'sign' | 'trailhead'
+export type LandmarkKind =
+  | 'cairn'
+  | 'pass'
+  | 'temple'
+  | 'hut'
+  | 'gate'
+  | 'ruins'
+  | 'waterfall'
+  | 'boulder'
+  | 'peak'
+  | 'slab'
+  | 'ropes'
+  | 'pavilion'
+  | 'sign'
+  | 'trailhead'
 
 /** 출발점 입구 문을 세울 거리(m). 처음 화면에서 캐릭터 앞에 보이게 */
 const TRAILHEAD_AT = 10
@@ -28,6 +47,11 @@ export const LANDMARK_ICON: Record<LandmarkKind, string> = {
   gate: '🏯',
   ruins: '🧱',
   waterfall: '💧',
+  boulder: '🪨',
+  peak: '⛰️',
+  slab: '🪨',
+  ropes: '🧗',
+  pavilion: '⛩️',
   sign: '🪧',
   trailhead: '🥾',
 }
@@ -41,6 +65,11 @@ export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('깔딱')) return 'pass'
   if (name.endsWith('재') || name.includes('고개')) return 'cairn'
   if (name.endsWith('암') || name.endsWith('사')) return 'temple'
+  if (name.includes('마당바위')) return 'slab'
+  if (name.includes('기차바위')) return 'ropes'
+  if (name.endsWith('바위')) return 'boulder'
+  if (name.endsWith('봉')) return 'peak'
+  if (name.endsWith('정')) return 'pavilion'
   return 'sign'
 }
 
@@ -96,6 +125,22 @@ const SPECS: Record<LandmarkKind, Spec> = {
     // 비스듬한 너럭바위와 둘레 바위(src/scene/Landmarks.tsx 의 FALL_ROCKS), 물웅덩이
     colliders: [...grid([-2.8, -0.9, 0.9, 2.8], [-2.6, -5], 1.3, 5), { x: 0, z: 0.6, r: 2.2, height: 1 }],
   },
+  boulder: { side: 7.5, clear: 7, label: 5.4, footprint: [4, 3], colliders: [{ x: 0, z: 0, r: 2.6, height: 4 }] },
+  peak: {
+    side: 6,
+    clear: 6,
+    label: 4.4,
+    footprint: [4, 3],
+    colliders: [
+      { x: -1.5, z: -0.6, r: 1.7, height: 3.2 },
+      { x: 1.7, z: -0.4, r: 1.5, height: 3 },
+      { x: 0.2, z: 1.3, r: 0.3, height: 1.2 },
+    ],
+  },
+  // 등산로를 따라 지형 위에 까는 바위라 길을 막지 않는다. 충돌 원이 없고 자리도 옮기지 않는다
+  slab: { side: 0, clear: 9, label: 2.8, footprint: [0.3, 0.3], colliders: [] },
+  ropes: { side: 0, clear: 9, label: 3, footprint: [0.3, 0.3], colliders: [] },
+  pavilion: { side: 7, clear: 6.5, label: 6.4, footprint: [4.6, 4.6], colliders: [{ x: 0, z: 0, r: 2.5, height: 4.5 }] },
   sign: { side: 2.5, clear: 1.5, label: 2.7, footprint: [0.3, 0.3], colliders: [{ x: 0, z: 0, r: 0.2, height: 2.2 }] },
   trailhead: {
     side: 0,
@@ -142,9 +187,10 @@ export function landmarks(terrain: Terrain, trail: Trail): Landmark[] {
     if (spec.side === 0) {
       // 길 위에 걸쳐 선다. 기준 좌표 +z 가 진행 방향. 등산로가 꺾이는 곳이면 길이 벽에 덜 걸리는 방향으로 돌린다.
       // 이정표가 갈지자 길의 꺾이는 곳에 있으면 어느 쪽으로 돌려도 벽이 길에 걸리므로(북한산 위문),
-      // 앞뒤 SHIFT_RANGE 안에서 길이 문 사이로 곧게 지나는 가장 가까운 자리로 옮긴다. 출발점 입구는 처음 화면에 보이게 그대로 둔다
+      // 앞뒤 SHIFT_RANGE 안에서 길이 문 사이로 곧게 지나는 가장 가까운 자리로 옮긴다. 출발점 입구는 처음 화면에 보이게,
+      // 충돌 원이 없는 것(지형 위에 까는 마당바위·기차바위)은 이정표 자리 그대로 둔다
       let best = { hits: Infinity, at: cp.distance, rotation: heading }
-      const range = kind === 'trailhead' ? 0 : SHIFT_RANGE
+      const range = kind === 'trailhead' || spec.colliders.length === 0 ? 0 : SHIFT_RANGE
       for (let k = 0; k <= range / SHIFT_STEP && best.hits > 0; k++) {
         for (const sign of k === 0 ? [1] : [1, -1]) {
           const at = THREE.MathUtils.clamp(cp.distance + sign * k * SHIFT_STEP, 0, trail.length)

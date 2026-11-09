@@ -7,6 +7,7 @@ import { LANDMARK_ICON, landmarks, type Landmark } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
 import { seededRandom } from '../lib/random'
 import { useGame } from '../lib/store'
+import { Boulder, Pavilion, Peak, TrailSlab } from './NamedRocks'
 
 const LABEL_RANGE = 300 // 이 거리 안의 랜드마크만 이름을 띄운다(m)
 
@@ -27,6 +28,12 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
 
   return (
     <group>
+      {/* 마당바위·기차바위는 등산로를 따라 지형 위에 까는 바위라 세계 좌표로 그린다 */}
+      {list
+        .filter((l) => l.kind === 'slab' || l.kind === 'ropes')
+        .map((l) => (
+          <TrailSlab key={`${l.name}-slab`} terrain={terrain} trail={trail} at={l.distance} name={l.name} ropes={l.kind === 'ropes'} />
+        ))}
       {list.map((l) => (
         <group key={l.name} position={l.position} rotation={[0, l.rotation, 0]}>
           <LandmarkBody landmark={l} trail={trail} />
@@ -69,6 +76,15 @@ function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail })
       return <Ruins seed={landmark.distance} />
     case 'waterfall':
       return <Waterfall />
+    case 'boulder':
+      return <Boulder name={landmark.name} seed={landmark.distance} />
+    case 'peak':
+      return <Peak name={landmark.name} seed={landmark.distance} />
+    case 'pavilion':
+      return <Pavilion />
+    case 'slab':
+    case 'ropes':
+      return null
     case 'trailhead':
       return <Trailhead mountain={trail.data.mountain} park={trail.data.park} />
     default:
