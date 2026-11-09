@@ -1,4 +1,11 @@
-// 같이하기 서버: 접속한 사람의 코스·위치·아바타를 모아 1초에 10번 모두에게 나눠 준다.
+// 같이하기 서버: 접속한 사람의 코스·위치·아바타를 모아 같은 코스를 오르는 사람끼리 나눠 준다.
+//
+// 보내는 데이터를 줄이려고 이렇게 나눠 보낸다 (호스팅 요금은 나가는 데이터에 붙는다)
+//   p  위치: 1초에 5번, 같은 코스를 오르는 사람에게만. 그 코스에서 바뀐 게 없으면 보내지 않는다
+//      { t:'p', c:코스, p:[[id, 거리, 옆, 방향, 점프, 모드 번호], ...] }
+//   i  이름·아바타: 처음 보는 사람이거나 바뀌었을 때만  { t:'i', i:[[id, 이름, 아바타], ...] }
+//   e  감정 표현: 보낸 순간 같은 코스 사람에게 한 번  { t:'e', id, k }
+//   c  코스별 오르는 인원: 1초에 한 번, 바뀌었을 때만. 베이스캠프 사람도 받는다  { t:'c', c:{ 코스: 인원 } }
 // 실행: npm run server   (기본 포트 5200, PORT 환경변수로 바꿀 수 있다)
 // 개발 중에는 Vite 가 /ws 를 이 서버로 넘겨준다(vite.config.ts).
 // 저장하는 것은 없다. 접속이 끊기면 그 사람 정보는 바로 지운다.
@@ -13,16 +20,22 @@ import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 
 const PORT = Number(process.env.PORT) || 5200
-const TICK_MS = 100 // 위치를 나눠 주는 간격
+const TICK_MS = 200 // 위치를 나눠 주는 간격. 받는 쪽이 사이를 부드럽게 채운다
+const COUNT_MS = 1000 // 코스별 인원을 나눠 주는 간격
 const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 15000
 const MAX_PLAYERS = 50
 const MAX_PER_IP = 3 // 같은 IP 에서 동시에 붙을 수 있는 수. 집·학교처럼 한 IP 를 나눠 쓰는 경우를 생각해 1 보다 넉넉히 둔다
 const MAX_MESSAGE = 512 // 한 메시지 최대 크기(바이트). 위치 메시지는 200바이트 안팎이다
 const MAX_MESSAGES_PER_SEC = 30
 const NAME_MAX = 12
+const EMOTE_GAP_MS = 500 // 감정 표현 사이 최소 간격
 const AVATARS = new Set(['hiker', 'uncle', 'potato', 'duck', 'tofu', 'mini-beard', 'mini-girl', 'mini-kid', 'barbarian', 'ranger', 'knight'])
 // lobby 는 베이스캠프(출발 전 고르는 화면), hidden 은 혼자 오르기. 둘 다 다른 사람 화면에 그리지 않는다
-const MODES = new Set(['lobby', 'hidden', 'hiking', 'summit', 'photo', 'photoResult'])
+// 순서가 곧 위치 메시지의 모드 번호다. 클라이언트(src/lib/net.ts)의 MODES 와 같아야 한다
+const MODE_LIST = ['lobby', 'hidden', 'hiking', 'summit', 'photo', 'photoResult']
+const MODES = new Set(MODE_LIST)
+/** 산길 위에 그릴 사람인지 */
+const climbing = (p) => p.mode !== 'lobby' && p.mode !== 'hidden'
 const EMOTES = new Set(['wave', 'thanks', 'yaho', 'cheer', 'summit', 'cheerup', 'fighting'])
 
 const ALLOWED_ORIGINS = new Set(
@@ -65,12 +78,15 @@ function clientIp(req) {
 /** 내 컴퓨터에서 온 접속. 개발 중 창을 여러 개 띄워도 막히지 않게 IP 제한에서 뺀다 */
 const isLoopback = (ip) => ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
 
-/** @type {Map<import('ws').WebSocket, { id: string, name: string, avatar: string, course: string, distance: number, offset: number, facing: number, jump: number, mode: string, emote: { kind: string, at: number } | null, budget: number, ip: string, alive: boolean }>} */
+/** @type {Map<import('ws').WebSocket, { id: string, name: string, avatar: string, course: string, distance: number, offset: number, facing: number, jump: number, mode: string, budget: number, ip: string, alive: boolean, emoteAt: number, info: number, known: Map<string, number>, sentCourse: string, sentPeers: string, sentCounts: string }>} */
 const players = new Map()
 /** IP 마다 붙어 있는 연결 수 */
 const perIp = new Map()
 let nextId = 1
+/** 위치나 오르는 사람이 바뀐 코스. 다음 위치 메시지에서 그 코스 사람에게만 보낸다 */
+const dirty = new Set()
 
+const round = (v, k) => Math.round(v * k) / k
 const num = (v, min, max) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(max, Math.max(min, v)) : null)
 // 제어 문자와 꺾쇠는 빼고 받는다
 // oxlint-disable-next-line no-control-regex
@@ -103,6 +119,7 @@ function drop(ws) {
   const me = players.get(ws)
   if (!me) return
   players.delete(ws)
+  dirty.add(me.course)
   const n = (perIp.get(me.ip) ?? 1) - 1
   if (n > 0) perIp.set(me.ip, n)
   else perIp.delete(me.ip)
@@ -111,7 +128,26 @@ function drop(ws) {
 wss.on('connection', (ws, req) => {
   const ip = clientIp(req)
   perIp.set(ip, (perIp.get(ip) ?? 0) + 1)
-  const me = { id: String(nextId++), name: '등산객', avatar: 'hiker', course: '', distance: 0, offset: 0, facing: 0, jump: 0, mode: 'lobby', emote: null, budget: MAX_MESSAGES_PER_SEC, ip, alive: true }
+  const me = {
+    id: String(nextId++),
+    name: '등산객',
+    avatar: 'hiker',
+    course: '',
+    distance: 0,
+    offset: 0,
+    facing: 0,
+    jump: 0,
+    mode: 'lobby',
+    budget: MAX_MESSAGES_PER_SEC,
+    ip,
+    alive: true,
+    emoteAt: 0,
+    info: 0, // 이름·아바타가 바뀔 때마다 늘린다
+    known: new Map(), // 이 사람에게 보낸 다른 사람의 info 번호
+    sentCourse: '', // 마지막으로 보낸 위치 메시지의 코스와 내용 (같으면 다시 보내지 않는다)
+    sentPeers: '',
+    sentCounts: '',
+  }
   players.set(ws, me)
   ws.send(JSON.stringify({ type: 'welcome', id: me.id }))
 
@@ -133,17 +169,33 @@ wss.on('connection', (ws, req) => {
     if (!msg || typeof msg !== 'object') return
     if (msg.type === 'state') {
       const name = str(msg.name, NAME_MAX)
-      if (name) me.name = name
-      if (AVATARS.has(msg.avatar)) me.avatar = msg.avatar
+      const avatar = AVATARS.has(msg.avatar) ? msg.avatar : me.avatar
+      if ((name && name !== me.name) || avatar !== me.avatar) {
+        me.name = name || me.name
+        me.avatar = avatar
+        me.info++
+      }
       const course = str(msg.course, 40)
-      if (course) me.course = course
-      me.distance = num(msg.distance, 0, 20000) ?? me.distance
-      me.offset = num(msg.offset, -50, 50) ?? me.offset
-      me.facing = num(msg.facing, -10, 10) ?? me.facing
-      me.jump = num(msg.jump, 0, 5) ?? me.jump
+      if (course && course !== me.course) {
+        dirty.add(me.course)
+        me.course = course
+      }
+      // 보낼 때 쓰는 자릿수로 줄여 둔다. 눈에 띄지 않는 떨림으로 코스가 바뀐 것처럼 보이지 않게 한다
+      me.distance = round(num(msg.distance, 0, 20000) ?? me.distance, 10)
+      me.offset = round(num(msg.offset, -50, 50) ?? me.offset, 100)
+      me.facing = round(num(msg.facing, -10, 10) ?? me.facing, 100)
+      me.jump = round(num(msg.jump, 0, 5) ?? me.jump, 100)
       if (MODES.has(msg.mode)) me.mode = msg.mode
-    } else if (msg.type === 'emote' && EMOTES.has(msg.kind)) {
-      me.emote = { kind: msg.kind, at: Date.now() }
+      dirty.add(me.course)
+    } else if (msg.type === 'emote' && EMOTES.has(msg.kind) && climbing(me)) {
+      // 한 사람이 보낸 것을 여럿에게 나눠 주니, 너무 자주 누르면 버린다
+      const now = Date.now()
+      if (now - me.emoteAt < EMOTE_GAP_MS) return
+      me.emoteAt = now
+      const out = JSON.stringify({ t: 'e', id: me.id, k: msg.kind })
+      for (const [other, p] of players) {
+        if (p !== me && p.course === me.course && climbing(p) && other.readyState === other.OPEN) other.send(out)
+      }
     }
   })
 
@@ -151,15 +203,61 @@ wss.on('connection', (ws, req) => {
   ws.on('error', () => drop(ws))
 })
 
+/** 위치 나눠 주기: 바뀐 코스의 오르는 사람에게 같은 코스 다른 사람 위치를 보낸다 */
 setInterval(() => {
-  const all = [...players.values()]
-  const peers = all.map(({ budget: _budget, ip: _ip, alive: _alive, ...p }) => p)
-  for (const [ws, me] of players) {
-    me.budget = Math.min(MAX_MESSAGES_PER_SEC, me.budget + MAX_MESSAGES_PER_SEC * (TICK_MS / 1000))
-    if (ws.readyState !== ws.OPEN) continue
-    ws.send(JSON.stringify({ type: 'peers', peers: peers.filter((p) => p.id !== me.id) }))
+  // 코스마다 오르는 사람을 모은다
+  const byCourse = new Map()
+  for (const p of players.values()) {
+    p.budget = Math.min(MAX_MESSAGES_PER_SEC, p.budget + MAX_MESSAGES_PER_SEC * (TICK_MS / 1000))
+    if (!climbing(p)) continue
+    const list = byCourse.get(p.course)
+    if (list) list.push(p)
+    else byCourse.set(p.course, [p])
   }
+  for (const [ws, me] of players) {
+    if (ws.readyState !== ws.OPEN) continue
+    if (!climbing(me)) {
+      // 베이스캠프로 나가면 남은 사람을 지우라고 한 번 알린다
+      if (me.sentPeers) send(ws, me, me.sentCourse, [])
+      continue
+    }
+    if (!dirty.has(me.course) && me.sentCourse === me.course) continue
+    const others = (byCourse.get(me.course) ?? []).filter((p) => p !== me)
+    // 처음 보거나 이름·아바타가 바뀐 사람만 따로 알린다
+    const info = others.filter((p) => me.known.get(p.id) !== p.info)
+    if (info.length) {
+      for (const p of info) me.known.set(p.id, p.info)
+      ws.send(JSON.stringify({ t: 'i', i: info.map((p) => [p.id, p.name, p.avatar]) }))
+    }
+    send(ws, me, me.course, others)
+  }
+  dirty.clear()
 }, TICK_MS)
+
+/** 위치 메시지. 지난번과 똑같으면 보내지 않는다 */
+function send(ws, me, course, others) {
+  const peers = JSON.stringify(others.map((p) => [p.id, p.distance, p.offset, p.facing, p.jump, MODE_LIST.indexOf(p.mode)]))
+  const key = others.length ? peers : ''
+  if (course === me.sentCourse && key === me.sentPeers) return
+  me.sentCourse = course
+  me.sentPeers = key
+  ws.send(`{"t":"p","c":${JSON.stringify(course)},"p":${peers}}`)
+}
+
+/** 코스별 오르는 인원: 베이스캠프 코스 카드와 같이하기 패널에 쓴다. 바뀐 사람에게만 보낸다 */
+setInterval(() => {
+  const counts = {}
+  for (const p of players.values()) if (climbing(p)) counts[p.course] = (counts[p.course] ?? 0) + 1
+  const out = JSON.stringify({ t: 'c', c: counts })
+  for (const [ws, me] of players) {
+    if (ws.readyState !== ws.OPEN || me.sentCounts === out) continue
+    me.sentCounts = out
+    ws.send(out)
+  }
+  // 나간 사람의 info 번호는 지운다 (오래 켜 둔 연결에서 쌓이지 않게)
+  const ids = new Set([...players.values()].map((p) => p.id))
+  for (const me of players.values()) for (const id of me.known.keys()) if (!ids.has(id)) me.known.delete(id)
+}, COUNT_MS)
 
 // 끊긴 연결 정리: 폰이 잠들거나 와이파이가 끊겨 닫힘 신호 없이 사라진 사람이 화면에 남고 자리를 차지하지 않게 한다
 setInterval(() => {

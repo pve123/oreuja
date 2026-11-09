@@ -9,7 +9,10 @@ import { occlusionUniforms } from '../lib/occlusion'
 import { Avatar } from './Avatar'
 import type { HikerHandle } from './Hiker'
 
-const FOLLOW = 10 // 받은 위치로 따라가는 빠르기 (클수록 바로 붙는다)
+const FOLLOW = 15 // 채운 위치로 따라가는 빠르기 (클수록 바로 붙는다)
+// 위치는 1초에 5번 온다. 받은 위치로 바로 뛰지 않고 지난 위치에서 이 시간 동안 고르게 걸어가게 채운다(ms).
+// 서버 간격(200ms)보다 조금 길게 잡아 메시지가 늦게 와도 멈칫하지 않게 한다
+const BLEND_MS = 240
 const SNAP = 40 // 이보다 멀리 뛰면(순간이동·코스 재시작) 따라가지 않고 바로 옮긴다(m)
 const LABEL_RANGE = 120 // 이 거리 안의 사람만 이름표를 띄운다(m)
 
@@ -38,7 +41,9 @@ export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail: Trail }) {
   const hiker = useRef<HikerHandle>(null!)
   const label = useRef<THREE.Group>(null!)
-  const shown = useRef<{ distance: number; offset: number } | null>(null)
+  const shown = useRef<{ distance: number; offset: number; facing: number } | null>(null)
+  // 지난 위치(from)에서 받은 위치(to)로 채워 가는 구간
+  const seg = useRef<{ fromD: number; fromO: number; toD: number; toO: number; at: number } | null>(null)
   const [peer] = useState(() => useNet.getState().peers.find((p) => p.id === id) as Peer)
   const [view, setView] = useState({ name: peer.name, emote: null as string | null, near: true })
   const emoteSeen = useRef<{ at: number; localAt: number } | null>(null)
@@ -48,16 +53,27 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
     const p = useNet.getState().peers.find((q) => q.id === id)
     if (!p || !hiker.current) return
 
-    // 받은 위치로 부드럽게 따라간다
-    const s = (shown.current ??= { distance: p.distance, offset: p.offset })
+    // 받은 위치 사이를 고르게 채우고, 그 위치로 부드럽게 따라간다
+    const now = performance.now()
+    const g = (seg.current ??= { fromD: p.distance, fromO: p.offset, toD: p.distance, toO: p.offset, at: now })
+    const t = Math.min(1, (now - g.at) / BLEND_MS)
+    const targetD = g.fromD + (g.toD - g.fromD) * t
+    const targetO = g.fromO + (g.toO - g.fromO) * t
+    if (p.distance !== g.toD || p.offset !== g.toO) {
+      Object.assign(g, { fromD: targetD, fromO: targetO, toD: p.distance, toO: p.offset, at: now })
+    }
+    const s = (shown.current ??= { distance: p.distance, offset: p.offset, facing: p.facing })
     const k = 1 - Math.exp(-FOLLOW * dt)
     if (Math.abs(p.distance - s.distance) > SNAP) {
+      Object.assign(g, { fromD: p.distance, fromO: p.offset, toD: p.distance, toO: p.offset })
       s.distance = p.distance
       s.offset = p.offset
     }
     const before = s.distance + s.offset
-    s.distance += (p.distance - s.distance) * k
-    s.offset += (p.offset - s.offset) * k
+    s.distance += (targetD - s.distance) * k
+    s.offset += (targetO - s.offset) * k
+    // 방향도 짧은 쪽으로 돌며 따라간다
+    s.facing += Math.atan2(Math.sin(p.facing - s.facing), Math.cos(p.facing - s.facing)) * k
     const heading = trail.headingAt(s.distance)
     const pos = trail.positionAt(s.distance)
     pos.x += -Math.cos(heading) * s.offset
@@ -66,7 +82,7 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
     pos.y = groundAt(terrain, trail, stoneSteps(terrain, trail), s.distance, s.offset, pos.x, pos.z).y
     hiker.current.stride(s.distance + s.offset - before)
     hiker.current.group.position.copy(pos).setY(pos.y + p.jump)
-    hiker.current.group.rotation.y = heading + p.facing
+    hiker.current.group.rotation.y = heading + s.facing
     hiker.current.setAirborne(p.jump > 0)
     hiker.current.setCheering(p.mode !== 'hiking')
     label.current.position.copy(hiker.current.group.position)
