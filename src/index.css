@@ -588,12 +588,13 @@ kbd {
   background: var(--accent);
   border-color: transparent;
 }
+/* 세로 화면은 💬 위쪽으로 두 칸씩 펼친다. 왼쪽으로 펼치면 쉬운 조작의 「걷기」 버튼을 덮는다 */
 .emote-dial-menu {
   position: absolute;
-  right: calc(100% + 10px);
-  bottom: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
   display: grid;
-  grid-template-columns: repeat(4, 58px);
+  grid-template-columns: repeat(2, 66px);
   gap: 6px;
   padding: 8px;
   border-radius: 18px;
@@ -637,6 +638,14 @@ kbd {
 @media (max-width: 760px), (max-height: 500px) {
   .emote-dial {
     bottom: calc(34px + 76px + 14px + var(--sab));
+  }
+}
+/* 가로로 눕힌 폰은 위쪽 공간이 모자라 왼쪽으로 네 칸씩 펼친다 (걷기 버튼과는 화면 반대편이라 겹치지 않는다) */
+@media (max-height: 500px) {
+  .emote-dial-menu {
+    right: calc(100% + 10px);
+    bottom: 0;
+    grid-template-columns: repeat(4, 58px);
   }
 }
 @media (hover: hover) and (pointer: fine) {
