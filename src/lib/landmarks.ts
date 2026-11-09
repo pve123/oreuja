@@ -7,7 +7,7 @@ import type { Obstacle } from './obstacles'
  * - cairn: 고개·재(하루재)에 쌓은 돌탑
  * - pass: 깔딱고개. 돌탑 옆에 숨 고르는 나무 벤치
  * - temple: 절·암자(인수암, 보리사, 대동사). 붉은 기둥, 기와지붕, 연등
- * - hut: 산장(백운산장). 막돌 벽에 처마가 넓은 낮은 지붕을 얹은 돌 산장
+ * - hut: 산장(백운산장)·대피소(도봉산대피소, 1층 막돌에 연두색 2층을 얹은 건물). 막돌 벽에 처마가 넓은 낮은 지붕을 얹은 돌 산장
  * - gate: 성문(백운봉암문 위문). 이름에 암문·성문이 든 곳. 등산로가 위가 평평한 네모 문 사이로 지나간다
  * - ruins: 문터(수문터). 무너진 성벽 터
  * - waterfall: 폭포(개연폭포). 비스듬한 너럭바위를 타고 미끄러져 내리는 물줄기와 얕은 물웅덩이
@@ -16,6 +16,8 @@ import type { Obstacle } from './obstacles'
  * - peak: 봉우리(도솔봉, 관음사 국기봉). 둥근 바위 무더기와 검은 정상석
  * - slab: 마당바위. 등산로를 따라 넓은 화강암 너럭바위를 지형 위에 깔고 표지판을 세운다
  * - ropes: 기차바위. 등산로를 따라 가파른 맨바위를 깔고, 바위 틈과 양쪽 밧줄을 놓는다
+ * - rockgate: 바위 문(관악문). 바위 기둥 둘 위에 큰 바위가 얹히고 그 사이로 등산로가 지나간다
+ * - ridge: 능선(포대능선). 등산로를 따라 좁은 바위 능선을 깔고 낮은 쪽에 쇠줄 난간을 놓는다
  * - pavilion: 정자(매월정). 육각 정자에 붉은 기둥, 초록 단청, 기와지붕
  * - trailhead: 출발점(탐방지원센터). 등산로를 가로지르는 나무 입구 문과 등산 안내도. 이정표가 아니라 코스마다 하나 세운다
  */
@@ -31,9 +33,19 @@ export type LandmarkKind =
   | 'peak'
   | 'slab'
   | 'ropes'
+  | 'rockgate'
+  | 'ridge'
   | 'pavilion'
   | 'sign'
   | 'trailhead'
+
+/** 산성 대문(북한산성 대동문) 크기(m): 문구멍 반폭, 홍예가 시작하는 높이, 성벽 반길이·높이·두께 (src/scene/Landmarks.tsx 의 FortressGate) */
+export const FORTRESS = { half: 1.5, spring: 2.4, wall: 10, top: 5.2, depth: 3 }
+
+/** 산성 대문 충돌 원 (+z 가 진행 방향). 문구멍 양옆 벽을 1.15m 간격 원으로 막는다 */
+export const FORTRESS_COLLIDERS: Obstacle[] = [-1, 1].flatMap((s) =>
+  Array.from({ length: 8 }, (_, i) => ({ x: s * (FORTRESS.half + 0.9 + i * 1.15), z: 0, r: 0.9, height: FORTRESS.top })),
+)
 
 /** 출발점 입구 문을 세울 거리(m). 처음 화면에서 캐릭터 앞에 보이게 */
 const TRAILHEAD_AT = 10
@@ -51,6 +63,8 @@ export const LANDMARK_ICON: Record<LandmarkKind, string> = {
   peak: '⛰️',
   slab: '🪨',
   ropes: '🧗',
+  rockgate: '🪨',
+  ridge: '⛰️',
   pavilion: '⛩️',
   sign: '🪧',
   trailhead: '🥾',
@@ -58,7 +72,9 @@ export const LANDMARK_ICON: Record<LandmarkKind, string> = {
 
 export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('폭포')) return 'waterfall'
-  if (name.includes('산장')) return 'hut'
+  if (name.includes('산장') || name.includes('대피소')) return 'hut'
+  if (name.includes('관악문')) return 'rockgate'
+  if (name.includes('능선')) return 'ridge'
   if (name.includes('문터')) return 'ruins'
   // 성문은 암문·성문만. 우이암 코스의 하늘문처럼 「문」이 든 다른 지점은 표지판으로 둔다
   if (name.includes('암문') || name.includes('성문')) return 'gate'
@@ -140,6 +156,20 @@ const SPECS: Record<LandmarkKind, Spec> = {
   // 등산로를 따라 지형 위에 까는 바위라 길을 막지 않는다. 충돌 원이 없고 자리도 옮기지 않는다
   slab: { side: 0, clear: 9, label: 2.8, footprint: [0.3, 0.3], colliders: [] },
   ropes: { side: 0, clear: 9, label: 3, footprint: [0.3, 0.3], colliders: [] },
+  ridge: { side: 0, clear: 4, label: 2.8, footprint: [0.3, 0.3], colliders: [] },
+  // 바위 기둥 둘 사이로 길이 지나간다 (src/scene/NamedRocks.tsx 의 RockGate)
+  rockgate: {
+    side: 0,
+    clear: 7,
+    label: 6.8,
+    footprint: [6, 3],
+    colliders: [
+      { x: -2.6, z: 0, r: 1.35, height: 4.2 },
+      { x: 2.6, z: 0.1, r: 1.3, height: 3.8 },
+      { x: -3.6, z: 1.2, r: 0.9, height: 0.8 },
+      { x: 3.5, z: -1, r: 0.8, height: 0.6 },
+    ],
+  },
   pavilion: { side: 7, clear: 6.5, label: 6.4, footprint: [4.6, 4.6], colliders: [{ x: 0, z: 0, r: 2.5, height: 4.5 }] },
   sign: { side: 2.5, clear: 1.5, label: 2.7, footprint: [0.3, 0.3], colliders: [{ x: 0, z: 0, r: 0.2, height: 2.2 }] },
   trailhead: {
@@ -228,7 +258,9 @@ export function landmarks(terrain: Terrain, trail: Trail): Landmark[] {
 
     // 그래도 등산로 가운데 줄에 걸리는 원은 뺀다. 랜드마크 때문에 길이 막히는 일은 없게
     const colliders = place(spec.colliders, position, rotation).filter((c) => trailHits(trail, cp.distance, [c]) === 0)
-    return { ...cp, kind, position, rotation, label: spec.label, clear: spec.clear, colliders }
+    // 2층짜리 대피소는 이름표를 한 층 더 높이 띄운다
+    const label = spec.label + (kind === 'hut' && cp.name.includes('대피소') ? 2.6 : 0)
+    return { ...cp, kind, position, rotation, label, clear: spec.clear, colliders }
   })
   cache.set(trail, out)
   return out

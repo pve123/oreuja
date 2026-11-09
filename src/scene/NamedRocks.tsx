@@ -13,7 +13,7 @@ const ROCK = ['#b3ab9f', '#a9a195', '#bcb4a7', '#a0988c']
 /** 비탈에 묻힌 바닥이 떠 보이지 않게 모든 바위 밑에 까는 받침 */
 const FOOTING: Blob = { pos: [0, -0.4, 0], scale: [2.6, 0.9, 2.2], color: '#9d958a' }
 
-type Blob = {
+export type Blob = {
   pos: [number, number, number]
   scale: [number, number, number]
   rot?: [number, number, number]
@@ -50,7 +50,7 @@ function blob(seed: number, flatBottom = -2, flatTop = 2) {
   return geo
 }
 
-function Blobs({ blobs, seed }: { blobs: Blob[]; seed: number }) {
+export function Blobs({ blobs, seed }: { blobs: Blob[]; seed: number }) {
   return (
     <>
       {blobs.map((b, i) => (
@@ -145,6 +145,22 @@ export function Peak({ name, seed }: { name: string; seed: number }) {
           { pos: [1.2, 0.15, 1.9], scale: [0.5, 0.25, 0.4] },
         ]}
       />
+      {name.includes('국기봉') ? (
+        // 관음사 국기봉: 큰 바위 꼭대기에 태극기 게양대
+        <group position={[-1.4, 2.5, -0.6]}>
+          <Flagpole height={4.5} />
+        </group>
+      ) : (
+        <PeakMarker label={label} />
+      )}
+    </group>
+  )
+}
+
+/** 봉우리 앞 검은 정상석 */
+function PeakMarker({ label }: { label: THREE.Texture }) {
+  return (
+    <group>
       <mesh position={[0.2, 0.06, 1.3]} receiveShadow>
         <boxGeometry args={[0.7, 0.12, 0.55]} />
         <meshStandardMaterial color="#cfc9be" roughness={0.9} />
@@ -158,6 +174,89 @@ export function Peak({ name, seed }: { name: string; seed: number }) {
         <meshStandardMaterial map={label} roughness={0.5} />
       </mesh>
     </group>
+  )
+}
+
+/** 태극기: 흰 바탕 가운데 빨강·파랑 태극, 네 귀에 검은 괘 */
+function taegeukTexture() {
+  const c = document.createElement('canvas')
+  c.width = 192
+  c.height = 128
+  const g = c.getContext('2d')!
+  g.fillStyle = '#ffffff'
+  g.fillRect(0, 0, 192, 128)
+  g.save()
+  g.translate(96, 64)
+  g.rotate(Math.atan2(2, 3))
+  g.fillStyle = '#cd2e3a'
+  g.beginPath()
+  g.arc(0, 0, 32, Math.PI, 0)
+  g.fill()
+  g.fillStyle = '#0047a0'
+  g.beginPath()
+  g.arc(0, 0, 32, 0, Math.PI)
+  g.fill()
+  g.beginPath()
+  g.arc(-16, 0, 16, 0, Math.PI * 2)
+  g.fillStyle = '#cd2e3a'
+  g.fill()
+  g.beginPath()
+  g.arc(16, 0, 16, 0, Math.PI * 2)
+  g.fillStyle = '#0047a0'
+  g.fill()
+  g.restore()
+  g.fillStyle = '#111111'
+  for (const [x, y, r] of [[34, 26, -0.6], [158, 26, 0.6], [34, 102, 0.6], [158, 102, -0.6]] as const) {
+    g.save()
+    g.translate(x, y)
+    g.rotate(r)
+    for (let k = -1; k <= 1; k++) g.fillRect(-14, k * 8 - 2.5, 28, 5)
+    g.restore()
+  }
+  const tex = new THREE.CanvasTexture(c)
+  tex.colorSpace = THREE.SRGBColorSpace
+  return tex
+}
+
+/** 태극기를 단 게양대. 깃대 꼭대기에 금색 꼭지 */
+export function Flagpole({ height }: { height: number }) {
+  const tex = useMemo(() => taegeukTexture(), [])
+  useEffect(() => () => tex.dispose(), [tex])
+  return (
+    <group>
+      <mesh position={[0, height / 2, 0]} castShadow>
+        <cylinderGeometry args={[0.045, 0.06, height, 8]} />
+        <meshStandardMaterial color="#d9dadc" metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, height + 0.08, 0]}>
+        <sphereGeometry args={[0.1, 10, 8]} />
+        <meshStandardMaterial color="#d4a72c" metalness={0.6} roughness={0.3} />
+      </mesh>
+      <mesh position={[0.68, height - 0.5, 0]} castShadow>
+        <planeGeometry args={[1.3, 0.87]} />
+        <meshStandardMaterial map={tex} side={THREE.DoubleSide} roughness={0.8} />
+      </mesh>
+    </group>
+  )
+}
+
+/**
+ * 바위 문 (관악산 관악문). 큰 바위 기둥 둘 위에 커다란 바위가 얹혀 그 사이로 등산로가 지나간다.
+ * 왼쪽 기둥 위에는 납작한 바위가 한 장 더 얹힌다. 충돌 원은 src/lib/landmarks.ts 의 rockgate 와 맞춘다
+ */
+export function RockGate({ seed }: { seed: number }) {
+  return (
+    <Blobs
+      seed={Math.round(seed) + 80}
+      blobs={[
+        { pos: [-2.5, 1.5, 0], scale: [1.4, 2.7, 1.7], color: '#b9ad9b' },
+        { pos: [2.5, 1.3, 0.1], scale: [1.35, 2.5, 1.6], color: '#b3a796' },
+        { pos: [0.2, 4.6, -0.1], scale: [3.6, 1.7, 2.1], flatBottom: -0.45, color: '#c0b29e' },
+        { pos: [-2.4, 4.1, 0.6], scale: [1.6, 0.45, 1.2], color: '#bdb1a0' },
+        { pos: [-3.6, 0.2, 1.2], scale: [1, 0.6, 0.9] },
+        { pos: [3.5, 0.1, -1], scale: [0.9, 0.5, 0.8] },
+      ]}
+    />
   )
 }
 
@@ -300,6 +399,16 @@ function drapeAlong(terrain: Terrain, trail: Trail, at: number, along: number, w
   return geo
 }
 
+/** 등산로 at 둘레에서 왼쪽(-1)·오른쪽(1) 가운데 땅이 더 낮은 쪽 */
+function lowerSide(terrain: Terrain, trail: Trail, at: number) {
+  const drop = (side: number) => {
+    let sum = 0
+    for (let s = -10; s <= 10; s += 5) sum += beside(terrain, trail, at + s, side * 6).pos.y
+    return sum
+  }
+  return drop(1) < drop(-1) ? 1 : -1
+}
+
 /** 등산로 위 at 에서 옆으로 t 만큼 비킨 곳 (지형 높이) */
 function beside(terrain: Terrain, trail: Trail, d: number, t: number) {
   const p = trail.positionAt(d)
@@ -314,22 +423,28 @@ function beside(terrain: Terrain, trail: Trail, d: number, t: number) {
  * - 마당바위: 앞뒤 14m 를 너른 화강암 판으로 덮고, 길옆에 이름 표지판과 낮은 바위를 둔다
  * - 기차바위: 앞뒤 18m 를 좁고 밝은 바위 비탈로 덮고, 길 오른쪽에 바위 틈, 양쪽에 쇠기둥과 밧줄을 놓는다
  */
-export function TrailSlab({ terrain, trail, at, name, ropes }: { terrain: Terrain; trail: Trail; at: number; name: string; ropes: boolean }) {
+export type SlabMode = 'yard' | 'ropes' | 'ridge'
+
+export function TrailSlab({ terrain, trail, at, name, mode }: { terrain: Terrain; trail: Trail; at: number; name: string; mode: SlabMode }) {
+  const ropes = mode === 'ropes'
+  const ridge = mode === 'ridge'
   const built = useMemo(() => {
     const rand = seededRandom(Math.round(at))
-    const along = ropes ? 18 : 14
+    const along = ropes ? 18 : ridge ? 20 : 14
     const wobble = Array.from({ length: 8 }, () => rand())
     const width = (s: number) => {
       const k = Math.min(7, Math.max(0, Math.floor(((s + along) / (along * 2)) * 8)))
       const edge = 1 - Math.max(0, Math.abs(s) / along - 0.75) * 2 // 양 끝으로 좁아진다
-      return (ropes ? 2.6 : 5) * (0.8 + wobble[k] * 0.35) * edge
+      return (ropes ? 2.6 : ridge ? 2.2 : 5) * (0.8 + wobble[k] * 0.35) * edge
     }
     const slab = drapeAlong(terrain, trail, at, along, width)
     const crack = ropes ? drapeAlong(terrain, trail, at, along - 2, () => 0.07, 0.8, SLAB_LIFT + 0.02) : null
     const posts: { pos: THREE.Vector3 }[] = []
     const lines: { a: THREE.Vector3; b: THREE.Vector3 }[] = []
-    if (ropes) {
-      for (const side of [-1.5, 1.5]) {
+    // 기차바위는 양쪽 밧줄, 능선은 낭떠러지 쪽(더 낮은 쪽) 한쪽에 쇠줄 난간
+    const ropeSides = ropes ? [-1.5, 1.5] : ridge ? [lowerSide(terrain, trail, at) * 1.4] : []
+    {
+      for (const side of ropeSides) {
         let prev: THREE.Vector3 | null = null
         for (let s = -along + 2; s <= along - 2; s += 3) {
           const top = beside(terrain, trail, at + s, side).pos.add(new THREE.Vector3(0, SLAB_LIFT + 0.9, 0))
@@ -339,15 +454,15 @@ export function TrailSlab({ terrain, trail, at, name, ropes }: { terrain: Terrai
         }
       }
     }
-    const sign = ropes ? null : beside(terrain, trail, at, width(0) * 0.7 + 0.8)
-    const stones = ropes
+    const sign = mode !== 'yard' ? null : beside(terrain, trail, at, width(0) * 0.7 + 0.8)
+    const stones = mode !== 'yard'
       ? []
       : [-8, -3, 5, 9].map((s, i) => {
           const b = beside(terrain, trail, at + s, (i % 2 ? -1 : 1) * (width(s) - 0.4))
           return { pos: b.pos, size: 0.5 + rand() * 0.5, rot: rand() * 3 }
         })
     return { slab, crack, posts, lines, sign, stones }
-  }, [terrain, trail, at, ropes])
+  }, [terrain, trail, at, ropes, ridge, mode])
   useEffect(
     () => () => {
       built.slab.dispose()
@@ -359,7 +474,7 @@ export function TrailSlab({ terrain, trail, at, name, ropes }: { terrain: Terrai
   return (
     <group>
       <mesh geometry={built.slab} receiveShadow>
-        <meshStandardMaterial color={ropes ? '#bab3a6' : '#b4ada0'} roughness={0.85} flatShading polygonOffset polygonOffsetFactor={-2} />
+        <meshStandardMaterial color={ropes ? '#bab3a6' : ridge ? '#aaa397' : '#b4ada0'} roughness={0.85} flatShading polygonOffset polygonOffsetFactor={-2} />
       </mesh>
       {built.crack && (
         <mesh geometry={built.crack}>
@@ -390,7 +505,7 @@ export function TrailSlab({ terrain, trail, at, name, ropes }: { terrain: Terrai
 }
 
 /** 두 기둥 꼭대기를 잇는 밧줄 */
-function Rope({ a, b }: { a: THREE.Vector3; b: THREE.Vector3 }) {
+export function Rope({ a, b, color = '#e8e4da' }: { a: THREE.Vector3; b: THREE.Vector3; color?: string }) {
   const { mid, len, quat } = useMemo(() => {
     const dir = b.clone().sub(a)
     return {
@@ -402,7 +517,7 @@ function Rope({ a, b }: { a: THREE.Vector3; b: THREE.Vector3 }) {
   return (
     <mesh position={mid} quaternion={quat}>
       <cylinderGeometry args={[0.025, 0.025, len, 5]} />
-      <meshStandardMaterial color="#e8e4da" roughness={0.9} />
+      <meshStandardMaterial color={color} roughness={0.9} />
     </mesh>
   )
 }
