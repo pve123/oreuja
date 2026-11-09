@@ -3,6 +3,7 @@ import { useFrame } from '@react-three/fiber'
 import { RoundedBox } from '@react-three/drei'
 import * as THREE from 'three'
 import { seededRandom } from '../lib/random'
+import { jitterVertices } from '../lib/geometry'
 import type { AvatarKind } from '../lib/avatars'
 import { makeTrekkingPole } from './TrekkingPole'
 
@@ -44,18 +45,7 @@ const std = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters>
 
 /** 꼭짓점을 흔든 울퉁불퉁한 감자 */
 function potatoGeometry() {
-  const geo = new THREE.IcosahedronGeometry(1, 2)
-  const rand = seededRandom(5)
-  const pos = geo.attributes.position as THREE.BufferAttribute
-  const v = new THREE.Vector3()
-  const moved = new Map<string, number>()
-  for (let i = 0; i < pos.count; i++) {
-    v.fromBufferAttribute(pos, i)
-    const key = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`
-    if (!moved.has(key)) moved.set(key, 0.88 + rand() * 0.2)
-    v.multiplyScalar(moved.get(key)!)
-    pos.setXYZ(i, v.x, v.y, v.z)
-  }
+  const geo = jitterVertices(new THREE.IcosahedronGeometry(1, 2), seededRandom(5), 0.88, 0.2)
   geo.computeVertexNormals()
   return geo
 }

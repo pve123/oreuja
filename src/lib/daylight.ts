@@ -30,8 +30,8 @@ export const MOON = new THREE.Vector3(0, Math.sin(THREE.MathUtils.degToRad(MOON_
 
 export type Phase = '새벽' | '아침' | '낮' | '저녁' | '밤'
 
-/** 지금 화면에 쓰는 시간대 값. 하늘을 바꾸면 목표값(target) 쪽으로 1초쯤에 걸쳐 옮겨 간다 (settle). Daylight 가 매 프레임 갱신한다 */
-export const daylight = {
+/** 시간대 값 묶음. 화면에 쓰는 값(daylight)과 목표값(target)이 같은 모양이다 */
+const lightState = () => ({
   /** 해 높이(°). 지평선이 0, 아래면 음수 */
   elevation: 0,
   /** 해 방위(°). 북쪽 0, 동쪽 90 */
@@ -53,28 +53,13 @@ export const daylight = {
   rayleigh: 0,
   turbidity: 0,
   mie: 0,
-}
+})
 
-/** 고른 하늘의 목표값. applyDaylight 가 채우고 settle 이 daylight 를 이쪽으로 옮긴다 */
-const target = {
-  elevation: 0,
-  azimuth: 90,
-  phase: '낮' as Phase,
-  skySun: new THREE.Vector3(),
-  sun: new THREE.Vector3(),
-  sunColor: new THREE.Color(),
-  sunIntensity: 0,
-  moonIntensity: 0,
-  skyColor: new THREE.Color(),
-  groundColor: new THREE.Color(),
-  hemiIntensity: 0,
-  fogColor: new THREE.Color(),
-  photoEmissive: 0,
-  stars: 0,
-  rayleigh: 0,
-  turbidity: 0,
-  mie: 0,
-}
+/** 지금 화면에 쓰는 시간대 값. 하늘을 바꾸면 목표값(target) 쪽으로 1초쯤에 걸쳐 옮겨 간다 (settle). Daylight 가 매 프레임 갱신한다 */
+export const daylight = lightState()
+
+/** 고른 하늘의 목표값. applyDaylight 가 채우고 settle 이 daylight 를 이쪽으로 옮긴다. sun 은 조명 방향(SUN)의 목표 */
+const target = { ...lightState(), sun: new THREE.Vector3() }
 
 /** 하늘이 바뀔 때 자리 잡는 시간 상수(초). 1초쯤 지나면 거의 다 옮겨 간다 */
 const BLEND_TAU = 0.35

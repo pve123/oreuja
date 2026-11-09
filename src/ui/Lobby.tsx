@@ -3,7 +3,8 @@ import { estimateMinutes, formatMinutes, type Trail, type TrailData } from '../l
 import { useGame, type ControlMode } from '../lib/store'
 import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
 import { isClimbing, useNet } from '../lib/net'
-import { AVATARS, useAvatarThumbs } from '../lib/avatars'
+import { AVATARS } from '../lib/avatars'
+import { AvatarChips } from './AvatarChips'
 import { playHudEnter } from '../lib/splash'
 import { SKY_PRESETS, currentPhase, useSky, type Phase } from '../lib/daylight'
 
@@ -12,17 +13,9 @@ import { SKY_PRESETS, currentPhase, useSky, type Phase } from '../lib/daylight'
  * 게임 로비처럼 출발점 3D 장면(내 캐릭터) 위에 띄운다. 다시 온 사람은 지난번 고른 것이 그대로라 「출발」만 누르면 된다.
  * 걷는 중에도 Esc(또는 코스 패널 버튼)로 다시 연다.
  */
-export function Lobby({
-  trail,
-  trails,
-  mountains,
-  mountain,
-}: {
-  trail: Trail
-  trails: Trail[]
-  mountains: Mountain[]
-  mountain: Mountain
-}) {
+type LobbyProps = { trail: Trail; trails: Trail[]; mountains: Mountain[]; mountain: Mountain }
+
+export function Lobby(props: LobbyProps) {
   const mode = useGame((s) => s.mode)
   const open = mode === 'lobby'
 
@@ -46,20 +39,10 @@ export function Lobby({
   }, [open])
 
   if (!open) return null
-  return <LobbyPanel trail={trail} trails={trails} mountains={mountains} mountain={mountain} />
+  return <LobbyPanel {...props} />
 }
 
-function LobbyPanel({
-  trail,
-  trails,
-  mountains,
-  mountain,
-}: {
-  trail: Trail
-  trails: Trail[]
-  mountains: Mountain[]
-  mountain: Mountain
-}) {
+function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
   const [shownMountain, setShownMountain] = useState(mountain)
   const [courseId, setCourseId] = useState(trail.data.id)
   const [others, setOthers] = useState<{ id: string; courses: TrailData[] | 'loading' | 'failed' }>()
@@ -319,29 +302,13 @@ function ControlSwitch() {
 /** 캐릭터 고르기 줄. 고르면 뒤의 3D 캐릭터가 바로 바뀐다 */
 function AvatarStrip() {
   const avatar = useGame((s) => s.avatar)
-  const setAvatar = useGame((s) => s.setAvatar)
-  const thumbs = useAvatarThumbs((s) => s.thumbs)
   const current = AVATARS.find((a) => a.kind === avatar)
   return (
     <div className="panel lobby-avatars">
       <div className="lobby-label">
         캐릭터 <b>{current?.name}</b>
       </div>
-      <div className="avatar-bar" role="radiogroup" aria-label="캐릭터 고르기">
-        {AVATARS.map((a) => (
-          <button
-            key={a.kind}
-            role="radio"
-            aria-checked={a.kind === avatar}
-            className={a.kind === avatar ? 'avatar-chip selected' : 'avatar-chip'}
-            title={`${a.name} · ${a.desc}`}
-            aria-label={a.name}
-            onClick={() => setAvatar(a.kind)}
-          >
-            {thumbs[a.kind] ? <img src={thumbs[a.kind]} alt="" className="avatar-thumb" /> : a.name}
-          </button>
-        ))}
-      </div>
+      <AvatarChips />
     </div>
   )
 }

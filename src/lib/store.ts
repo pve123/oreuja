@@ -162,3 +162,10 @@ export const input = {
   /** 터치 조이스틱 기울기. 화면 기준으로 x 는 오른쪽 +, y 는 위쪽 +, 길이 0~1 (src/ui/TouchControls.tsx) */
   stick: { x: 0, y: 0 },
 }
+
+/** 누르고 있던 입력을 모두 뗀 상태로 되돌린다 (창이 포커스를 잃으면 keyup 이 오지 않아 계속 걷는 것을 막는다) */
+export function releaseInput() {
+  Object.assign(input, { forward: false, backward: false, left: false, right: false, run: false, jump: false })
+  input.stick.x = 0
+  input.stick.y = 0
+}

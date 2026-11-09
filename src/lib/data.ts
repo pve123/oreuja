@@ -175,15 +175,19 @@ export class Trail {
   }
 }
 
-/** 지형 높이(m) 쌍선형 보간 */
-export function sampleHeight(t: Terrain, x: number, z: number) {
+/** (x, z) 가 든 격자 칸 (i, j) 와 칸 안 위치 (u, v), 격자 높이를 읽는 h */
+function gridCell(t: Terrain, x: number, z: number) {
   const fx = ((x - t.minX) / (t.maxX - t.minX)) * (t.width - 1)
   const fz = ((z - t.minZ) / (t.maxZ - t.minZ)) * (t.height - 1)
   const i = THREE.MathUtils.clamp(Math.floor(fx), 0, t.width - 2)
   const j = THREE.MathUtils.clamp(Math.floor(fz), 0, t.height - 2)
-  const u = fx - i
-  const v = fz - j
   const h = (a: number, b: number) => t.heights[b * t.width + a]
+  return { i, j, u: fx - i, v: fz - j, h }
+}
+
+/** 지형 높이(m) 쌍선형 보간 */
+export function sampleHeight(t: Terrain, x: number, z: number) {
+  const { i, j, u, v, h } = gridCell(t, x, z)
   return (h(i, j) * (1 - u) + h(i + 1, j) * u) * (1 - v) + (h(i, j + 1) * (1 - u) + h(i + 1, j + 1) * u) * v
 }
 
@@ -192,13 +196,7 @@ export function sampleHeight(t: Terrain, x: number, z: number) {
  * 흙길·계단처럼 지면에 딱 붙어야 하는 것이 땅속에 묻히지 않게 한다.
  */
 export function meshHeight(t: Terrain, x: number, z: number) {
-  const fx = ((x - t.minX) / (t.maxX - t.minX)) * (t.width - 1)
-  const fz = ((z - t.minZ) / (t.maxZ - t.minZ)) * (t.height - 1)
-  const i = THREE.MathUtils.clamp(Math.floor(fx), 0, t.width - 2)
-  const j = THREE.MathUtils.clamp(Math.floor(fz), 0, t.height - 2)
-  const u = fx - i
-  const v = fz - j
-  const h = (a: number, b: number) => t.heights[b * t.width + a]
+  const { i, j, u, v, h } = gridCell(t, x, z)
   // 칸마다 (i,j+1)-(i+1,j) 대각선으로 나눈 두 삼각형
   if (u + v <= 1) return h(i, j) + u * (h(i + 1, j) - h(i, j)) + v * (h(i, j + 1) - h(i, j))
   return h(i + 1, j + 1) + (1 - u) * (h(i, j + 1) - h(i + 1, j + 1)) + (1 - v) * (h(i + 1, j) - h(i + 1, j + 1))

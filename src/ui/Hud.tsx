@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { estimateMinutes, formatMinutes, type Trail } from '../lib/data'
-import { input, useGame } from '../lib/store'
+import { input, releaseInput, useGame } from '../lib/store'
 import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
 import { TouchControls, TouchGuide } from './TouchControls'
+import { AvatarChips } from './AvatarChips'
 import { EmoteDial } from './EmoteDial'
 import { useWakeLock } from '../lib/wakeLock'
 import { IS_TOUCH } from '../lib/device'
@@ -41,22 +42,13 @@ function useKeyboard() {
       set(e, true)
     }
     const up = (e: KeyboardEvent) => set(e, false)
-    const blur = () =>
-      Object.assign(input, {
-        forward: false,
-        backward: false,
-        left: false,
-        right: false,
-        run: false,
-        jump: false,
-      })
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
-    window.addEventListener('blur', blur)
+    window.addEventListener('blur', releaseInput)
     return () => {
       window.removeEventListener('keydown', down)
       window.removeEventListener('keyup', up)
-      window.removeEventListener('blur', blur)
+      window.removeEventListener('blur', releaseInput)
     }
   }, [])
 }
@@ -251,7 +243,6 @@ function SidePanel({
 /** 캐릭터 고르기. 모습 그림을 누르면 바로 바뀐다 (그림을 만들기 전에는 이름) */
 function AvatarPanel() {
   const avatar = useGame((s) => s.avatar)
-  const setAvatar = useGame((s) => s.setAvatar)
   const thumbs = useAvatarThumbs((s) => s.thumbs)
   const current = AVATARS.find((a) => a.kind === avatar)
 
@@ -268,21 +259,7 @@ function AvatarPanel() {
         </>
       }
     >
-      <div className="avatar-bar" role="radiogroup" aria-label="캐릭터 고르기">
-        {AVATARS.map((a) => (
-          <button
-            key={a.kind}
-            role="radio"
-            aria-checked={a.kind === avatar}
-            className={a.kind === avatar ? 'avatar-chip selected' : 'avatar-chip'}
-            title={`${a.name} · ${a.desc}`}
-            aria-label={a.name}
-            onClick={() => setAvatar(a.kind)}
-          >
-            {thumbs[a.kind] ? <img src={thumbs[a.kind]} alt="" className="avatar-thumb" /> : a.name}
-          </button>
-        ))}
-      </div>
+      <AvatarChips />
     </SidePanel>
   )
 }
