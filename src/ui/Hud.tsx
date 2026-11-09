@@ -61,8 +61,8 @@ function useKeyboard() {
 
 export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   useKeyboard()
-  // 걷는 동안 3D 화면을 넓게 보도록 코스 정보는 처음에 접어 둔다 (이름만 보인다)
-  const [courseFolded, toggleCourse] = useFolded('course')
+  // 코스 정보는 컴퓨터에서는 펼쳐 두고, 폰에서는 3D 화면을 가리지 않게 접어 둔다 (이름만 보인다)
+  const [courseFolded, toggleCourse] = useFolded('course', !OPEN_BY_DEFAULT)
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
   const sections = useMemo(() => trail.sections(), [trail])
@@ -177,11 +177,13 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   )
 }
 
-/** HUD 를 새로 짜면서 패널을 모두 접어 두는 것으로 바꿔, 예전에 펼쳐 둔 기억(folded:)은 쓰지 않는다 */
-const FOLD_KEY = 'hiking-metaverse:folded2:'
+/** 코스와 캐릭터 패널을 기본으로 펼쳐 두는 것으로 바꿔, 예전에 접어 둔 기억(folded2:)은 쓰지 않는다 */
+const FOLD_KEY = 'hiking-metaverse:folded3:'
+/** 코스·캐릭터 패널을 처음에 펼쳐 둘지. 폰·태블릿은 펼치면 3D 화면을 많이 가려 접어 둔다 */
+const OPEN_BY_DEFAULT = !IS_TOUCH
 
-/** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 접어 둔다 (걷는 동안 3D 화면을 넓게) */
-function useFolded(name: string): [boolean, () => void] {
+/** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 foldedByDefault 를 따른다 */
+function useFolded(name: string, foldedByDefault = true): [boolean, () => void] {
   const [folded, setFolded] = useState(() => {
     try {
       const saved = localStorage.getItem(FOLD_KEY + name)
@@ -189,7 +191,7 @@ function useFolded(name: string): [boolean, () => void] {
     } catch {
       // 저장소를 못 쓰는 환경이면 기본값
     }
-    return true
+    return foldedByDefault
   })
   const toggle = () =>
     setFolded((f) => {
@@ -221,8 +223,23 @@ function FoldButton({ label, collapsed, onToggle }: { label: string; collapsed: 
 }
 
 /** 오른쪽 위 패널. 머리줄 전체를 눌러 접고 편다 */
-function SidePanel({ name, title, sub, className, children }: { name: string; title: string; sub?: ReactNode; className?: string; children: ReactNode }) {
-  const [folded, toggle] = useFolded(name)
+function SidePanel({
+  name,
+  title,
+  sub,
+  className,
+  open,
+  children,
+}: {
+  name: string
+  title: string
+  sub?: ReactNode
+  className?: string
+  /** 처음에 펼쳐 둘지 (기억이 없을 때) */
+  open?: boolean
+  children: ReactNode
+}) {
+  const [folded, toggle] = useFolded(name, !open)
   return (
     <section className={`panel side-panel ${className ?? ''}`}>
       <button className="side-head" aria-expanded={!folded} onClick={toggle}>
@@ -245,6 +262,7 @@ function AvatarPanel() {
   return (
     <SidePanel
       name="avatar"
+      open={OPEN_BY_DEFAULT}
       title="캐릭터"
       className="avatar-panel"
       sub={
