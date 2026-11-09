@@ -26,7 +26,7 @@ import { Daylight } from './Daylight'
 import { AVATARS, type AvatarKind } from '../lib/avatars'
 import { playJump, playStep, setAmbience, type Surface } from '../lib/sound'
 import { STAIR_HALF_WIDTH, groundAt, stairAt, stoneSteps, trailGround } from '../lib/steps'
-import { localPlayer } from '../lib/net'
+import { emoteBubble, localPlayer, sendEmote } from '../lib/net'
 import { Peers } from './Peers'
 
 const WALK_SPEED = 6 // m/s (게임 속도: 실제의 약 5배)
@@ -136,6 +136,8 @@ const LOBBY_SHIFT_X = 0.2
 const LOBBY_SHIFT_UP = 0.16
 const LOBBY_SHIFT_UP_NARROW = 0.3
 const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
+/** 기념사진 말풍선 꼬리 끝을 둘 높이(발에서 m). 만세 동작으로 든 스틱 끝보다 조금 위 */
+const PHOTO_BUBBLE_HEIGHT = 2.6
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
 const GRAVITY = 15 // m/s², 실제(9.8)보다 세게 해서 경쾌하게
 /** 땅에 서 있을 때도 아래로 살짝 눌러 비탈에서 뜨지 않게 (m/s) */
@@ -553,6 +555,8 @@ function WorldScene({ terrain, trail }: Props) {
           finishedAt: new Date().toISOString(),
           durationSec: Math.round((Date.now() - startedAt) / 1000),
         })
+        // 정상에 닿으면 머리 위에 「⛰️🚩 정상이다」를 저절로 띄운다 (같이 오르는 사람들 화면에도)
+        sendEmote('summit')
       }
     }
     b.synced.distance = distance
@@ -624,7 +628,11 @@ function WorldScene({ terrain, trail }: Props) {
       occlusionUniforms.uOccCamera.value.copy(camera.position)
       // 카메라가 자리 잡고 몇 프레임 그린 뒤 촬영 (방금 그린 프레임을 복사)
       if (++photoFrames.current === 3) {
-        useGame.getState().setPhoto(composePhoto(gl.domElement, trail.data))
+        // 사진 속 캐릭터 머리 위에 「⛰️🚩 정상이다」 말풍선을 그려 넣는다 (머리 위치를 화면 좌표로 바꿔 넘긴다)
+        camera.updateMatrixWorld()
+        const head = new THREE.Vector3(pos.x, pos.y + PHOTO_BUBBLE_HEIGHT, pos.z).project(camera)
+        const bubble = { text: emoteBubble('summit'), x: (head.x + 1) / 2, y: (1 - head.y) / 2 }
+        useGame.getState().setPhoto(composePhoto(gl.domElement, trail.data, bubble))
       }
       return
     }
