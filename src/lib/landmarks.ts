@@ -11,6 +11,8 @@ import type { Obstacle } from './obstacles'
  * - gate: 성문(백운봉암문 위문). 이름에 암문·성문이 든 곳. 등산로가 위가 평평한 네모 문 사이로 지나간다
  * - ruins: 문터(수문터). 무너진 성벽 터
  * - waterfall: 폭포(개연폭포). 비스듬한 너럭바위를 타고 미끄러져 내리는 물줄기와 얕은 물웅덩이
+ * - junction: 갈림길(소귀천계곡 갈림길). 화살표 판 세 장이 서로 다른 쪽을 가리키는 이정표 기둥
+ * - spring: 샘터·약수터. 돌로 두른 물받이, 돌벽에서 나오는 물줄기, 기둥에 건 바가지
  * - sign: 그 밖의 이름. 나무 표지판
  * - boulder: 이름 붙은 바위(코끼리바위, 하마바위, 철모바위, 치마바위). 둥근 화강암 덩어리를 이름에 맞게 짜 맞춘다
  * - peak: 봉우리(도솔봉, 관음사 국기봉). 둥근 바위 무더기와 검은 정상석
@@ -36,6 +38,8 @@ export type LandmarkKind =
   | 'rockgate'
   | 'ridge'
   | 'pavilion'
+  | 'junction'
+  | 'spring'
   | 'sign'
   | 'trailhead'
 
@@ -66,6 +70,8 @@ export const LANDMARK_ICON: Record<LandmarkKind, string> = {
   rockgate: '🪨',
   ridge: '⛰️',
   pavilion: '⛩️',
+  junction: '🧭',
+  spring: '🚰',
   sign: '🪧',
   trailhead: '🥾',
 }
@@ -73,6 +79,8 @@ export const LANDMARK_ICON: Record<LandmarkKind, string> = {
 export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('폭포')) return 'waterfall'
   if (name.includes('산장') || name.includes('대피소')) return 'hut'
+  if (name.includes('갈림길')) return 'junction'
+  if (name.includes('샘터') || name.includes('약수')) return 'spring'
   if (name.includes('관악문')) return 'rockgate'
   if (name.includes('능선')) return 'ridge'
   if (name.includes('문터')) return 'ruins'
@@ -171,6 +179,8 @@ const SPECS: Record<LandmarkKind, Spec> = {
     ],
   },
   pavilion: { side: 7, clear: 6.5, label: 6.4, footprint: [4.6, 4.6], colliders: [{ x: 0, z: 0, r: 2.5, height: 4.5 }] },
+  junction: { side: 2.2, clear: 1.6, label: 2.8, footprint: [0.3, 0.3], colliders: [{ x: 0, z: 0, r: 0.2, height: 2.3 }] },
+  spring: { side: 3, clear: 2.6, label: 2.2, footprint: [2.2, 1.8], colliders: [{ x: 0, z: -0.3, r: 1, height: 1.1 }] },
   sign: { side: 2.5, clear: 1.5, label: 2.7, footprint: [0.3, 0.3], colliders: [{ x: 0, z: 0, r: 0.2, height: 2.2 }] },
   trailhead: {
     side: 0,
