@@ -70,17 +70,20 @@ const STAIR_UP_SPEED = 0.8
 /** 카메라 높이가 캐릭터 높이를 따라가는 빠르기. 계단에서 카메라가 덜컹거리지 않게 몸보다 느리게 */
 const CAMERA_Y_RATE = 6
 const TURN_SPEED = 3.6 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 200도
-/** 터치 조이스틱: 이보다 작게 기울이면 가만히 있고, 이보다 크게 밀면 뛴다. 몸은 기울인 쪽으로 이 빠르기(rad/s)로 돈다 */
+/**
+ * 터치 조이스틱: 좌우로 기울이면 몸을 돌리고 위아래로 기울이면 앞뒤로 걷는다. 카메라는 늘 등 뒤에서 가는 쪽을 본다.
+ * 각 축은 STICK_DEAD 보다 작게 기울이면 무시하고, 위로 STICK_RUN 보다 크게 밀면 뛴다
+ */
 const STICK_DEAD = 0.14
 const STICK_RUN = 0.82
-const STICK_TURN_SPEED = 9
+/** 조이스틱을 옆으로 끝까지 밀었을 때 몸을 돌리는 빠르기(rad/s). 키보드(TURN_SPEED)보다 조금 느리게 해 엄지로 섬세하게 꺾는다 */
+const STICK_TURN_SPEED = 2.6
 /** 조이스틱을 조금만 기울였을 때 걷는 빠르기 비율. 여기서부터 STICK_RUN 까지 기울일수록 빨라진다 */
 const STICK_WALK_MIN = 0.4
-/**
- * 조이스틱으로 걸을 때 카메라가 등 뒤로 돌아가는 빠르기. 앞으로 밀수록 천천히 돌아가고 옆으로 밀면 그대로 둔다.
- * 키보드처럼 바로 따라가면 옆으로 미는 동안 카메라와 몸이 서로를 쫓아 제자리에서 빙빙 돈다
- */
-const STICK_FOLLOW_RATE = 1.2
+/** 점프 중 카메라가 바라보는 높이를 발밑 땅보다 이만큼 아래로는 내리지 않는다(m). 오르막에서 기준점이 땅속에 들어가 땅 밑이 보이지 않게 */
+const CAMERA_GROUND_FLOOR = 0.2
+/** 카메라 자체도 그 자리 땅보다 이만큼은 위에 둔다(m) */
+const CAMERA_GROUND_CLEARANCE = 0.4
 /**
  * 터치로 둘러볼 때 손가락 1px 에 도는 각도(°). OrbitControls 는 화면 높이 기준이라 폰을 가로로 눕히면 두 배 빨라지므로
  * 높이와 상관없이 같게 맞춘다. 세로 폰 화면 너비만큼 끌면 약 60° 돈다
@@ -382,18 +385,19 @@ function WorldScene({ terrain, trail }: Props) {
       turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
       move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
       b.yaw += turn * TURN_SPEED * dt
-      // 터치 조이스틱: 카메라가 보는 쪽을 앞으로 삼아 기울인 방향으로 몸을 돌리며 걷는다 (요즘 3D 게임의 카메라 기준 이동)
-      const tilt = Math.hypot(input.stick.x, input.stick.y)
-      if (tilt > STICK_DEAD && move === 0 && turn === 0) {
+      // 터치 조이스틱: 좌우는 몸 돌리기, 위아래는 앞뒤로 걷기. 카메라가 등 뒤로 따라와 늘 가는 쪽이 화면 앞이다
+      const { x: sx, y: sy } = input.stick
+      if (Math.hypot(sx, sy) > STICK_DEAD && move === 0 && turn === 0) {
         stick = true
-        // 카메라에서 캐릭터 쪽이 앞. 화면 오른쪽은 yaw 가 작아지는 쪽이다
-        const forward = Math.atan2(camera.position.x - b.x, camera.position.z - b.z) + Math.PI
-        const want = forward - Math.atan2(input.stick.x, input.stick.y)
-        const diff = Math.atan2(Math.sin(want - b.yaw), Math.cos(want - b.yaw))
-        b.yaw += THREE.MathUtils.clamp(diff, -STICK_TURN_SPEED * dt, STICK_TURN_SPEED * dt)
-        // 조금 기울이면 천천히, 많이 기울일수록 빨리 걷고 끝까지 밀면 뛴다
-        move = THREE.MathUtils.lerp(STICK_WALK_MIN, 1, THREE.MathUtils.clamp((tilt - STICK_DEAD) / (STICK_RUN - STICK_DEAD), 0, 1))
-        running = running || tilt > STICK_RUN
+        const axis = (v: number) => Math.sign(v) * THREE.MathUtils.clamp((Math.abs(v) - STICK_DEAD) / (1 - STICK_DEAD), 0, 1)
+        const steer = -axis(sx) // 오른쪽으로 밀면 yaw 가 작아진다
+        b.yaw += steer * STICK_TURN_SPEED * dt
+        if (steer !== 0) turn = steer
+        if (sy > STICK_DEAD) {
+          // 조금 기울이면 천천히, 많이 기울일수록 빨리 걷고 끝까지 밀면 뛴다
+          move = THREE.MathUtils.lerp(STICK_WALK_MIN, 1, THREE.MathUtils.clamp((sy - STICK_DEAD) / (STICK_RUN - STICK_DEAD), 0, 1))
+          running = running || sy > STICK_RUN
+        } else if (sy < -STICK_DEAD * 2) move = -1 // 아래로 당기면 뒷걸음
       }
     }
     let dx = 0
@@ -579,6 +583,8 @@ function WorldScene({ terrain, trail }: Props) {
     if (Number.isNaN(cameraY.current) || Math.abs(cameraY.current - pos.y) > 3) cameraY.current = pos.y
     const lookY = b.airTime > 0 ? Math.min(pos.y, cameraY.current + 0.02) : pos.y
     cameraY.current += (lookY - cameraY.current) * (1 - Math.exp(-CAMERA_Y_RATE * dt))
+    // 오르막으로 뛰면 앞쪽 땅이 느리게 따라오는 높이보다 높아진다. 발밑 땅보다 내려가지 않게 받친다
+    cameraY.current = Math.max(cameraY.current, Math.min(pos.y, meshHeight(terrain, pos.x, pos.z)) - CAMERA_GROUND_FLOOR)
     const target = new THREE.Vector3(pos.x, cameraY.current + 1.5, pos.z)
     // 안전망: 카메라 값이 한 번이라도 깨지면 다음 프레임에도 계속 깨진 채로 남아 화면이 비므로, 캐릭터 등 뒤로 다시 놓는다
     if (!Number.isFinite(camera.position.x + camera.position.y + camera.position.z + lastTarget.current.x + lastTarget.current.y + lastTarget.current.z)) {
@@ -597,18 +603,15 @@ function WorldScene({ terrain, trail }: Props) {
     dir.normalize()
     camera.position.copy(target).addScaledVector(dir, arm)
 
-    // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 키보드로 다시 걷거나 몸을 돌리면 따라간다
-    // 조이스틱으로 걸을 때는 보던 쪽을 지킨다. 옆으로 밀면 카메라는 그대로 두고 캐릭터가 화면을 가로지르며, 앞으로 밀수록 천천히 등 뒤로 돌아간다
+    // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 손가락·마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
     // 베이스캠프에서는 캐릭터 앞쪽 비스듬히 돌아가 낮게 비춘다
-    if (input.forward || input.backward || input.left || input.right || lobby) freeLook.current = false
-    if (stick) freeLook.current = true
-    const followRate = !freeLook.current ? FOLLOW_RATE : stick ? STICK_FOLLOW_RATE * Math.max(0, input.stick.y) : 0
-    if (followRate > 0) {
+    if (input.forward || input.backward || input.left || input.right || stick || lobby) freeLook.current = false
+    if (!freeLook.current) {
       const off = camera.position.clone().sub(target)
       const horizontal = Math.hypot(off.x, off.z)
       let azimuth = Math.atan2(off.x, off.z)
       const want = lobby ? b.yaw + LOBBY_ANGLE + Math.sin(performance.now() / 5000) * LOBBY_SWAY : b.yaw + Math.PI
-      const k = 1 - Math.exp(-followRate * dt)
+      const k = 1 - Math.exp(-FOLLOW_RATE * dt)
       azimuth += Math.atan2(Math.sin(want - azimuth), Math.cos(want - azimuth)) * k // 가까운 쪽으로 돈다
       let y = camera.position.y
       if (lobby) y += (target.y + Math.sin(LOBBY_PITCH) * arm - y) * k
@@ -644,6 +647,9 @@ function WorldScene({ terrain, trail }: Props) {
     const reach = hit ? Math.max(CAMERA_MIN_ARM, hit.timeOfImpact - CAMERA_PROBE_MARGIN) : arm
     z.shown = reach < z.shown ? reach : z.shown + (reach - z.shown) * (1 - Math.exp(-CAMERA_RELEASE_RATE * dt))
     camera.position.copy(target).addScaledVector(dir, z.shown)
+    // 마지막 안전망: 레이가 놓친 비탈(점프 중 낮은 기준점 등)에서도 카메라가 땅속에 들어가지 않게 올린다
+    const floor = meshHeight(terrain, camera.position.x, camera.position.z) + CAMERA_GROUND_CLEARANCE
+    if (camera.position.y < floor) camera.position.y = floor
     occlusionUniforms.uOccCamera.value.copy(camera.position)
     // 캐릭터와 카메라가 자리 잡고 몇 프레임 그린 뒤 첫 화면을 걷어 내게 알린다
     if (drawnFrames.current < 5 && ++drawnFrames.current === 5) useGame.setState({ sceneReady: true })
