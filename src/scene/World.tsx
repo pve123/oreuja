@@ -74,6 +74,20 @@ const TURN_SPEED = 3.6 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에
 const STICK_DEAD = 0.14
 const STICK_RUN = 0.82
 const STICK_TURN_SPEED = 9
+/** 조이스틱을 조금만 기울였을 때 걷는 빠르기 비율. 여기서부터 STICK_RUN 까지 기울일수록 빨라진다 */
+const STICK_WALK_MIN = 0.4
+/**
+ * 조이스틱으로 걸을 때 카메라가 등 뒤로 돌아가는 빠르기. 앞으로 밀수록 천천히 돌아가고 옆으로 밀면 그대로 둔다.
+ * 키보드처럼 바로 따라가면 옆으로 미는 동안 카메라와 몸이 서로를 쫓아 제자리에서 빙빙 돈다
+ */
+const STICK_FOLLOW_RATE = 1.2
+/**
+ * 터치로 둘러볼 때 손가락 1px 에 도는 각도(°). OrbitControls 는 화면 높이 기준이라 폰을 가로로 눕히면 두 배 빨라지므로
+ * 높이와 상관없이 같게 맞춘다. 세로 폰 화면 너비만큼 끌면 약 60° 돈다
+ */
+const TOUCH_LOOK_DEG_PER_PX = 0.15
+/** 터치 둘러보기 관성. 손가락을 떼면 잠깐 미끄러지다 멈춘다 (drei 와 World 가 프레임마다 한 번씩 update 하므로 두 번 적용된다) */
+const TOUCH_LOOK_DAMPING = 0.08
 /** 카메라와 캐릭터 가슴 사이 가장 가까운 거리(m) */
 const CAMERA_MIN_DISTANCE = 4
 /** 첫 화면 카메라 거리(m). 캐릭터 온몸과 앞길이 함께 보이게 가장 가까운 거리보다 조금 떨어져 시작한다 */
@@ -377,7 +391,8 @@ function WorldScene({ terrain, trail }: Props) {
         const want = forward - Math.atan2(input.stick.x, input.stick.y)
         const diff = Math.atan2(Math.sin(want - b.yaw), Math.cos(want - b.yaw))
         b.yaw += THREE.MathUtils.clamp(diff, -STICK_TURN_SPEED * dt, STICK_TURN_SPEED * dt)
-        move = 1
+        // 조금 기울이면 천천히, 많이 기울일수록 빨리 걷고 끝까지 밀면 뛴다
+        move = THREE.MathUtils.lerp(STICK_WALK_MIN, 1, THREE.MathUtils.clamp((tilt - STICK_DEAD) / (STICK_RUN - STICK_DEAD), 0, 1))
         running = running || tilt > STICK_RUN
       }
     }
@@ -582,15 +597,18 @@ function WorldScene({ terrain, trail }: Props) {
     dir.normalize()
     camera.position.copy(target).addScaledVector(dir, arm)
 
-    // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
+    // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 마우스로 둘러보는 중이면 그 자리에 두고, 키보드로 다시 걷거나 몸을 돌리면 따라간다
+    // 조이스틱으로 걸을 때는 보던 쪽을 지킨다. 옆으로 밀면 카메라는 그대로 두고 캐릭터가 화면을 가로지르며, 앞으로 밀수록 천천히 등 뒤로 돌아간다
     // 베이스캠프에서는 캐릭터 앞쪽 비스듬히 돌아가 낮게 비춘다
-    if (input.forward || input.backward || input.left || input.right || stick || lobby) freeLook.current = false
-    if (!freeLook.current) {
+    if (input.forward || input.backward || input.left || input.right || lobby) freeLook.current = false
+    if (stick) freeLook.current = true
+    const followRate = !freeLook.current ? FOLLOW_RATE : stick ? STICK_FOLLOW_RATE * Math.max(0, input.stick.y) : 0
+    if (followRate > 0) {
       const off = camera.position.clone().sub(target)
       const horizontal = Math.hypot(off.x, off.z)
       let azimuth = Math.atan2(off.x, off.z)
       const want = lobby ? b.yaw + LOBBY_ANGLE + Math.sin(performance.now() / 5000) * LOBBY_SWAY : b.yaw + Math.PI
-      const k = 1 - Math.exp(-FOLLOW_RATE * dt)
+      const k = 1 - Math.exp(-followRate * dt)
       azimuth += Math.atan2(Math.sin(want - azimuth), Math.cos(want - azimuth)) * k // 가까운 쪽으로 돈다
       let y = camera.position.y
       if (lobby) y += (target.y + Math.sin(LOBBY_PITCH) * arm - y) * k
@@ -656,7 +674,10 @@ function WorldScene({ terrain, trail }: Props) {
         minPolarAngle={Math.PI * 0.2}
         maxPolarAngle={Math.PI * 0.49}
         // 마우스로 끌면 캐릭터 둘레를 돌아 정면도 볼 수 있다. 걷기 시작하면 다시 등 뒤로 따라간다
-        rotateSpeed={0.6}
+        // 터치는 손가락 1px 에 도는 각도를 화면 높이와 상관없이 맞추고 관성을 조금 준다
+        rotateSpeed={IS_TOUCH ? (TOUCH_LOOK_DEG_PER_PX * size.height) / 360 : 0.6}
+        enableDamping={IS_TOUCH}
+        dampingFactor={TOUCH_LOOK_DAMPING}
         onStart={() => {
           freeLook.current = true
         }}
