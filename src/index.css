@@ -892,8 +892,21 @@ kbd {
   width: 160px;
   height: 140px;
 }
+/* 정상 기록 네 칸은 두 줄로 */
+.summit-stats {
+  grid-template-columns: repeat(2, 1fr);
+}
 .summit-stats dd {
   font-size: 15px;
+}
+.summit-best {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: rgba(255, 213, 138, 0.16);
+  color: var(--accent-2);
+  font-size: 15px;
+  font-weight: 800;
 }
 .modal-sub {
   margin: 0;
