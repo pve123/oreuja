@@ -1,5 +1,6 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { input } from '../lib/store'
+import { IS_TOUCH } from '../lib/device'
 
 /** 손잡이가 움직이는 반지름(px). 이만큼 밀면 기울기 1. 작으면 엄지를 조금만 움직여도 뛰어 버려 민감하다 */
 const RADIUS = 60
@@ -76,6 +77,72 @@ export function TouchControls() {
       <div ref={base} className="stick">
         <div ref={knob} className="stick-knob" />
       </div>
+    </div>
+  )
+}
+
+const GUIDE_KEY = 'hiking-metaverse:touch-guide'
+/** 조작 안내를 띄워 두는 가장 긴 시간(ms) */
+const GUIDE_MS = 8000
+/** 안내가 뜨자마자 눌러서 읽기도 전에 사라지지 않게, 이 시간(ms)이 지난 뒤의 터치만 안내를 걷는다 */
+const GUIDE_MIN_MS = 1200
+
+function guideSeen() {
+  try {
+    return localStorage.getItem(GUIDE_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
+/**
+ * 터치 기기에서 처음 걸을 때 한 번만 보여 주는 조작 안내. 모바일 게임처럼 손가락이 움직이는 모습으로 조이스틱·둘러보기·점프 자리를 짚는다.
+ * 화면을 누르거나 GUIDE_MS 가 지나면 걷어 내고 브라우저에 기억해 다시 띄우지 않는다. 터치는 막지 않아 안내가 떠 있는 동안에도 바로 걸을 수 있다
+ */
+export function TouchGuide() {
+  const [show, setShow] = useState(() => IS_TOUCH && !guideSeen())
+
+  useEffect(() => {
+    if (!show) return
+    const shownAt = performance.now()
+    const hide = () => {
+      setShow(false)
+      try {
+        localStorage.setItem(GUIDE_KEY, '1')
+      } catch {
+        // 저장소를 못 쓰면 다음에 또 보여 준다
+      }
+    }
+    const onDown = () => {
+      if (performance.now() - shownAt > GUIDE_MIN_MS) hide()
+    }
+    const t = setTimeout(hide, GUIDE_MS)
+    window.addEventListener('pointerdown', onDown, true)
+    return () => {
+      clearTimeout(t)
+      window.removeEventListener('pointerdown', onDown, true)
+    }
+  }, [show])
+
+  if (!show) return null
+  return (
+    <div className="touch-guide" role="note" aria-label="조작 안내">
+      <div className="guide-item guide-stick">
+        <span className="guide-finger guide-finger-stick" aria-hidden />
+        <p>엄지를 대고 밀면 걸어요</p>
+      </div>
+      <div className="guide-item guide-look">
+        <span className="guide-finger guide-finger-look" aria-hidden />
+        <p>
+          끌어서 둘러봐요
+          <br />
+          두 손가락으로 확대해요
+        </p>
+      </div>
+      <div className="guide-item guide-jump">
+        <p>눌러서 뛰어요</p>
+      </div>
+      <p className="guide-dismiss">화면을 누르면 안내가 사라져요</p>
     </div>
   )
 }

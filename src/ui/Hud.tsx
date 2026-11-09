@@ -5,7 +5,9 @@ import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
-import { TouchControls } from './TouchControls'
+import { TouchControls, TouchGuide } from './TouchControls'
+import { useWakeLock } from '../lib/wakeLock'
+import { IS_TOUCH } from '../lib/device'
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
@@ -72,6 +74,8 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   const leftMinutes = estimateMinutes(left.length, left.gain)
   const current = sections.findIndex((s) => distance < s.end)
   const next = sections[current === -1 ? sections.length - 1 : current]
+  // 폰에서 걷는 동안은 화면이 꺼지지 않게 한다
+  useWakeLock(IS_TOUCH && mode === 'hiking')
 
   if (mode !== 'hiking') return null
 
@@ -167,6 +171,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       <TogetherPanel trail={trail} />
       {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
       <TouchControls />
+      <TouchGuide />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
     </>
   )
