@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { input, useGame } from '../lib/store'
 import { IS_TOUCH } from '../lib/device'
+import { readStored, writeStored } from '../lib/storage'
 
 /** 손잡이가 움직이는 반지름(px). 이만큼 밀면 기울기 1. 작으면 엄지를 조금만 움직여도 뛰어 버려 민감하다 */
 const RADIUS = 60
@@ -87,20 +88,12 @@ const GUIDE_MS = 8000
 /** 안내가 뜨자마자 눌러서 읽기도 전에 사라지지 않게, 이 시간(ms)이 지난 뒤의 터치만 안내를 걷는다 */
 const GUIDE_MIN_MS = 1200
 
-function guideSeen() {
-  try {
-    return localStorage.getItem(GUIDE_KEY) === '1'
-  } catch {
-    return false
-  }
-}
-
 /**
  * 터치 기기에서 처음 걸을 때 한 번만 보여 주는 조작 안내. 모바일 게임처럼 손가락이 움직이는 모습으로 조이스틱·둘러보기·점프 자리를 짚는다.
  * 화면을 누르거나 GUIDE_MS 가 지나면 걷어 내고 브라우저에 기억해 다시 띄우지 않는다. 터치는 막지 않아 안내가 떠 있는 동안에도 바로 걸을 수 있다
  */
 export function TouchGuide() {
-  const [show, setShow] = useState(() => IS_TOUCH && !guideSeen())
+  const [show, setShow] = useState(() => IS_TOUCH && readStored(GUIDE_KEY) !== '1')
   // 쉬운 조작은 조이스틱 자리에 「걷기」 버튼이 있어 누르는 모습으로 안내한다
   const easy = useGame((s) => s.controlMode === 'easy')
 
@@ -109,11 +102,8 @@ export function TouchGuide() {
     const shownAt = performance.now()
     const hide = () => {
       setShow(false)
-      try {
-        localStorage.setItem(GUIDE_KEY, '1')
-      } catch {
-        // 저장소를 못 쓰면 다음에 또 보여 준다
-      }
+      // 저장소를 못 쓰면 다음에 또 보여 준다
+      writeStored(GUIDE_KEY, '1')
     }
     const onDown = () => {
       if (performance.now() - shownAt > GUIDE_MIN_MS) hide()

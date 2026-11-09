@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { readStored, writeStored } from './storage'
 import { create } from 'zustand'
 
 /**
@@ -225,12 +226,8 @@ const FIXED_SKY: Record<Exclude<SkyPreset, 'now'>, { elevation: number; azimuth:
 const SKY_KEY = 'hiking-metaverse:sky'
 
 function loadSky(): SkyPreset {
-  try {
-    const v = localStorage.getItem(SKY_KEY)
-    return SKY_PRESETS.some((p) => p.kind === v) ? (v as SkyPreset) : 'now'
-  } catch {
-    return 'now'
-  }
+  const v = readStored(SKY_KEY)
+  return SKY_PRESETS.some((p) => p.kind === v) ? (v as SkyPreset) : 'now'
 }
 
 /** 고른 하늘대로 목표값을 채운다. now 면 실제 시각(개발 중에는 ?time= 값). Daylight 가 매 프레임 부르고 이어서 settle 한다 */
@@ -244,11 +241,7 @@ export function applySky(preset: SkyPreset, now: Date = kstNow()) {
 export const useSky = create<{ preset: SkyPreset; setPreset: (preset: SkyPreset) => void }>((set) => ({
   preset: loadSky(),
   setPreset: (preset) => {
-    try {
-      localStorage.setItem(SKY_KEY, preset)
-    } catch {
-      // 저장소를 못 쓰는 환경이면 이번 접속에만 쓴다
-    }
+    writeStored(SKY_KEY, preset)
     set({ preset })
   },
 }))
