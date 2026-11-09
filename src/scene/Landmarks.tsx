@@ -278,40 +278,120 @@ function Hut() {
   )
 }
 
-/** 성문 단면: 아치 구멍이 뚫린 벽 (가운데가 등산로) */
+/** 성문 문구멍 반폭과 높이(m). 북한산성 위문처럼 위가 평평한 네모 문 */
+const GATE_HALF = 1.3
+const GATE_TOP = 3
+
+/** 성문 단면: 네모 문구멍이 뚫린 벽 (가운데가 등산로). 바닥은 비탈에 묻히게 2m 내린다 */
 function gateShape() {
   const s = new THREE.Shape()
   s.moveTo(-3.5, -2)
-  s.lineTo(-1.3, -2)
-  s.lineTo(-1.3, 2)
-  s.absarc(0, 2, 1.3, Math.PI, 0, true)
-  s.lineTo(1.3, -2)
+  s.lineTo(-GATE_HALF, -2)
+  s.lineTo(-GATE_HALF, GATE_TOP)
+  s.lineTo(GATE_HALF, GATE_TOP)
+  s.lineTo(GATE_HALF, -2)
   s.lineTo(3.5, -2)
   s.lineTo(3.5, 4.6)
   s.lineTo(-3.5, 4.6)
   s.closePath()
-  return new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: false, curveSegments: 16 }).translate(0, 0, -1.3)
+  return new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: false }).translate(0, 0, -1.3)
 }
 
-/** 돌 성문 (암문). 등산로가 아치 사이로 지나가고, 위에는 여장(성가퀴)이 늘어선다 */
+/** 화강암 마름돌을 줄 맞춰 쌓은 벽 무늬. 한 장이 2.4m 이고, 줄마다 돌 너비와 밝기가 조금씩 다르다 */
+function ashlarTexture() {
+  const tex = canvasTexture(256, 256, (g) => {
+    const rand = seededRandom(17)
+    g.fillStyle = '#a69e8e'
+    g.fillRect(0, 0, 256, 256)
+    const rows = [66, 60, 68, 62]
+    let y = 0
+    for (const h of rows) {
+      let x = 0
+      while (x < 256) {
+        // 남은 폭이 좁으면 마지막 돌에 합쳐 무늬 이음매에 가는 돌이 생기지 않게 한다
+        let w = 70 + rand() * 60
+        if (256 - x - w < 60) w = 256 - x
+        const shade = 200 + Math.round(rand() * 30)
+        g.fillStyle = `rgb(${shade + 8},${shade},${shade - 18})`
+        g.fillRect(x + 1.5, y + 1.5, w - 3, h - 3)
+        x += w
+      }
+      y += h
+    }
+  })
+  tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+  tex.repeat.set(1 / 2.4, 1 / 2.4)
+  return tex
+}
+
+/**
+ * 돌 성문 (북한산성 백운봉암문). 마름돌 벽에 위가 평평한 네모 문이 뚫려 있고, 문 둘레에 큰 문설주와 상인방 돌을 댄다.
+ * 문 안쪽에는 한 단 좁은 문틀이 한 번 더 있다. 벽 양옆은 큰 자연 바위에 기대어 있고, 문 앞에 안내판이 선다
+ */
 function Gate() {
   const wall = useMemo(() => gateShape(), [])
+  const ashlar = useMemo(() => ashlarTexture(), [])
   return (
     <group>
       <mesh geometry={wall} castShadow receiveShadow>
-        <Std color="#b7b0a3" flatShading />
+        <Std color="#ffffff" map={ashlar} />
       </mesh>
-      {[-3.15, -2.25, -1.35, -0.45, 0.45, 1.35, 2.25, 3.15].flatMap((x) =>
-        [-1.05, 1.05].map((z) => (
-          <mesh key={`${x},${z}`} position={[x, 4.9, z]} castShadow>
-            <boxGeometry args={[0.55, 0.6, 0.45]} />
-            <Std color="#a9a296" flatShading />
+      {/* 앞뒤 면의 문설주와 상인방 */}
+      {[-1.33, 1.33].map((z) => (
+        <group key={z}>
+          {[-1, 1].map((s) => (
+            <mesh key={s} position={[s * (GATE_HALF + 0.25), GATE_TOP / 2 - 0.5, z]} castShadow>
+              <boxGeometry args={[0.5, GATE_TOP + 1, 0.08]} />
+              <Std color="#c2bbae" flatShading />
+            </mesh>
+          ))}
+          <mesh position={[0, GATE_TOP + 0.32, z]} castShadow>
+            <boxGeometry args={[GATE_HALF * 2 + 1.1, 0.64, 0.1]} />
+            <Std color="#bab3a6" flatShading />
           </mesh>
-        )),
-      )}
+        </group>
+      ))}
+      {/* 문 안쪽의 좁은 문틀 */}
+      <mesh position={[0, GATE_TOP - 0.15, 0]}>
+        <boxGeometry args={[GATE_HALF * 2, 0.3, 0.8]} />
+        <Std color="#9f988c" flatShading />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[s * (GATE_HALF - 0.08), GATE_TOP / 2 - 1, 0]}>
+          <boxGeometry args={[0.16, GATE_TOP + 2, 0.8]} />
+          <Std color="#9f988c" flatShading />
+        </mesh>
+      ))}
+      {/* 벽 위로 들쭉날쭉 남은 맨 윗줄 돌 */}
+      {[-3.1, -2.2, -1.2, -0.3, 0.7, 1.6, 2.6].map((x, i) => (
+        <mesh key={x} position={[x, 4.6 + (0.18 + (i % 3) * 0.06) / 2, 0]} castShadow>
+          <boxGeometry args={[0.86, 0.18 + (i % 3) * 0.06, 2.5]} />
+          <Std color={GRANITE[i % GRANITE.length]} flatShading />
+        </mesh>
+      ))}
+      {/* 벽이 기댄 자연 바위. 비탈 아래로 깊이 묻어 떠 보이지 않게 한다 */}
+      {GATE_ROCKS.map((r, i) => (
+        <mesh key={i} position={r.pos} scale={r.scale} rotation={[0.2 * i, 0.9 * i, 0.1]} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <Std color={GRANITE[(i + 2) % GRANITE.length]} flatShading />
+        </mesh>
+      ))}
+      {/* 문 앞 안내판. 북한산 위문은 등산로가 벽을 따라 왼쪽에서 와서 꺾여 들어오므로 오른쪽에 세운다 */}
+      <mesh position={[2.1, 0.9, -1.9]} rotation={[0, -0.35, 0]} castShadow>
+        <boxGeometry args={[0.55, 1.9, 0.08]} />
+        <Std color="#4a4a48" />
+      </mesh>
     </group>
   )
 }
+
+/** 성문 양옆 바위 [위치, 크기]. src/lib/landmarks.ts 의 gate 충돌 원과 맞춘다 */
+const GATE_ROCKS: { pos: [number, number, number]; scale: [number, number, number] }[] = [
+  { pos: [-4.7, 1.2, 0.2], scale: [1.6, 3.4, 1.9] },
+  { pos: [-3.9, 0.1, 2], scale: [1, 1.4, 1] },
+  { pos: [4.8, 1.5, -0.1], scale: [1.8, 3.8, 2.1] },
+  { pos: [4, 0.4, 2], scale: [1.1, 1.8, 1.1] },
+]
 
 /** 무너진 성벽 터: 길 양옆에 높이가 들쭉날쭉한 돌무더기 */
 function Ruins({ seed }: { seed: number }) {
