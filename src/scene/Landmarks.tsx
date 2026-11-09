@@ -3,11 +3,11 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Terrain, Trail } from '../lib/data'
-import { LANDMARK_ICON, landmarks, type Landmark } from '../lib/landmarks'
+import { FORTRESS, LANDMARK_ICON, landmarks, type Landmark } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
 import { seededRandom } from '../lib/random'
 import { useGame } from '../lib/store'
-import { Boulder, Pavilion, Peak, TrailSlab } from './NamedRocks'
+import { Boulder, Pavilion, Peak, RockGate, TrailSlab } from './NamedRocks'
 
 const LABEL_RANGE = 300 // 이 거리 안의 랜드마크만 이름을 띄운다(m)
 
@@ -28,11 +28,18 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
 
   return (
     <group>
-      {/* 마당바위·기차바위는 등산로를 따라 지형 위에 까는 바위라 세계 좌표로 그린다 */}
+      {/* 마당바위·기차바위·능선은 등산로를 따라 지형 위에 까는 바위라 세계 좌표로 그린다 */}
       {list
-        .filter((l) => l.kind === 'slab' || l.kind === 'ropes')
+        .filter((l) => l.kind === 'slab' || l.kind === 'ropes' || l.kind === 'ridge')
         .map((l) => (
-          <TrailSlab key={`${l.name}-slab`} terrain={terrain} trail={trail} at={l.distance} name={l.name} ropes={l.kind === 'ropes'} />
+          <TrailSlab
+            key={`${l.name}-slab`}
+            terrain={terrain}
+            trail={trail}
+            at={l.distance}
+            name={l.name}
+            mode={l.kind === 'ropes' ? 'ropes' : l.kind === 'ridge' ? 'ridge' : 'yard'}
+          />
         ))}
       {list.map((l) => (
         <group key={l.name} position={l.position} rotation={[0, l.rotation, 0]}>
@@ -69,7 +76,7 @@ function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail })
     case 'temple':
       return <Temple />
     case 'hut':
-      return <Hut />
+      return <Hut twoStory={landmark.name.includes('대피소')} />
     case 'gate':
       return <Gate />
     case 'ruins':
@@ -82,8 +89,11 @@ function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail })
       return <Peak name={landmark.name} seed={landmark.distance} />
     case 'pavilion':
       return <Pavilion />
+    case 'rockgate':
+      return <RockGate seed={landmark.distance} />
     case 'slab':
     case 'ropes':
+    case 'ridge':
       return null
     case 'trailhead':
       return <Trailhead mountain={trail.data.mountain} park={trail.data.park} />
@@ -252,11 +262,15 @@ function rubbleTexture() {
   })
 }
 
+/** 대피소 2층 높이(m) */
+const UPPER_FLOOR = 2.6
+
 /**
  * 돌 산장 (북한산 백운산장). 막돌을 쌓은 벽에 처마가 넓은 낮은 박공지붕을 얹고,
- * 앞면에 나무 문틀을 댄 유리문 두 짝과 창을 낸다. 문 앞에 벤치를 둔다
+ * 앞면에 나무 문틀을 댄 유리문 두 짝과 창을 낸다. 문 앞에 벤치를 둔다.
+ * twoStory 면 대피소(도봉산대피소)처럼 막돌 1층 위에 흰 창이 줄지은 연두색 2층을 얹고 그 위에 지붕을 올린다
  */
-function Hut() {
+function Hut({ twoStory = false }: { twoStory?: boolean }) {
   // 단면이 삼각형인 기둥을 눕혀 박공지붕을 만든다 (꼭짓점 하나가 위로)
   const roof = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 3, 1, false, Math.PI / 2).rotateZ(Math.PI / 2), [])
   const stone = useMemo(() => {
@@ -277,16 +291,41 @@ function Hut() {
         <boxGeometry args={[5, 2.8, 4]} />
         <Std color="#ffffff" map={stone} />
       </mesh>
+      {twoStory && (
+        <group position={[0, 2.8, 0]}>
+          <mesh position={[0, UPPER_FLOOR / 2, 0]} castShadow receiveShadow>
+            <boxGeometry args={[5, UPPER_FLOOR, 4]} />
+            <Std color="#cfe0c4" />
+          </mesh>
+          {/* 층 사이 콘크리트 띠와 2층 흰 창 */}
+          <mesh position={[0, 0.05, 0]}>
+            <boxGeometry args={[5.2, 0.2, 4.2]} />
+            <Std color="#a9a69e" />
+          </mesh>
+          {[-1.6, -0.55, 0.5, 1.55].map((x) => (
+            <mesh key={x} position={[x, 1.2, 2.02]}>
+              <boxGeometry args={[0.9, 0.8, 0.05]} />
+              <Std color="#9fb6c0" roughness={0.2} metalness={0.3} />
+            </mesh>
+          ))}
+          <mesh position={[0, 1.2, 2.04]}>
+            <boxGeometry args={[4.3, 0.06, 0.03]} />
+            <Std color="#f2f2f0" />
+          </mesh>
+        </group>
+      )}
       {/* 낮은 지붕과 앞뒤로 길게 나온 처마 */}
-      <mesh geometry={roof} position={[0, 3.12, 0]} scale={[5.9, 0.62, 3.3]} castShadow>
-        <Std color="#4a3428" flatShading />
-      </mesh>
-      {[-1, 1].map((s) => (
-        <mesh key={s} position={[0, 2.84, s * 2.82]} rotation={[s * 0.2, 0, 0]}>
-          <boxGeometry args={[5.9, 0.16, 0.08]} />
-          <Std color="#3b2a20" />
+      <group position={[0, twoStory ? UPPER_FLOOR : 0, 0]}>
+        <mesh geometry={roof} position={[0, 3.12, 0]} scale={[5.9, 0.62, 3.3]} castShadow>
+          <Std color="#4a3428" flatShading />
         </mesh>
-      ))}
+        {[-1, 1].map((s) => (
+          <mesh key={s} position={[0, 2.84, s * 2.82]} rotation={[s * 0.2, 0, 0]}>
+            <boxGeometry args={[5.9, 0.16, 0.08]} />
+            <Std color="#3b2a20" />
+          </mesh>
+        ))}
+      </group>
       {/* 나무 문틀을 댄 유리문 두 짝과 창 */}
       {[-1.55, -0.55].map((x) => (
         <group key={x} position={[x, 1.05, 2.03]}>
@@ -418,6 +457,98 @@ function Gate() {
         <boxGeometry args={[0.55, 1.9, 0.08]} />
         <Std color="#4a4a48" />
       </mesh>
+    </group>
+  )
+}
+
+const { half: FORT_HALF, spring: FORT_SPRING, wall: FORT_WALL, top: FORT_TOP, depth: FORT_DEPTH } = FORTRESS
+
+/** 산성 대문 성벽 단면: 홍예 문구멍이 뚫린 긴 벽. 바닥은 비탈에 묻히게 2m 내린다 */
+function fortressShape() {
+  const s = new THREE.Shape()
+  s.moveTo(-FORT_WALL, -2)
+  s.lineTo(-FORT_HALF, -2)
+  s.lineTo(-FORT_HALF, FORT_SPRING)
+  s.absarc(0, FORT_SPRING, FORT_HALF, Math.PI, 0, true)
+  s.lineTo(FORT_HALF, -2)
+  s.lineTo(FORT_WALL, -2)
+  s.lineTo(FORT_WALL, FORT_TOP)
+  s.lineTo(-FORT_WALL, FORT_TOP)
+  s.closePath()
+  return new THREE.ExtrudeGeometry(s, { depth: FORT_DEPTH, bevelEnabled: false, curveSegments: 16 }).translate(0, 0, -FORT_DEPTH / 2)
+}
+
+/**
+ * 산성 대문 (북한산성 대동문). 마름돌 성벽에 홍예 문이 뚫리고, 성벽 위에는 흰 여장이 늘어서며,
+ * 문 위에는 붉은 기둥과 단청 띠, 우진각 기와지붕을 얹은 문루가 선다. 문루 앞에 「大東門」 현판을 단다
+ */
+export function FortressGate() {
+  const wall = useMemo(() => fortressShape(), [])
+  const ashlar = useMemo(() => ashlarTexture(), [])
+  useEffect(() => () => ashlar.dispose(), [ashlar])
+  const hip = useMemo(() => new THREE.ConeGeometry(1, 1, 4).rotateY(Math.PI / 4), [])
+  const board = useMemo(
+    () =>
+      canvasTexture(192, 64, (g) => {
+        g.fillStyle = '#1f1d1b'
+        g.fillRect(0, 0, 192, 64)
+        g.fillStyle = '#f1e6c8'
+        g.font = 'bold 40px serif'
+        g.textAlign = 'center'
+        g.textBaseline = 'middle'
+        g.fillText('大東門', 96, 34)
+      }),
+    [],
+  )
+  useEffect(() => () => board.dispose(), [board])
+  const red = '#a8322c'
+  const tile = '#3f444a'
+  return (
+    <group>
+      <mesh geometry={wall} castShadow receiveShadow>
+        <Std color="#ffffff" map={ashlar} />
+      </mesh>
+      {/* 여장: 앞뒤 가장자리에 흰 담을 늘어세우고 사이를 조금씩 띄운다. 문루 자리는 비운다 */}
+      {[-1, 1].flatMap((side) =>
+        Array.from({ length: 10 }, (_, i) => -FORT_WALL + 0.9 + i * 1.9)
+          .filter((x) => Math.abs(x) > 3.3)
+          .map((x) => (
+            <mesh key={`${side}:${x}`} position={[x, FORT_TOP + 0.45, side * (FORT_DEPTH / 2 - 0.25)]} castShadow>
+              <boxGeometry args={[1.6, 0.9, 0.45]} />
+              <Std color="#e8e6df" />
+            </mesh>
+          )),
+      )}
+      {/* 문루 */}
+      <group position={[0, FORT_TOP, 0]}>
+        <mesh position={[0, 0.1, 0]} receiveShadow>
+          <boxGeometry args={[6, 0.2, 3.4]} />
+          <Std color="#9d968a" />
+        </mesh>
+        {[-2.4, -0.8, 0.8, 2.4].flatMap((x) =>
+          [-1.15, 1.15].map((z) => (
+            <mesh key={`${x}:${z}`} position={[x, 1.25, z]} castShadow>
+              <cylinderGeometry args={[0.14, 0.15, 2.1, 10]} />
+              <Std color={red} roughness={0.7} />
+            </mesh>
+          )),
+        )}
+        <mesh position={[0, 2.45, 0]}>
+          <boxGeometry args={[5.4, 0.4, 2.7]} />
+          <Std color="#2f8f6a" />
+        </mesh>
+        <mesh position={[0, 2.45, 1.37]}>
+          <planeGeometry args={[1.5, 0.5]} />
+          <Std color="#ffffff" map={board} />
+        </mesh>
+        <mesh position={[0, 2.75, 0]} castShadow>
+          <boxGeometry args={[7, 0.18, 4.2]} />
+          <Std color={tile} flatShading />
+        </mesh>
+        <mesh geometry={hip} position={[0, 3.45, 0]} scale={[4.6, 1.3, 2.9]} castShadow>
+          <Std color={tile} flatShading />
+        </mesh>
+      </group>
     </group>
   )
 }
