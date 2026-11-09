@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { EMOTES, isClimbing, sendEmote, useNet } from '../lib/net'
+import { EMOTES, othersClimbing, sendEmote, useNet } from '../lib/net'
 import type { Trail } from '../lib/data'
 
 /** 왼쪽 아래 같이하기 패널: 접속 상태, 같은 코스 인원, 내 닉네임, 감정 표현 버튼 */
@@ -7,8 +7,8 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
   const status = useNet((s) => s.status)
   const name = useNet((s) => s.name)
   const setName = useNet((s) => s.setName)
-  const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id && isClimbing(p)).length)
-  const total = useNet((s) => s.peers.filter(isClimbing).length)
+  const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id).length)
+  const total = useNet((s) => Math.max(othersClimbing(s.counts), sameCourse))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
 

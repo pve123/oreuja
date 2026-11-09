@@ -154,7 +154,7 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/ui/SoundControls.tsx` | 소리 켜기·끄기 버튼과 이정표 도착·정상·기념사진 소리 |
 | `src/lib/summit.ts`, `src/scene/SummitFlag.tsx` | 정상에서 가장 트인 풍경 방향을 찾아 기념사진 구도를 정하고, 그쪽에 깃발을 세운다 |
 | `src/lib/photo.ts` | 화면을 복사하고 기념 문구 띠와 서비스 이름을 얹어 기념사진을 만든다 |
-| `server/index.mjs` | 같이하기 서버. 접속한 사람들 상태를 1초에 10번 모두에게 나눠 준다 (`npm run server`). 접속 출처·IP 당 접속 수를 거르고, 끊긴 연결을 정리하고, `/health` 로 상태를 알린다 |
+| `server/index.mjs` | 같이하기 서버. 같은 코스를 오르는 사람끼리 위치를 1초에 5번, 바뀌었을 때만 나눠 주고 코스별 인원은 1초에 한 번 알린다 (`npm run server`). 접속 출처·IP 당 접속 수를 거르고, 끊긴 연결을 정리하고, `/health` 로 상태를 알린다 |
 | `tests/server.mjs` | 같이하기 서버 시험 (`npm run test:server`) |
 | `src/lib/net.ts` | 같이하기 서버 연결, 닉네임, 감정 표현 |
 | `src/lib/storage.ts` | 브라우저 저장소 읽기·쓰기. 저장소를 못 쓰는 환경에서도 오류 없이 넘어간다 |
