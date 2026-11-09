@@ -13,7 +13,7 @@ const NAME_MAX = 12
 const AVATARS = new Set(['hiker', 'uncle', 'potato', 'duck', 'tofu', 'mini-beard', 'mini-girl', 'mini-kid', 'barbarian', 'ranger', 'knight'])
 // lobby 는 베이스캠프(출발 전 고르는 화면), hidden 은 혼자 오르기. 둘 다 다른 사람 화면에 그리지 않는다
 const MODES = new Set(['lobby', 'hidden', 'hiking', 'summit', 'photo', 'photoResult'])
-const EMOTES = new Set(['wave', 'cheer', 'heart'])
+const EMOTES = new Set(['wave', 'cheer', 'heart', 'yaho'])
 
 /** @type {Map<import('ws').WebSocket, { id: string, name: string, avatar: string, course: string, distance: number, offset: number, facing: number, jump: number, mode: string, emote: { kind: string, at: number } | null, budget: number }>} */
 const players = new Map()
