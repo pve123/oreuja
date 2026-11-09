@@ -211,23 +211,45 @@ function Temple() {
   )
 }
 
-/** 통나무 산장: 벽, 박공지붕, 굴뚝과 연기, 창문 불빛, 문 앞 벤치 */
+/** 막돌을 쌓은 벽 무늬 (백운산장). 크기가 제각각인 밝은 화강암 돌 사이에 회색 줄눈이 보인다. 한 장이 2.5m */
+function rubbleTexture() {
+  return canvasTexture(256, 256, (g) => {
+    const rand = seededRandom(29)
+    g.fillStyle = '#8f897e'
+    g.fillRect(0, 0, 256, 256)
+    let y = 0
+    while (y < 256) {
+      const h = Math.min(26 + rand() * 22, 256 - y)
+      let x = 0
+      while (x < 256) {
+        let w = 34 + rand() * 46
+        if (256 - x - w < 24) w = 256 - x
+        const shade = 196 + Math.round(rand() * 34)
+        g.fillStyle = `rgb(${shade + 4},${shade},${shade - 12})`
+        g.beginPath()
+        g.roundRect(x + 2 + rand() * 2, y + 2 + rand() * 2, w - 5, h - 5, 6)
+        g.fill()
+        x += w
+      }
+      y += h
+    }
+  })
+}
+
+/**
+ * 돌 산장 (북한산 백운산장). 막돌을 쌓은 벽에 처마가 넓은 낮은 박공지붕을 얹고,
+ * 앞면에 나무 문틀을 댄 유리문 두 짝과 창을 낸다. 문 앞에 벤치를 둔다
+ */
 function Hut() {
   // 단면이 삼각형인 기둥을 눕혀 박공지붕을 만든다 (꼭짓점 하나가 위로)
   const roof = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 3, 1, false, Math.PI / 2).rotateZ(Math.PI / 2), [])
-  const smoke = useRef<THREE.Group>(null!)
-  useFrame((_, dt) => {
-    smoke.current.children.forEach((c, i) => {
-      c.position.y += dt * 0.5
-      c.scale.multiplyScalar(1 + dt * 0.3)
-      if (c.position.y > 2.4) {
-        c.position.y = 0
-        c.scale.setScalar(0.25 + i * 0.02)
-      }
-      const m = (c as THREE.Mesh).material as THREE.MeshStandardMaterial
-      m.opacity = 0.55 * (1 - c.position.y / 2.4)
-    })
-  })
+  const stone = useMemo(() => {
+    const tex = rubbleTexture()
+    tex.wrapS = tex.wrapT = THREE.RepeatWrapping
+    tex.repeat.set(2, 1.1)
+    return tex
+  }, [])
+  useEffect(() => () => stone.dispose(), [stone])
 
   return (
     <group>
@@ -237,43 +259,42 @@ function Hut() {
       </mesh>
       <mesh position={[0, 1.4, 0]} castShadow receiveShadow>
         <boxGeometry args={[5, 2.8, 4]} />
-        <Std color="#8b5a3c" />
+        <Std color="#ffffff" map={stone} />
       </mesh>
-      {/* 통나무 결 */}
-      {[0.4, 0.95, 1.5, 2.05, 2.6].map((y) => (
-        <mesh key={y} position={[0, y, 2.01]}>
-          <boxGeometry args={[5.02, 0.05, 0.02]} />
-          <Std color="#6b4329" />
+      {/* 낮은 지붕과 앞뒤로 길게 나온 처마 */}
+      <mesh geometry={roof} position={[0, 3.12, 0]} scale={[5.9, 0.62, 3.3]} castShadow>
+        <Std color="#4a3428" flatShading />
+      </mesh>
+      {[-1, 1].map((s) => (
+        <mesh key={s} position={[0, 2.84, s * 2.82]} rotation={[s * 0.2, 0, 0]}>
+          <boxGeometry args={[5.9, 0.16, 0.08]} />
+          <Std color="#3b2a20" />
         </mesh>
       ))}
-      <mesh geometry={roof} position={[0, 3.35, 0]} scale={[5.8, 1.1, 2.75]} castShadow>
-        <Std color="#5a3d2b" flatShading />
-      </mesh>
-      {/* 문과 창문 */}
-      <mesh position={[-1.2, 1.05, 2.03]}>
-        <boxGeometry args={[0.9, 1.8, 0.05]} />
-        <Std color="#4a2f1f" />
-      </mesh>
-      {[0.6, 1.8].map((x) => (
-        <mesh key={x} position={[x, 1.6, 2.03]}>
-          <boxGeometry args={[0.8, 0.65, 0.05]} />
-          <Std color="#ffd27a" emissive="#ffb347" emissiveIntensity={0.6} />
-        </mesh>
-      ))}
-      {/* 굴뚝과 연기 */}
-      <mesh position={[1.6, 4, -0.8]} castShadow>
-        <boxGeometry args={[0.5, 1.4, 0.5]} />
-        <Std color="#6e6a64" />
-      </mesh>
-      <group ref={smoke} position={[1.6, 4.8, -0.8]}>
-        {[0, 1, 2, 3].map((i) => (
-          <mesh key={i} position={[0, i * 0.6, 0]} scale={0.25 + i * 0.08}>
-            <sphereGeometry args={[1, 10, 8]} />
-            <meshStandardMaterial color="#e8e8e8" transparent opacity={0.4} depthWrite={false} />
+      {/* 나무 문틀을 댄 유리문 두 짝과 창 */}
+      {[-1.55, -0.55].map((x) => (
+        <group key={x} position={[x, 1.05, 2.03]}>
+          <mesh>
+            <boxGeometry args={[0.9, 2.1, 0.06]} />
+            <Std color="#6b4a2f" />
           </mesh>
-        ))}
+          <mesh position={[0, 0.05, 0.02]}>
+            <boxGeometry args={[0.68, 1.8, 0.04]} />
+            <Std color="#a9c2cc" roughness={0.15} metalness={0.3} />
+          </mesh>
+        </group>
+      ))}
+      <group position={[1.4, 1.55, 2.03]}>
+        <mesh>
+          <boxGeometry args={[1.5, 1.1, 0.06]} />
+          <Std color="#6b4a2f" />
+        </mesh>
+        <mesh position={[0, 0, 0.02]}>
+          <boxGeometry args={[1.3, 0.9, 0.04]} />
+          <Std color="#a9c2cc" roughness={0.15} metalness={0.3} />
+        </mesh>
       </group>
-      <Bench position={[1.2, 0, 2.7]} />
+      <Bench position={[1.2, 0, 2.9]} />
     </group>
   )
 }
@@ -447,55 +468,84 @@ function waterTexture() {
   return tex
 }
 
-/** 바위 절벽에서 떨어지는 물줄기와 물웅덩이 */
+/** 물줄기 면: 위는 좁고 아래로 갈수록 넓게 퍼진다 */
+function fallGeometry() {
+  const geo = new THREE.PlaneGeometry(1, 1, 1, 8)
+  const pos = geo.attributes.position as THREE.BufferAttribute
+  for (let i = 0; i < pos.count; i++) {
+    const t = 0.5 - pos.getY(i) // 위 0, 아래 1
+    pos.setX(i, pos.getX(i) * (0.9 + t * 1.6))
+  }
+  return geo
+}
+
+/** 너럭바위 둘레를 감싸는 바위 [위치, 크기] */
+const FALL_ROCKS: { pos: [number, number, number]; scale: [number, number, number] }[] = [
+  { pos: [-3.4, 0.9, -2], scale: [1.9, 1.5, 1.8] },
+  { pos: [3.3, 1.1, -2.4], scale: [1.8, 1.7, 1.9] },
+  { pos: [-3, 3.1, -4.5], scale: [1.7, 1.6, 1.7] },
+  { pos: [3.1, 3.4, -4.8], scale: [1.6, 1.5, 1.6] },
+  { pos: [0, 5, -6.4], scale: [3.6, 1.1, 2] },
+]
+
+/**
+ * 폭포 (북한산 개연폭포). 매끈하게 비스듬한 너른 화강암 너럭바위를 타고 물줄기가 미끄러져 내려 얕은 물웅덩이에 고인다.
+ * 물이 흐르는 자리는 젖어서 짙고, 너럭바위 양옆과 위를 큰 바위가 감싸며, 웅덩이 둘레에는 납작한 바위가 깔린다
+ */
 function Waterfall() {
   const tex = useMemo(() => waterTexture(), [])
   useEffect(() => () => tex.dispose(), [tex])
+  const fall = useMemo(() => fallGeometry(), [])
   const water = useRef<THREE.Mesh>(null!)
   useFrame((_, dt) => {
     // 물결 무늬를 아래로 흘린다
     const map = (water.current.material as THREE.MeshStandardMaterial).map
     if (map) map.offset.y += dt * 1.2
   })
-  const cliff = useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(1, 1)
-    const rand = seededRandom(17)
-    const pos = geo.attributes.position as THREE.BufferAttribute
-    const v = new THREE.Vector3()
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i).multiplyScalar(0.85 + rand() * 0.25)
-      pos.setXYZ(i, v.x, v.y, v.z)
-    }
-    geo.computeVertexNormals()
-    return geo
-  }, [])
+  // 너럭바위 윗면: 뒤쪽 위에서 웅덩이까지 비스듬히 내려온다. 물줄기는 그 바로 위를 흐른다
+  const top = new THREE.Vector3(0, 4.7, -5.6)
+  const bottom = new THREE.Vector3(0, 0.1, -0.8)
+  const length = top.distanceTo(bottom)
+  const slope = Math.atan2(top.y - bottom.y, bottom.z - top.z)
 
   return (
     <group>
-      <mesh geometry={cliff} position={[0, 3, -3.8]} scale={[4.4, 6, 2.4]} castShadow receiveShadow>
-        <Std color="#8f8a82" flatShading />
-      </mesh>
-      {/* 물줄기 */}
-      <mesh ref={water} position={[0, 3.4, -1.25]} rotation={[-0.12, 0, 0]}>
-        <planeGeometry args={[1.3, 6.8]} />
-        <meshStandardMaterial map={tex} transparent opacity={0.85} roughness={0.2} side={THREE.DoubleSide} />
-      </mesh>
-      {/* 물웅덩이와 물보라 */}
-      <mesh position={[0, 0.05, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow>
-        <circleGeometry args={[2, 28]} />
-        <meshStandardMaterial color="#5fa8c9" roughness={0.1} metalness={0.2} transparent opacity={0.85} />
-      </mesh>
-      {[-0.4, 0.3, 0].map((x, i) => (
-        <mesh key={i} position={[x, 0.25 + i * 0.1, -1 + i * 0.15]}>
-          <sphereGeometry args={[0.35 + i * 0.08, 10, 8]} />
-          <meshStandardMaterial color="#ffffff" transparent opacity={0.35} depthWrite={false} />
+      <group position={[(top.x + bottom.x) / 2, (top.y + bottom.y) / 2, (top.z + bottom.z) / 2]} rotation={[-(Math.PI / 2 - slope), 0, 0]}>
+        {/* 너럭바위 (아래로 깊이 묻는다) */}
+        <mesh position={[0, -0.4, -0.75]} castShadow receiveShadow>
+          <boxGeometry args={[6.4, length + 1.4, 1.5]} />
+          <Std color="#b3a897" flatShading />
+        </mesh>
+        {/* 젖은 자리와 물줄기 */}
+        <mesh position={[0, 0, 0.01]} scale={[1.7, length, 1]} geometry={fall}>
+          <Std color="#6f675c" />
+        </mesh>
+        <mesh ref={water} position={[0, 0, 0.04]} scale={[1.1, length, 1]} geometry={fall}>
+          <meshStandardMaterial map={tex} transparent opacity={0.85} roughness={0.2} side={THREE.DoubleSide} />
+        </mesh>
+      </group>
+      {FALL_ROCKS.map((r, i) => (
+        <mesh key={i} position={r.pos} scale={r.scale} rotation={[0.3 * i, 0.7 * i, 0.15]} castShadow receiveShadow>
+          <dodecahedronGeometry args={[1, 0]} />
+          <Std color={['#a69b8a', '#b9ae9d', '#a1978a', '#ada291', '#9f9586'][i]} flatShading />
         </mesh>
       ))}
-      {/* 웅덩이 둘레 돌 */}
-      {Array.from({ length: 9 }, (_, i) => {
-        const a = (i / 9) * Math.PI * 2
+      {/* 얕은 물웅덩이와 물보라 */}
+      <mesh position={[0, 0.06, 0.6]} rotation={[-Math.PI / 2, 0, 0]} scale={[1.5, 1, 1]} receiveShadow>
+        <circleGeometry args={[2, 28]} />
+        <meshStandardMaterial color="#6fa9bf" roughness={0.1} metalness={0.2} transparent opacity={0.8} />
+      </mesh>
+      {[-0.5, 0.4, 0].map((x, i) => (
+        <mesh key={i} position={[x, 0.2 + i * 0.08, -0.4 + i * 0.15]}>
+          <sphereGeometry args={[0.3 + i * 0.08, 10, 8]} />
+          <meshStandardMaterial color="#ffffff" transparent opacity={0.3} depthWrite={false} />
+        </mesh>
+      ))}
+      {/* 웅덩이 둘레 납작한 바위 */}
+      {Array.from({ length: 7 }, (_, i) => {
+        const a = Math.PI * (0.05 + (i / 6) * 0.9) // 앞쪽 반원
         return (
-          <mesh key={i} position={[Math.cos(a) * 2.1, 0.1, Math.sin(a) * 2.1]} scale={[0.35, 0.25, 0.3]}>
+          <mesh key={i} position={[Math.cos(a) * 3.3, 0.08, 0.6 + Math.sin(a) * 2.3]} rotation={[0, a, 0]} scale={[0.8, 0.22, 0.55]}>
             <dodecahedronGeometry args={[1, 0]} />
             <Std color={GRANITE[i % GRANITE.length]} flatShading />
           </mesh>

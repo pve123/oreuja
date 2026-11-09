@@ -11,6 +11,7 @@ import { meshHeight, standHeight, type Terrain as TerrainData, type Trail } from
 import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
 import { SummitFlag } from './SummitFlag'
+import { SummitRock } from './SummitRock'
 import { Forest } from './Forest'
 import { Landmarks } from './Landmarks'
 import { TrailDetails } from './TrailDetails'
@@ -756,6 +757,7 @@ function WorldScene({ terrain, trail }: Props) {
       <Rocks terrain={terrain} trail={trail} />
       <TrailDetails terrain={terrain} trail={trail} />
       <SummitFlag terrain={terrain} trail={trail} />
+      <SummitRock terrain={terrain} trail={trail} />
       <Landmarks terrain={terrain} trail={trail} />
       <Avatar ref={hiker} kind={avatar} />
       <Peers terrain={terrain} trail={trail} />
