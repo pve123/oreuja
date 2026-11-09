@@ -242,8 +242,9 @@ kbd {
   font-weight: 400;
   color: var(--muted);
 }
-/* 터치 화면에는 키보드가 없고, 좁은 화면은 위쪽 자리가 모자라다 */
-@media (hover: none), (max-width: 760px) {
+/* 터치 화면에는 키보드가 없고, 좁은 화면은 위쪽 자리가 모자라다.
+   터치 기기는 hover 만 보지 않고 포인터 굵기도 본다. 삼성 인터넷은 폰에서도 hover: hover 를 알려 src/lib/device.ts 의 IS_TOUCH 와 어긋난다 */
+@media (hover: none), (pointer: coarse), (pointer: none), (max-width: 760px) {
   .help-panel {
     display: none;
   }
@@ -588,12 +589,13 @@ kbd {
   background: var(--accent);
   border-color: transparent;
 }
+/* 세로 화면은 💬 위쪽으로 두 칸씩 펼친다. 왼쪽으로 펼치면 쉬운 조작의 「걷기」 버튼을 덮는다 */
 .emote-dial-menu {
   position: absolute;
-  right: calc(100% + 10px);
-  bottom: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
   display: grid;
-  grid-template-columns: repeat(4, 58px);
+  grid-template-columns: repeat(2, 66px);
   gap: 6px;
   padding: 8px;
   border-radius: 18px;
@@ -637,6 +639,14 @@ kbd {
 @media (max-width: 760px), (max-height: 500px) {
   .emote-dial {
     bottom: calc(34px + 76px + 14px + var(--sab));
+  }
+}
+/* 가로로 눕힌 폰은 위쪽 공간이 모자라 왼쪽으로 네 칸씩 펼친다 (걷기 버튼과는 화면 반대편이라 겹치지 않는다) */
+@media (max-height: 500px) {
+  .emote-dial-menu {
+    right: calc(100% + 10px);
+    bottom: 0;
+    grid-template-columns: repeat(4, 58px);
   }
 }
 @media (hover: hover) and (pointer: fine) {
@@ -1295,8 +1305,8 @@ kbd {
   height: 52px;
 }
 /* 좁은 화면: 캐릭터·도움말을 위에, 코스 패널을 그 아래 쌓는다. 오른쪽 위 모서리는 소리 버튼 자리 */
-/* 터치 기기 공통(폰 가로·태블릿): 혼자 오르는 동안 닉네임·감정 표현 패널은 조이스틱 자리와 겹쳐 감춘다 (같이하기를 열 때 다시 둔다) */
-@media (hover: none) {
+/* 터치 기기 공통: 혼자 오르는 동안 닉네임·감정 표현 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다 (감정 표현은 💬 버튼으로 보낸다) */
+@media (hover: none), (pointer: coarse), (pointer: none) {
   .together {
     display: none;
   }
@@ -1792,7 +1802,7 @@ kbd {
   border: 1px solid rgba(42, 22, 8, 0.3);
   opacity: 0.7;
 }
-@media (hover: none) {
+@media (hover: none), (pointer: coarse), (pointer: none) {
   .lobby-key {
     display: none;
   }
