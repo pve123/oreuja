@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { readStored, writeStored } from './storage'
 import { create } from 'zustand'
 
 /**
@@ -29,8 +30,8 @@ export const MOON = new THREE.Vector3(0, Math.sin(THREE.MathUtils.degToRad(MOON_
 
 export type Phase = '새벽' | '아침' | '낮' | '저녁' | '밤'
 
-/** 지금 화면에 쓰는 시간대 값. 하늘을 바꾸면 목표값(target) 쪽으로 1초쯤에 걸쳐 옮겨 간다 (settle). Daylight 가 매 프레임 갱신한다 */
-export const daylight = {
+/** 시간대 값 묶음. 화면에 쓰는 값(daylight)과 목표값(target)이 같은 모양이다 */
+const lightState = () => ({
   /** 해 높이(°). 지평선이 0, 아래면 음수 */
   elevation: 0,
   /** 해 방위(°). 북쪽 0, 동쪽 90 */
@@ -52,28 +53,13 @@ export const daylight = {
   rayleigh: 0,
   turbidity: 0,
   mie: 0,
-}
+})
 
-/** 고른 하늘의 목표값. applyDaylight 가 채우고 settle 이 daylight 를 이쪽으로 옮긴다 */
-const target = {
-  elevation: 0,
-  azimuth: 90,
-  phase: '낮' as Phase,
-  skySun: new THREE.Vector3(),
-  sun: new THREE.Vector3(),
-  sunColor: new THREE.Color(),
-  sunIntensity: 0,
-  moonIntensity: 0,
-  skyColor: new THREE.Color(),
-  groundColor: new THREE.Color(),
-  hemiIntensity: 0,
-  fogColor: new THREE.Color(),
-  photoEmissive: 0,
-  stars: 0,
-  rayleigh: 0,
-  turbidity: 0,
-  mie: 0,
-}
+/** 지금 화면에 쓰는 시간대 값. 하늘을 바꾸면 목표값(target) 쪽으로 1초쯤에 걸쳐 옮겨 간다 (settle). Daylight 가 매 프레임 갱신한다 */
+export const daylight = lightState()
+
+/** 고른 하늘의 목표값. applyDaylight 가 채우고 settle 이 daylight 를 이쪽으로 옮긴다. sun 은 조명 방향(SUN)의 목표 */
+const target = { ...lightState(), sun: new THREE.Vector3() }
 
 /** 하늘이 바뀔 때 자리 잡는 시간 상수(초). 1초쯤 지나면 거의 다 옮겨 간다 */
 const BLEND_TAU = 0.35
@@ -107,7 +93,7 @@ export function parseDebugTime(value: string | null): Date | null {
 }
 
 /** KST 시각의 해 높이와 방위(°). NOAA 근사식 */
-export function solarPosition(kst: Date) {
+function solarPosition(kst: Date) {
   const rad = THREE.MathUtils.degToRad
   const start = Date.UTC(kst.getUTCFullYear(), 0, 1)
   const dayOfYear = Math.floor((kst.getTime() - start) / 86400000) + 1
@@ -126,7 +112,7 @@ export function solarPosition(kst: Date) {
 }
 
 /** 해 높이와 시각(오전·오후)으로 시간대 이름을 정한다 */
-export function phaseOf(elevation: number, morning: boolean): Phase {
+function phaseOf(elevation: number, morning: boolean): Phase {
   if (elevation < -8) return '밤'
   if (elevation < 10) return morning ? (elevation < 0 ? '새벽' : '아침') : '저녁'
   return '낮'
@@ -152,7 +138,7 @@ const HIGH_SUN = new THREE.Color('#fff1dc')
 export const MOON_COLOR = new THREE.Color('#8fa3d9')
 
 /** 해 높이(°)와 방위(°)로 조명·하늘·안개 목표값을 채운다 */
-export function applyDaylight(elevation: number, azimuth: number, morning: boolean) {
+function applyDaylight(elevation: number, azimuth: number, morning: boolean) {
   const d = target
   d.elevation = elevation
   d.azimuth = azimuth
@@ -191,7 +177,7 @@ export function applyDaylight(elevation: number, azimuth: number, morning: boole
 }
 
 /** 시각으로 바로 채운다 */
-export function applyTime(kst: Date) {
+function applyTime(kst: Date) {
   const { elevation, azimuth } = solarPosition(kst)
   applyDaylight(elevation, azimuth, kst.getUTCHours() < 12)
 }
@@ -225,12 +211,8 @@ const FIXED_SKY: Record<Exclude<SkyPreset, 'now'>, { elevation: number; azimuth:
 const SKY_KEY = 'hiking-metaverse:sky'
 
 function loadSky(): SkyPreset {
-  try {
-    const v = localStorage.getItem(SKY_KEY)
-    return SKY_PRESETS.some((p) => p.kind === v) ? (v as SkyPreset) : 'now'
-  } catch {
-    return 'now'
-  }
+  const v = readStored(SKY_KEY)
+  return SKY_PRESETS.some((p) => p.kind === v) ? (v as SkyPreset) : 'now'
 }
 
 /** 고른 하늘대로 목표값을 채운다. now 면 실제 시각(개발 중에는 ?time= 값). Daylight 가 매 프레임 부르고 이어서 settle 한다 */
@@ -244,11 +226,7 @@ export function applySky(preset: SkyPreset, now: Date = kstNow()) {
 export const useSky = create<{ preset: SkyPreset; setPreset: (preset: SkyPreset) => void }>((set) => ({
   preset: loadSky(),
   setPreset: (preset) => {
-    try {
-      localStorage.setItem(SKY_KEY, preset)
-    } catch {
-      // 저장소를 못 쓰는 환경이면 이번 접속에만 쓴다
-    }
+    writeStored(SKY_KEY, preset)
     set({ preset })
   },
 }))

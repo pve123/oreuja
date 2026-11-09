@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { readStored, writeStored } from './storage'
 
 export type AvatarKind =
   | 'hiker'
@@ -61,21 +62,12 @@ export const AVATAR_MODELS: Partial<Record<AvatarKind, AvatarModel>> = {
 const AVATAR_KEY = 'hiking-metaverse:avatar'
 
 export function loadAvatar(): AvatarKind {
-  try {
-    const saved = localStorage.getItem(AVATAR_KEY)
-    if (AVATARS.some((a) => a.kind === saved)) return saved as AvatarKind
-  } catch {
-    // 저장소를 못 쓰는 환경이면 기본값
-  }
-  return 'hiker'
+  const saved = readStored(AVATAR_KEY)
+  return AVATARS.some((a) => a.kind === saved) ? (saved as AvatarKind) : 'hiker'
 }
 
 export function saveAvatar(kind: AvatarKind) {
-  try {
-    localStorage.setItem(AVATAR_KEY, kind)
-  } catch {
-    // 저장소를 못 쓰는 환경이면 무시
-  }
+  writeStored(AVATAR_KEY, kind)
 }
 
 /** 캐릭터별 모습 그림(데이터 URL). AvatarThumbnails 가 앱이 뜰 때 한 번 찍어 채운다 */
