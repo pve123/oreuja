@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import { readStored, writeStored } from './storage'
 
 /**
  * 효과음과 산속 소리. 음원 파일 없이 Web Audio 로 그 자리에서 만든다.
@@ -7,23 +8,12 @@ import { create } from 'zustand'
 
 const MUTED_KEY = 'hiking-metaverse:muted'
 
-function loadMuted() {
-  try {
-    return localStorage.getItem(MUTED_KEY) === '1'
-  } catch {
-    return false
-  }
-}
 
 export const useSound = create<{ muted: boolean; toggle: () => void }>((set, get) => ({
-  muted: loadMuted(),
+  muted: readStored(MUTED_KEY) === '1',
   toggle: () => {
     const muted = !get().muted
-    try {
-      localStorage.setItem(MUTED_KEY, muted ? '1' : '0')
-    } catch {
-      // 저장소를 못 쓰는 환경이면 이번에만 적용
-    }
+    writeStored(MUTED_KEY, muted ? '1' : '0')
     if (master && ctx) master.gain.setTargetAtTime(muted ? 0 : MASTER_VOLUME, ctx.currentTime, 0.05)
     set({ muted })
   },

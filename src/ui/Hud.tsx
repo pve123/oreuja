@@ -9,6 +9,7 @@ import { TouchControls, TouchGuide } from './TouchControls'
 import { EmoteDial } from './EmoteDial'
 import { useWakeLock } from '../lib/wakeLock'
 import { IS_TOUCH } from '../lib/device'
+import { readStored, writeStored } from '../lib/storage'
 
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
@@ -189,21 +190,12 @@ const OPEN_BY_DEFAULT = !IS_TOUCH
 /** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 foldedByDefault 를 따른다 */
 function useFolded(name: string, foldedByDefault = true): [boolean, () => void] {
   const [folded, setFolded] = useState(() => {
-    try {
-      const saved = localStorage.getItem(FOLD_KEY + name)
-      if (saved !== null) return saved === '1'
-    } catch {
-      // 저장소를 못 쓰는 환경이면 기본값
-    }
-    return foldedByDefault
+    const saved = readStored(FOLD_KEY + name)
+    return saved === null ? foldedByDefault : saved === '1'
   })
   const toggle = () =>
     setFolded((f) => {
-      try {
-        localStorage.setItem(FOLD_KEY + name, f ? '0' : '1')
-      } catch {
-        // 저장소를 못 쓰는 환경이면 기억하지 않는다
-      }
+      writeStored(FOLD_KEY + name, f ? '0' : '1')
       return !f
     })
   return [folded, toggle]
