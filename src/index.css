@@ -892,17 +892,20 @@ kbd {
   background: rgba(255, 255, 255, 0.08);
   color: var(--text);
 }
+/* 감정 표현 일곱 개를 네 칸씩 두 줄로 */
 .emotes {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
   gap: 6px;
 }
 .emote-button {
-  flex: 1;
   height: 34px;
+  padding: 0;
   border: 0;
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.08);
-  font-size: 18px;
+  font-size: 17px;
+  white-space: nowrap;
   cursor: pointer;
 }
 .emote-button:hover {
