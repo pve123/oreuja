@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useProgress } from '@react-three/drei'
+import { PerformanceMonitor, useProgress } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
@@ -20,6 +20,16 @@ const DATA_END = 0.6
 const ASSETS_END = 0.92
 /** 장면 준비 신호가 끝내 오지 않아도 이 시간(ms)이 지나면 첫 화면을 걷는다 */
 const SPLASH_TIMEOUT = 25000
+/**
+ * 화소 배율 범위 [가장 낮게, 가장 높게]. 폰은 화소가 촘촘해서(3배까지) 그대로 그리면 GPU 가 벅차 1.5배까지만 그린다.
+ * PerformanceMonitor 가 프레임이 떨어지면 낮추고 여유가 생기면 올린다. 저사양 폰은 0.75배까지 내려 끊김을 줄인다
+ */
+const DPR_RANGE: [number, number] = IS_TOUCH ? [0.75, 1.5] : [1, 2]
+/** 배율을 이 단위로 반올림한다. 조금씩 자주 바뀌면 그때마다 화면 버퍼를 새로 만들어 오히려 끊긴다 */
+const DPR_STEP = 0.25
+const clampDpr = (v: number) => Math.min(window.devicePixelRatio || 1, Math.round(v / DPR_STEP) * DPR_STEP)
+/** 화질을 올렸다 내렸다 방향이 이만큼 바뀌면 오르내림을 멈추고 가장 낮은 배율에 둔다 (배율이 바뀔 때마다 잠깐 끊기므로) */
+const DPR_MAX_FLIPS = 4
 
 export default function App() {
   const [data, setData] = useState<{ terrain: Terrain; trails: Trail[]; mountains: Mountain[]; mountain: Mountain } | null>(
@@ -27,6 +37,21 @@ export default function App() {
   )
   const [error, setError] = useState<string | null>(null)
   const courseId = useGame((s) => s.courseId)
+  const [dpr, setDpr] = useState(() => clampDpr(DPR_RANGE[1]))
+  // 화질 오르내림 기록. drei 의 flipflops 는 이미 최고 화질인데 올린 것도 세서 빠른 기기가 가장 낮은 화질로 떨어지므로 직접 센다
+  const [tuning] = useState(() => ({ factor: 1, dir: 0, flips: 0, frozen: false }))
+  const tune = (factor: number, dir: number) => {
+    // 이미 끝까지 올렸거나 내린 상태에서 또 올리고 내리는 신호는 무시한다
+    if (tuning.frozen || factor === tuning.factor) return
+    tuning.factor = factor
+    if (tuning.dir !== 0 && dir !== tuning.dir && ++tuning.flips >= DPR_MAX_FLIPS) {
+      tuning.frozen = true
+      setDpr(clampDpr(DPR_RANGE[0]))
+      return
+    }
+    tuning.dir = dir
+    setDpr(clampDpr(DPR_RANGE[0] + (DPR_RANGE[1] - DPR_RANGE[0]) * factor))
+  }
 
   // 같이하기 서버에 붙는다. 서버가 없으면 혼자 오르기로 동작한다
   useEffect(() => startNet(), [])
@@ -73,10 +98,18 @@ export default function App() {
         camera={{ fov: 55, near: 0.5, far: 20000 }}
         // 기념사진 캡처를 위해 그린 화면을 유지. 톤 매핑은 후처리 맨 끝에서 한다 (scene/World 의 PostEffects)
         gl={{ preserveDrawingBuffer: true, toneMapping: THREE.NoToneMapping, powerPreference: 'high-performance' }}
-        // 폰은 화소가 촘촘해서(3배까지) 그대로 그리면 GPU 가 벅차다. 1.5배까지만 그려도 눈에 띄지 않는다
-        dpr={IS_TOUCH ? [1, 1.5] : [1, 2]}
+        dpr={dpr}
       >
-        <World terrain={data.terrain} trail={trail} />
+        {/* 기기 따라 화질 자동 조절: 가장 높은 배율에서 시작해 프레임이 떨어지면 내리고 여유가 생기면 올린다 */}
+        <PerformanceMonitor
+          factor={1}
+          // 한 번 판단(2.5초)에 배율 범위의 20% 씩 움직여 0.25 단위 배율이 바로 한 칸씩 바뀌게 한다
+          step={0.2}
+          onDecline={({ factor }) => tune(factor, -1)}
+          onIncline={({ factor }) => tune(factor, 1)}
+        >
+          <World terrain={data.terrain} trail={trail} />
+        </PerformanceMonitor>
       </Canvas>
       <SplashProgress />
       <Hud trail={trail} trails={data.trails} />

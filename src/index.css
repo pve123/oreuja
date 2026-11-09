@@ -560,6 +560,131 @@ kbd {
   }
 }
 
+/* 처음 걸을 때 한 번 보여 주는 조작 안내. 터치를 막지 않는다 */
+.touch-guide {
+  position: fixed;
+  inset: 0;
+  z-index: 21;
+  pointer-events: none;
+  background: radial-gradient(ellipse at 50% 70%, rgba(12, 18, 34, 0.15), rgba(12, 18, 34, 0.5));
+  animation: guide-in 0.4s ease both;
+}
+.guide-item {
+  position: fixed;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.guide-item p,
+.guide-dismiss {
+  margin: 0;
+  padding: 7px 12px;
+  border-radius: 12px;
+  background: rgba(22, 30, 52, 0.78);
+  color: #fdf6ec;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.4;
+  text-align: center;
+  white-space: nowrap;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+}
+/* 손가락은 조이스틱(.stick) 가운데에, 글은 조이스틱 테두리 위에 */
+.guide-stick {
+  left: calc(100px + var(--sal));
+  bottom: calc(136px + var(--sab) - 22px);
+  transform: translateX(-50%);
+  gap: 60px;
+}
+.guide-look {
+  right: calc(24px + var(--sar));
+  bottom: 46vh;
+}
+/* 점프 버튼 바로 위에 */
+.guide-jump {
+  right: calc(20px + var(--sar));
+  bottom: calc(204px + 76px + 12px + var(--sab));
+}
+.guide-dismiss {
+  position: fixed;
+  left: 50%;
+  top: 64%;
+  transform: translate(-50%, -50%);
+  font-size: 13px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+/* 손가락 끝: 반투명 동그라미가 움직이며 할 동작을 보여 준다 */
+.guide-finger {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: rgba(253, 246, 236, 0.85);
+  box-shadow:
+    0 0 0 8px rgba(253, 246, 236, 0.22),
+    0 4px 14px rgba(0, 0, 0, 0.35);
+}
+.guide-finger-stick {
+  animation: guide-push 1.6s ease-in-out infinite;
+}
+.guide-finger-look {
+  animation: guide-swipe 1.8s ease-in-out infinite;
+}
+@keyframes guide-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes guide-push {
+  0%,
+  15% {
+    transform: translateY(0);
+  }
+  55%,
+  75% {
+    transform: translateY(-34px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
+@keyframes guide-swipe {
+  0%,
+  10% {
+    transform: translateX(30px);
+    opacity: 0;
+  }
+  25% {
+    opacity: 1;
+  }
+  70% {
+    transform: translateX(-40px);
+    opacity: 1;
+  }
+  100% {
+    transform: translateX(-40px);
+    opacity: 0;
+  }
+}
+@media (max-width: 760px), (max-height: 500px) {
+  .guide-jump {
+    bottom: calc(34px + 76px + 12px + var(--sab));
+  }
+}
+/* 가로로 눕힌 폰은 아래쪽에 진행 패널이 있어 안내 문구를 가운데로 올린다 */
+@media (max-height: 500px) {
+  .guide-dismiss {
+    top: 50%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .guide-finger {
+    animation: none;
+  }
+}
+
 .overlay {
   position: fixed;
   inset: 0;
