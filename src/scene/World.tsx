@@ -249,8 +249,10 @@ function WorldScene({ terrain, trail }: Props) {
    * 내 발바닥 위치와 몸이 보는 방향(라디안, 0 = +z 쪽), 위쪽 속도, 땅에 붙어 있는지.
    * 등산로 진행 거리(distance)와 옆으로 비킨 거리(offset)는 여기서 계산해 store 에 넣는다.
    * synced 는 마지막으로 store 에 넣은 값이다. store 값이 이와 다르면(처음, 코스 바꾸기, 다시 오르기) 그 자리로 옮긴다.
+   * placedOn 은 몸을 놓은 코스 id 다. 코스를 바꾸면 store 값이 먼저 바뀌고 새 코스는 React 가 다시 그린 뒤에 들어와서,
+   * 그사이 프레임에 예전 코스 위에 놓이고 synced 가 맞춰져 버리면 새 코스로 옮기지 않았다. 코스가 바뀌면 거리와 상관없이 다시 놓는다
    */
-  const body = useRef({ x: 0, y: 0, z: 0, yaw: 0, vy: 0, grounded: true, airTime: 0, synced: { distance: NaN, offset: NaN } })
+  const body = useRef({ x: 0, y: 0, z: 0, yaw: 0, vy: 0, grounded: true, airTime: 0, synced: { distance: NaN, offset: NaN }, placedOn: '' })
   /** 다음 발소리까지 남은 걸음 주기와 산속 소리를 마지막으로 맞춘 시각 */
   const footstep = useRef({ phase: 0, ambienceAt: 0 })
   /** 계단: 마지막으로 디딘 칸 번호(-1 은 땅), 몸 그림에 얹는 디딤판 높이 차(m) */
@@ -418,8 +420,9 @@ function WorldScene({ terrain, trail }: Props) {
     let { distance, offset } = game
     const before = { distance, offset }
     const b = body.current
-    if (distance !== b.synced.distance || offset !== b.synced.offset) {
+    if (distance !== b.synced.distance || offset !== b.synced.offset || b.placedOn !== trail.data.id) {
       // 처음·코스 바꾸기·다시 오르기: 그 등산로 지점의 땅(또는 디딤판) 위에 놓는다
+      b.placedOn = trail.data.id
       const h = trail.headingAt(distance)
       const p = trail.positionAt(distance)
       b.x = p.x - Math.cos(h) * offset
@@ -545,7 +548,12 @@ function WorldScene({ terrain, trail }: Props) {
       // 굽은 길에서 기준점이 바뀌며 조금 넘친 만큼만 경계 위로 되돌리고, 그 자리 땅보다 낮으면 올린다
       b.x = p.x + ((b.x - p.x) / away) * ROAM_LIMIT
       b.z = p.z + ((b.z - p.z) / away) * ROAM_LIMIT
-      b.y = Math.max(b.y, standHeight(terrain, b.x, b.z))
+      const ground = standHeight(terrain, b.x, b.z)
+      // 걸어서는 경계를 이만큼 넘을 수 없다. 이렇게 멀면 다른 곳의 높이를 들고 온 것이라(코스를 바꾼 직후 등) 하늘에서 떨어지지 않게 땅에 바로 놓는다
+      if (away > ROAM_LIMIT * 2) {
+        b.y = ground + 0.05
+        b.vy = 0
+      } else b.y = Math.max(b.y, ground)
     }
     // 안전망 (게임들의 '바닥 밑으로 떨어지면 되살리기'): 어떤 이유로든 땅보다 한참 아래면 그 자리 땅 위로 올린다
     if (b.y < meshHeight(terrain, b.x, b.z) - FALL_RESCUE) {
