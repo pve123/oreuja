@@ -1,7 +1,7 @@
 import * as THREE from 'three'
 import { meshHeight, standHeight, type Terrain, type Trail } from './data'
 
-export const STEP_EVERY = 1.3 // 계단 간격(m)
+const STEP_EVERY = 1.3 // 계단 간격(m)
 export const STEP_SLOPE = 0.3 // 이보다 가파르면(30%) 돌계단을 놓는다
 export const STEP_WIDTH = 1.5 // 돌계단 폭(m). 길 폭보다 조금 좁다
 export const STEP_DEPTH = 0.42 // 디딤판 깊이(m)

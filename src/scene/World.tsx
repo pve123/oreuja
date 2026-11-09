@@ -38,7 +38,7 @@ const BACK_RUN_SPEED = 6
  * ROAM_SOFT 부터 바깥쪽 걸음이 점점 느려지고 화면 가장자리가 어두워지며, ROAM_LIMIT 에서는 더 나가지 못하고 경계를 따라 미끄러진다.
  */
 const ROAM_SOFT = 12
-export const ROAM_LIMIT = 20
+const ROAM_LIMIT = 20
 /** 경계에 닿을 때 바깥쪽 걸음 빠르기가 이만큼으로 줄어든다 */
 const ROAM_EDGE_SPEED = 0.25
 

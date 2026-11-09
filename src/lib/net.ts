@@ -46,18 +46,9 @@ export type NetStatus = 'connecting' | 'online' | 'offline'
 const SEND_MS = 100
 const RETRY_MS = 5000
 const NAME_KEY = 'hiking-metaverse:nickname'
-const TOGETHER_KEY = 'hiking-metaverse:together'
 
-/** 산길 위에 그릴 사람인지. 베이스캠프에 있거나 혼자 오르기를 고른 사람은 빼고 센다 */
+/** 산길 위에 그릴 사람인지. 베이스캠프에 있는 사람과 숨김(hidden)으로 알린 사람은 빼고 센다 */
 export const isClimbing = (p: Peer) => p.mode !== 'lobby' && p.mode !== 'hidden'
-
-function loadTogether() {
-  try {
-    return localStorage.getItem(TOGETHER_KEY) !== '0'
-  } catch {
-    return true
-  }
-}
 
 // 처음 붙는 닉네임: 산 오르는 모습 + 산악회 역할. 둘을 합쳐 12자(NAME_MAX)를 넘지 않게 고른 말들이다
 const MOODS = ['새벽', '숨찬', '느긋한', '씩씩한', '땀범벅', '쉬엄쉬엄', '성큼성큼', '헉헉대는', '앞서가는', '뒤처진', '길 잃은', '배고픈', '안개 속', '비 맞은', '신난', '졸린']
@@ -89,19 +80,7 @@ export const useNet = create<{
   /** 내가 마지막으로 보낸 감정 표현 (내 머리 위에도 띄운다) */
   myEmote: { kind: Emote; at: number } | null
   setName: (name: string) => void
-  /** 같이 오르기(true)인지 혼자 오르기(false)인지. 혼자면 다른 사람을 그리지 않고 나도 남에게 보이지 않는다 */
-  together: boolean
-  setTogether: (on: boolean) => void
 }>((set) => ({
-  together: loadTogether(),
-  setTogether: (together) => {
-    try {
-      localStorage.setItem(TOGETHER_KEY, together ? '1' : '0')
-    } catch {
-      // 저장소를 못 쓰는 환경이면 이번 접속에만 쓴다
-    }
-    set({ together })
-  },
   status: 'connecting',
   myId: null,
   name: loadName(),
@@ -210,8 +189,7 @@ function sendState() {
       offset: Math.round(p.offset * 100) / 100,
       facing: Math.round(p.facing * 100) / 100,
       jump: Math.round(p.jump * 100) / 100,
-      // 혼자 오르기면 서버에는 머물되(베이스캠프 인원 수는 받는다) 남의 화면에는 그리지 않게 한다
-      mode: useNet.getState().together ? p.mode : 'hidden',
+      mode: p.mode,
     }),
   )
 }
