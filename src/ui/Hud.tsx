@@ -415,6 +415,8 @@ export function SummitModal({ trail }: { trail: Trail }) {
   const records = useGame((s) => s.records)
   const { takePhoto, closePhoto, restart } = useGame.getState()
   const [now] = useState(() => new Date())
+  const photoName = `${trail.data.id}-${now.toISOString().slice(0, 10)}.png`
+  const shareFile = useShareFile(mode === 'photoResult' ? photo : null, photoName)
 
   if (mode === 'photo') return <div className="flash" />
 
@@ -425,7 +427,23 @@ export function SummitModal({ trail }: { trail: Trail }) {
           <div className="modal-brand">방구석 등반대 · 정상 기념사진</div>
           <img src={photo} alt="정상 기념사진" />
           <div className="actions">
-            <a className="btn primary" href={photo} download={`${trail.data.id}-${now.toISOString().slice(0, 10)}.png`}>
+            {/* 폰에서는 카카오톡·인스타그램 등으로 바로 보내는 공유가 주 버튼이고, 공유를 못 하는 컴퓨터에서는 저장이 주 버튼이다 */}
+            {shareFile && (
+              <button
+                className="btn primary"
+                onClick={() => {
+                  const { mountain, summit, summitElevation } = trail.data
+                  navigator
+                    .share({ files: [shareFile], title: '방구석 등반대', text: `${mountain} ${summit} ${summitElevation}m 완등! ⛰️🚩 방구석 등반대에서 올랐어요` })
+                    .catch(() => {
+                      // 공유 창을 닫은 것(AbortError)은 그냥 둔다
+                    })
+                }}
+              >
+                사진 공유
+              </button>
+            )}
+            <a className={shareFile ? 'btn' : 'btn primary'} href={photo} download={photoName}>
               사진 저장
             </a>
             <button className="btn" onClick={closePhoto}>
@@ -478,6 +496,32 @@ export function SummitModal({ trail }: { trail: Trail }) {
       </div>
     </div>
   )
+}
+
+/**
+ * 기념사진을 폰 공유 창(Web Share API)으로 보낼 파일. 공유할 수 없는 브라우저(대부분의 컴퓨터)면 null.
+ * 파일을 미리 만들어 둔다. 누른 뒤에 만들면 iOS 사파리가 사용자가 누른 동작이 아니라고 보고 공유 창을 막는다
+ */
+function useShareFile(photo: string | null, fileName: string) {
+  const [file, setFile] = useState<{ photo: string; file: File } | null>(null)
+  useEffect(() => {
+    if (!photo || typeof navigator.canShare !== 'function') return
+    let alive = true
+    fetch(photo)
+      .then((r) => r.blob())
+      .then((blob) => {
+        const f = new File([blob], fileName, { type: 'image/png' })
+        if (alive && navigator.canShare({ files: [f] })) setFile({ photo, file: f })
+      })
+      .catch(() => {
+        // 파일을 못 만들면 저장 버튼만 쓴다
+      })
+    return () => {
+      alive = false
+    }
+  }, [photo, fileName])
+  // 다시 찍어 사진이 바뀌면 예전 파일은 쓰지 않는다
+  return file && file.photo === photo ? file.file : null
 }
 
 function Badge({ trail }: { trail: Trail }) {

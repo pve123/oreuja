@@ -66,6 +66,10 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 
 같이하기까지 열려면 `server/index.mjs` 를 Render 나 Fly.io 같은 곳에 올리고 Vercel 환경변수 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣은 뒤 다시 배포한다.
 
+링크를 카카오톡이나 슬랙에 붙였을 때 보이는 미리보기 그림은 `public/og-image.jpg`(1200x630)다. og:image 는 절대 주소여야 해서 빌드할 때 `vite.config.ts` 의 `socialMeta` 가 넣는다. Vercel 이 빌드 중에 알려 주는 운영 주소(`VERCEL_PROJECT_PRODUCTION_URL`)를 쓰고, 다른 주소를 쓰려면 Vercel 환경변수 `SITE_URL` 에 `https://` 로 시작하는 주소를 넣는다. 로컬 빌드에는 넣지 않는다.
+
+미리보기가 실제로 뜨려면 메신저 서버가 로그인 없이 페이지와 그림을 받아 갈 수 있어야 한다. Vercel 프로젝트의 Settings 에서 Deployment Protection 의 Vercel Authentication 이 켜져 있으면 모든 주소가 Vercel 로그인 화면으로 넘어가서 미리보기도 뜨지 않는다. 누구나 들어와 쓰게 하려면 운영 주소에서는 이 보호를 끈다.
+
 ## 스마트폰
 
 폰 브라우저의 「홈 화면에 추가」로 설치하면 주소창 없이 앱처럼 열린다(`public/manifest.webmanifest`, `index.html` 의 apple 메타, 아이콘 `public/icon-*.png` 와 `apple-touch-icon.png`). 아이콘 원본은 `public/favicon.svg` 다.
