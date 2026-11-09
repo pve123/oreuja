@@ -29,18 +29,30 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
   if (bubble) drawBubble(ctx, bubble, w, h, font)
   ctx.fillStyle = '#fff'
   ctx.font = `800 ${Math.round(bar * 0.38)}px ${font}`
-  ctx.fillText(`${trail.mountain} ${trail.summit} ${trail.summitElevation}m`, pad, h - bar * 0.55)
+  const title = `${trail.mountain} ${trail.summit} ${trail.summitElevation}m`
+  ctx.fillText(title, pad, h - bar * 0.55)
+  const titleW = ctx.measureText(title).width
   ctx.font = `500 ${Math.round(bar * 0.2)}px ${font}`
   const date = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
-  ctx.fillText(`${trail.name} 완등 · ${date}`, pad, h - bar * 0.2)
+  const line = `${trail.name} 완등 · ${date}`
+  ctx.fillText(line, pad, h - bar * 0.2)
+  const lineW = ctx.measureText(line).width
 
-  // 오른쪽 아래 서비스 이름: 산 모양 표시와 「방구석 등반대」
+  // 서비스 이름: 산 모양 표시와 「방구석 등반대」. 둘째 줄 오른쪽에 두고, 좁은 폰 세로 사진처럼 자리가 모자라면
+  // 큰 제목 줄 오른쪽으로, 거기도 모자라면 사진 오른쪽 위로 옮겨 글자끼리 겹치지 않게 한다
   const brand = '방구석 등반대'
   const size = Math.round(bar * 0.2)
   ctx.font = `800 ${size}px ${font}`
   const textW = ctx.measureText(brand).width
+  const brandW = textW + size * 1.5 // 산 표시와 사이 간격까지
+  const gap = size * 1.2
   const right = w - pad
-  const base = h - bar * 0.2
+  const fits = (used: number) => pad + used + gap + brandW <= right
+  const base = fits(lineW) ? h - bar * 0.2 : fits(titleW) ? h - bar * 0.55 : pad + size
+  ctx.save()
+  // 사진 위쪽은 밝은 하늘일 수 있어 그림자를 깔아 읽히게 한다
+  ctx.shadowColor = 'rgba(0,0,0,0.45)'
+  ctx.shadowBlur = size * 0.4
   ctx.fillStyle = '#fdf6ec'
   ctx.textAlign = 'right'
   ctx.fillText(brand, right, base)
@@ -57,6 +69,7 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
   ctx.lineTo(mx + m * 1.1, my + m)
   ctx.closePath()
   ctx.fill()
+  ctx.restore()
 
   return canvas.toDataURL('image/png')
 }
