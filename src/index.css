@@ -1028,10 +1028,24 @@ kbd {
 .sound-toggle[aria-pressed='false'] {
   color: var(--muted);
 }
-/* 가운데 진행 패널과 겹칠 만큼 좁으면 미니맵을 숨긴다 */
-@media (max-width: 940px) {
+/* 창이 좁아지면 미니맵을 줄이고, 진행 패널이 위로 올라가는 좁은 화면에서는 숨긴다 */
+@media (max-width: 960px) {
+  .minimap {
+    width: 120px;
+    height: 120px;
+  }
+}
+@media (max-width: 760px) {
   .minimap {
     display: none;
+  }
+}
+/* 중간 폭 컴퓨터 창: 가운데 진행 패널이 왼쪽 아래 닉네임·감정 표현 패널과 겹치므로, 그 패널 오른쪽에서 시작해 미니맵 앞까지만 쓴다 */
+@media (min-width: 761px) and (max-width: 960px) and (hover: hover) and (pointer: fine) {
+  .hud-top .progress {
+    left: calc(242px + var(--sal));
+    transform: none;
+    width: min(460px, calc(100vw - 242px - 16px - 132px - var(--sal) - var(--sar)));
   }
 }
 .together {
