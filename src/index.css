@@ -560,6 +560,96 @@ kbd {
   }
 }
 
+/* 터치 화면 감정 표현: 점프 버튼 위 💬 버튼과 왼쪽으로 펼쳐지는 일곱 가지 */
+.emote-dial {
+  position: fixed;
+  right: calc(32px + var(--sar));
+  bottom: calc(204px + 76px + 14px + var(--sab));
+  z-index: 20;
+}
+.emote-dial-toggle {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255, 255, 255, 0.3);
+  background: rgba(22, 30, 52, 0.62);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  font-size: 22px;
+  line-height: 1;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.3);
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+.emote-dial-toggle:active {
+  transform: scale(0.92);
+}
+.emote-dial-toggle.on {
+  background: var(--accent);
+  border-color: transparent;
+}
+.emote-dial-menu {
+  position: absolute;
+  right: calc(100% + 10px);
+  bottom: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 58px);
+  gap: 6px;
+  padding: 8px;
+  border-radius: 18px;
+  background: rgba(22, 30, 52, 0.86);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.35);
+  animation: emote-dial-in 0.16s ease-out;
+  transform-origin: right bottom;
+}
+.emote-dial-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 56px;
+  padding: 0;
+  border: 0;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fdf6ec;
+  font-size: 10.5px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.emote-dial-item:active {
+  background: rgba(255, 255, 255, 0.2);
+}
+.emote-dial-icon {
+  font-size: 20px;
+  line-height: 1;
+}
+@keyframes emote-dial-in {
+  from {
+    opacity: 0;
+    transform: scale(0.85);
+  }
+}
+@media (max-width: 760px), (max-height: 500px) {
+  .emote-dial {
+    bottom: calc(34px + 76px + 14px + var(--sab));
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .emote-dial {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .emote-dial-menu {
+    animation: none;
+  }
+}
+
 /* 처음 걸을 때 한 번 보여 주는 조작 안내. 터치를 막지 않는다 */
 .touch-guide {
   position: fixed;
@@ -601,10 +691,10 @@ kbd {
   right: calc(24px + var(--sar));
   bottom: 46vh;
 }
-/* 점프 버튼 바로 위에 */
+/* 점프 버튼 바로 왼쪽에 (위쪽은 감정 표현 버튼 자리) */
 .guide-jump {
-  right: calc(20px + var(--sar));
-  bottom: calc(204px + 76px + 12px + var(--sab));
+  right: calc(20px + 76px + 12px + var(--sar));
+  bottom: calc(204px + 20px + var(--sab));
 }
 .guide-dismiss {
   position: fixed;
@@ -670,7 +760,7 @@ kbd {
 }
 @media (max-width: 760px), (max-height: 500px) {
   .guide-jump {
-    bottom: calc(34px + 76px + 12px + var(--sab));
+    bottom: calc(34px + 20px + var(--sab));
   }
 }
 /* 가로로 눕힌 폰은 아래쪽에 진행 패널이 있어 안내 문구를 가운데로 올린다 */

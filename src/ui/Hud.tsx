@@ -6,6 +6,7 @@ import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
 import { TouchControls, TouchGuide } from './TouchControls'
+import { EmoteDial } from './EmoteDial'
 import { useWakeLock } from '../lib/wakeLock'
 import { IS_TOUCH } from '../lib/device'
 
@@ -172,6 +173,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
       <TouchControls />
       <TouchGuide />
+      <EmoteDial />
       <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
     </>
   )
