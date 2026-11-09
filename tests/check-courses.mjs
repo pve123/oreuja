@@ -22,12 +22,8 @@ const START_WINDOW = 500
 const START_DROP_MAX = 25
 const DESCENT_MAX = 60
 const SUMMIT_BELOW_MAX = 15
-/** 큰 내리막을 일부러 두는 코스와 그 한도(m) */
-const DESCENT_ALLOWED = {
-  // 관악문에서 연주대로 바로 오르는 마지막 구간이 OSM 에 암벽(alpine_hiking)으로 올라 있어 데이터 스크립트가 빼고,
-  // 연주암 쪽으로 내려갔다 돌아 오른다. 정밀 지형에서 61m 다
-  'gwanaksan-sadang': 70,
-}
+/** 큰 내리막을 일부러 두는 코스와 그 한도(m). 코스 id 와 이유를 같이 적는다 (지금은 없다) */
+const DESCENT_ALLOWED = {}
 
 const mountains = JSON.parse(fs.readFileSync(path.join(DATA, 'mountains.json'), 'utf8'))
 const problems = []
