@@ -4,7 +4,7 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Terrain, Trail } from '../lib/data'
 import { groundAt, stoneSteps } from '../lib/steps'
-import { EMOTES, isClimbing, EMOTE_MS, useNet, type Peer } from '../lib/net'
+import { emoteBubble, isClimbing, EMOTE_MS, useNet, type Peer } from '../lib/net'
 import { occlusionUniforms } from '../lib/occlusion'
 import { Avatar } from './Avatar'
 import type { HikerHandle } from './Hiker'
@@ -13,7 +13,6 @@ const FOLLOW = 10 // 받은 위치로 따라가는 빠르기 (클수록 바로 �
 const SNAP = 40 // 이보다 멀리 뛰면(순간이동·코스 재시작) 따라가지 않고 바로 옮긴다(m)
 const LABEL_RANGE = 120 // 이 거리 안의 사람만 이름표를 띄운다(m)
 
-const emoteIcon = (kind: string) => EMOTES.find((e) => e.kind === kind)?.icon ?? ''
 
 /** 같은 코스를 오르는 다른 사람들 */
 export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
@@ -74,7 +73,7 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
 
     // 이름표와 말풍선은 바뀔 때만 다시 그린다. 감정 표현 시각은 서버 시계라 받은 순간 기준으로 잰다
     if (p.emote && p.emote.at !== emoteSeen.current?.at) emoteSeen.current = { at: p.emote.at, localAt: Date.now() }
-    const emoting = emoteSeen.current && Date.now() - emoteSeen.current.localAt < EMOTE_MS ? emoteIcon(p.emote!.kind) : null
+    const emoting = emoteSeen.current && Date.now() - emoteSeen.current.localAt < EMOTE_MS ? emoteBubble(p.emote!.kind) : null
     const near = pos.distanceTo(occlusionUniforms.uOccTarget.value) < LABEL_RANGE
     if (p.name !== view.name || emoting !== view.emote || near !== view.near) setView({ name: p.name, emote: emoting, near })
   })
@@ -116,7 +115,7 @@ function MyEmote() {
     <group ref={group}>
       {myEmote && hiddenAt !== myEmote.at && (
         <Html key={myEmote.at} position={[0, 1.6, 0]} center distanceFactor={14} zIndexRange={[10, 0]}>
-          <div className="emote-bubble mine">{emoteIcon(myEmote.kind)}</div>
+          <div className="emote-bubble mine">{emoteBubble(myEmote.kind)}</div>
         </Html>
       )}
     </group>

@@ -13,7 +13,7 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
 
-  // 숫자 1·2·3 키로 감정 표현 (이름을 고치는 중에는 끈다)
+  // 숫자 1~4 키로 감정 표현 (이름을 고치는 중에는 끈다)
   useEffect(() => {
     if (editing) return
     const down = (e: KeyboardEvent) => {

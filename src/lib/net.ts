@@ -8,12 +8,20 @@ import type { Mode } from './store'
  * 서버가 꺼져 있으면 혼자 오르기로 동작하고 몇 초마다 다시 붙어 본다.
  */
 
-export type Emote = 'wave' | 'cheer' | 'heart'
-export const EMOTES: { kind: Emote; icon: string; label: string; key: string }[] = [
+export type Emote = 'wave' | 'cheer' | 'heart' | 'yaho'
+/** 감정 표현. bubble 이 있으면 머리 위 말풍선에 icon 대신 그 글을 띄운다 */
+export const EMOTES: { kind: Emote; icon: string; label: string; key: string; bubble?: string }[] = [
   { kind: 'wave', icon: '👋', label: '손 흔들기', key: '1' },
   { kind: 'cheer', icon: '🙌', label: '만세', key: '2' },
   { kind: 'heart', icon: '❤️', label: '하트', key: '3' },
+  // 산에서 외치는 인사. 능선이나 정상에서 쓰라고 산 그림에 글자를 붙인다
+  { kind: 'yaho', icon: '⛰️', label: '야호', key: '4', bubble: '⛰️ 야호~' },
 ]
+/** 머리 위 말풍선에 띄울 글 */
+export const emoteBubble = (kind: string) => {
+  const e = EMOTES.find((x) => x.kind === kind)
+  return e ? (e.bubble ?? e.icon) : ''
+}
 /** 감정 표현 말풍선이 떠 있는 시간(ms) */
 export const EMOTE_MS = 3000
 
