@@ -10,12 +10,15 @@ import { ringDepthMaterial, withOcclusionFade } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
 import { DETAIL_VARIANTS, DetailTrees } from './DetailTrees'
+import { PHOTO_CAMERA_BACK, distanceToSegmentXZ, summitVista } from '../lib/summit'
 
 const COUNT = 30000
 const NEAR_TRAIL_SHARE = 0.45 // 절반 가까이는 등산로 250m 안에 심어 걸으며 보이게 한다
 const NEAR_TRAIL_RANGE = 250
 const TRAIL_CLEARANCE = 4 // 등산로 양옆 4m 는 비움
 const START_CLEARANCE = 30 // 출발점 둘레 30m 는 공터로 비워 첫 화면을 가리지 않게 함
+/** 정상에서 기념사진 카메라까지 선 둘레 이 거리(m)에는 나무를 심지 않는다. 사진 한가운데를 나무가 가리지 않게 (바위는 Rocks 가 6m 를 비운다) */
+const PHOTO_VIEW_CLEARANCE = 8
 const TREE_LINE = 760 // 사진이 없을 때: 이보다 높으면 바위 지대라 나무 없음
 const PINE_SHARE = 0.3 // 소나무 비율. 나머지는 참나무 같은 둥근 활엽수
 /** 줄기 반지름(m). 도형 줄기 아래 굵기(0.32)에 나무 크기를 곱한다 */
@@ -56,6 +59,8 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     const nearTrail = makeNearTrail(trail)
     const nearLandmark = makeLandmarkClear(terrain, trail)
     const start = trail.points[0]
+    const top = trail.points[trail.points.length - 1]
+    const photoCamera = top.clone().addScaledVector(summitVista(terrain, trail), -(PHOTO_CAMERA_BACK + 3))
     const usePhoto = layers.length > 0
     const out: Tree[] = []
     const q = new THREE.Quaternion()
@@ -88,6 +93,8 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       q.setFromAxisAngle(up, rand() * Math.PI * 2)
       const scale = new THREE.Vector3(s * (0.85 + rand() * 0.3), s * (0.85 + rand() * 0.4), s * (0.85 + rand() * 0.3))
       const variant = Math.floor(rand() * DETAIL_VARIANTS)
+      // 기념사진 시야는 나무를 다 만든 뒤에 거른다. 앞에서 건너뛰면 난수 순서가 밀려 다른 산 숲의 나무 자리가 모두 바뀐다
+      if (distanceToSegmentXZ(x, z, top, photoCamera) < PHOTO_VIEW_CLEARANCE) continue
       out.push({ matrix: new THREE.Matrix4().compose(new THREE.Vector3(x, y - 0.3, z), q, scale), color, pine, variant })
     }
     return out
