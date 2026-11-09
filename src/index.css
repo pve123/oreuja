@@ -525,11 +525,11 @@ kbd {
 }
 .stick {
   position: fixed;
-  left: calc(92px + var(--sal));
-  bottom: calc(132px + var(--sab));
-  width: 124px;
-  height: 124px;
-  margin: -62px 0 0 -62px;
+  left: calc(100px + var(--sal));
+  bottom: calc(136px + var(--sab));
+  width: 144px;
+  height: 144px;
+  margin: -72px 0 0 -72px;
   border-radius: 50%;
   border: 1.5px solid rgba(255, 255, 255, 0.3);
   background: rgba(22, 30, 52, 0.38);
@@ -546,9 +546,9 @@ kbd {
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 54px;
-  height: 54px;
-  margin: -27px 0 0 -27px;
+  width: 56px;
+  height: 56px;
+  margin: -28px 0 0 -28px;
   border-radius: 50%;
   background: rgba(253, 246, 236, 0.92);
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
