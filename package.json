@@ -9,7 +9,9 @@
     "lint": "oxlint",
     "preview": "vite preview",
     "data": "node scripts/prepare-data.mjs",
-    "server": "node server/index.mjs"
+    "server": "node server/index.mjs",
+    "test:courses": "node tests/check-courses.mjs",
+    "test:e2e": "node tests/e2e.mjs"
   },
   "dependencies": {
     "@react-three/drei": "^10.7.9",
@@ -31,6 +33,7 @@
     "@vitejs/plugin-react": "^6.1.2",
     "oxlint": "^1.89.0",
     "pngjs": "^7.0.0",
+    "puppeteer-core": "^25.16.0",
     "typescript": "~7.0.2",
     "vite": "^8.3.5"
   }

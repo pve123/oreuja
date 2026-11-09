@@ -25,3 +25,6 @@ dist-ssr
 
 # 데이터 준비용 원본 다운로드 캐시
 scripts/raw
+
+# 화면 시험이 실패했을 때 남기는 화면
+tests/screenshots

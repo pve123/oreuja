@@ -1,0 +1,51 @@
+# PR 과 main 에 올라갈 때 도는 시험
+#  - check: 린트, 빌드, 코스 데이터 점검. 1분 남짓
+#  - e2e: 헤드리스 크롬 화면 시험. 시험 컴퓨터에 그래픽 카드가 없어 3D 를 CPU 로 그려서 10분 안팎 걸린다.
+#    병합을 막는 필수 검사로 걸지 않고 결과만 본다 (실패하면 tests/screenshots 화면을 내려받아 본다)
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+      - run: npm run test:courses
+
+  e2e:
+    needs: check
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npm run test:e2e
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screenshots
+          path: tests/screenshots
+          if-no-files-found: ignore
