@@ -10,6 +10,7 @@ import { ringDepthMaterial, withOcclusionFade } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles } from '../lib/obstacles'
 import { DETAIL_VARIANTS, DetailTrees } from './DetailTrees'
+import { IS_TOUCH } from '../lib/device'
 import { PHOTO_CAMERA_BACK, distanceToSegmentXZ, summitVista } from '../lib/summit'
 
 const COUNT = 30000
@@ -157,8 +158,10 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
   return (
     <group>
-      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, COUNT]} castShadow customDepthMaterial={materials.depth} />
-      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, COUNT]} castShadow customDepthMaterial={materials.depth} />
+      {/* 그림자는 캐릭터 둘레 60m 에만 생기고 그 안은 정밀 나무가 그림자를 만든다. 폰에서는 도형 나무 2만여 그루를
+          그림자용으로 한 번 더 그리지 않는다 (폰 화면 삼각형의 약 30%) */}
+      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, COUNT]} castShadow={!IS_TOUCH} customDepthMaterial={materials.depth} />
+      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, COUNT]} castShadow={!IS_TOUCH} customDepthMaterial={materials.depth} />
       <instancedMesh ref={trunks} args={[shapes.trunk, materials.trunk, COUNT]} />
       {/* 정밀 모델은 받는 동안 도형 나무가 그대로 보인다 */}
       <Suspense fallback={null}>

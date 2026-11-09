@@ -241,6 +241,12 @@ function WorldScene({ terrain, trail }: Props) {
   /** 베이스캠프 창을 피해 화면을 옮긴 정도 (0~1) */
   const lobbyView = useRef({ shift: 0, down: 0 })
   const size = useThree((s) => s.size)
+  const scene = useThree((s) => s.scene)
+  // 개발 중에는 콘솔과 화면 시험 스크립트에서 장면을 들여다볼 수 있게 꺼내 둔다 (그릴 물체 수 세기 등)
+  useEffect(() => {
+    if (!import.meta.env.DEV) return
+    Object.assign(window, { __scene: scene, __gl: gl })
+  }, [scene, gl])
   /** 휠로 고른 카메라 거리(arm)와 스프링 암이 실제로 보여 주는 거리(shown) */
   const zoom = useRef({ arm: CAMERA_START_DISTANCE, shown: CAMERA_START_DISTANCE })
   const photoFrames = useRef(0)
