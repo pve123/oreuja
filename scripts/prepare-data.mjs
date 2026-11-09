@@ -371,6 +371,69 @@ function shortestPath(graph, startCoord, goalCoord) {
   return route
 }
 
+/**
+ * 군더더기 잘라 내기: 지나온 자리에서 SPUR_GAP 안으로 되돌아오는데 그사이 경로가 SPUR_MIN~SPUR_MAX 이면 갔다가 되짚어 온 구간으로 보고 뺀다.
+ * 같은 자리를 지나는 OSM 길이 겹쳐 있으면 가장 짧은 길이 한쪽으로 조금 갔다가 다른 길로 갈아타 돌아오는 일이 있다.
+ * 망월사 코스는 중간에 이렇게 70m 를 왕복하는 구간이 있었다.
+ * SPUR_MIN 은 갈지자 길의 꺾이는 끝처럼 짧게 가까워지는 곳을 자르지 않으려는 하한이다.
+ *
+ * 출발점은 따로 더 넓게(START_SPUR_GAP) 본다. 출발점 옆으로 나란히 지나는 길이 있으면 되돌아오는 길이 출발점을 정확히 지나지 않는다.
+ * 진달래능선 코스는 출발점에서 산 반대쪽으로 13m 내려갔다가 3m 옆 길로 돌아와서 캐릭터가 산을 등지고 섰다.
+ * 출발 방향이 거꾸로 서면 바로 눈에 띄므로 출발점만 기준을 넓히고, 경로가 출발점 가까이 돌아온 가장 먼 지점부터 시작한다
+ */
+const SPUR_GAP = 3
+const SPUR_MIN = 12
+const SPUR_MAX = 150
+const START_SPUR_GAP = 5
+/** 점 p 에서 선분 a-b 위 가장 가까운 점 */
+function nearestOnSegment(p, a, b) {
+  const dx = b.x - a.x, dz = b.z - a.z
+  const len2 = dx * dx + dz * dz
+  const t = len2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.z - a.z) * dz) / len2))
+  return { x: a.x + dx * t, z: a.z + dz * t }
+}
+/**
+ * 경로 한 구간(출발점이나 거쳐 갈 지점에서 다음 지점까지)의 군더더기를 뺀다. 거쳐 갈 지점에 들렀다 되돌아 나오는 길은 일부러 가는 길이라
+ * 구간을 나눠 부른다. fromStart 면 코스 출발점이라 출발점 규칙도 쓴다
+ */
+function trimSpurs(input, courseName, fromStart) {
+  let raw = input
+  // 출발점 군더더기: 출발점에서 START_SPUR_GAP 안으로 돌아오는 가장 먼 선분을 찾아 그 위 가장 가까운 점에서 시작한다
+  // 되돌아온 거리는 선분 위 가장 가까운 점까지 잰다 (선분 시작점까지만 재면 긴 선분 하나로 돌아오는 길을 놓친다)
+  let along = 0
+  let startCut = -1
+  for (let k = 1; fromStart && k + 1 < raw.length; k++) {
+    along += Math.hypot(raw[k].x - raw[k - 1].x, raw[k].z - raw[k - 1].z)
+    if (along > SPUR_MAX) break
+    const q = nearestOnSegment(raw[0], raw[k], raw[k + 1])
+    if (along + Math.hypot(q.x - raw[k].x, q.z - raw[k].z) < SPUR_MIN) continue
+    if (Math.hypot(q.x - raw[0].x, q.z - raw[0].z) < START_SPUR_GAP) startCut = k
+  }
+  if (startCut > 0) {
+    const q = nearestOnSegment(raw[0], raw[startCut], raw[startCut + 1])
+    console.log(`  ${courseName}: 출발점에서 갔다가 ${Math.hypot(q.x - raw[0].x, q.z - raw[0].z).toFixed(1)}m 옆으로 되돌아오는 군더더기를 뺐다`)
+    raw = [q, ...raw.slice(startCut + 1)]
+  }
+  const out = []
+  for (let i = 0; i < raw.length; i++) {
+    out.push(raw[i])
+    along = 0
+    let cut = -1
+    for (let j = i + 1; j < raw.length; j++) {
+      along += Math.hypot(raw[j].x - raw[j - 1].x, raw[j].z - raw[j - 1].z)
+      if (along > SPUR_MAX) break
+      if (along >= SPUR_MIN && Math.hypot(raw[j].x - raw[i].x, raw[j].z - raw[i].z) < SPUR_GAP) cut = j
+    }
+    if (cut > 0) {
+      let len = 0
+      for (let j = i + 1; j <= cut; j++) len += Math.hypot(raw[j].x - raw[j - 1].x, raw[j].z - raw[j - 1].z)
+      console.log(`  ${courseName}: ${i}번째 노드에서 ${len.toFixed(0)}m 갔다가 되돌아오는 군더더기를 뺐다`)
+      i = cut // raw[cut] 은 raw[i] 와 같은 자리라 건너뛴다
+    }
+  }
+  return out
+}
+
 /** 코스 하나의 등산로 데이터를 만든다 */
 function buildTrail(course, graph, sampleHeight) {
   console.log(`[${course.name}]`)
@@ -385,16 +448,17 @@ function buildTrail(course, graph, sampleHeight) {
     if (gap > MAX_CHECKPOINT_OFFSET) console.warn(`  ! 거쳐 갈 지점이 길에서 ${gap.toFixed(0)}m 떨어져 있다`)
     return { id, ...graph.nodes.get(id) }
   }), goal]
+  // 구간마다 로컬 좌표로 바꾸고 군더더기를 뺀 뒤 잇는다
   const route = []
   let from = course.start
   for (const leg of legs) {
-    const part = shortestPath(graph, from, leg)
+    const part = trimSpurs(shortestPath(graph, from, leg).map((n) => toLocal(n.lat, n.lon)), course.name, from === course.start)
     route.push(...(route.length ? part.slice(1) : part))
     from = leg
   }
 
-  // 로컬 좌표로 바꾸고 2m 간격으로 다시 나눠 부드럽게 만든다
-  const raw = route.map((n) => toLocal(n.lat, n.lon))
+  // 2m 간격으로 다시 나눠 부드럽게 만든다
+  const raw = route
   const STEP = 2
   const pts = [raw[0]]
   for (let k = 1; k < raw.length; k++) {
