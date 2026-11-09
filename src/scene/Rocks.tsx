@@ -2,8 +2,9 @@ import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { meshHeight, sampleHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
+import { jitterVertices } from '../lib/geometry'
 import { classifyGround, samplePhoto } from '../lib/photo-map'
-import { makeNearTrail, usePhotoLayers } from '../lib/placement'
+import { makeNearTrail, scatterPoint, usePhotoLayers } from '../lib/placement'
 import { withOcclusionFade } from '../lib/occlusion'
 import { makeLandmarkClear } from '../lib/landmarks'
 import { setObstacles, type Obstacle } from '../lib/obstacles'
@@ -37,19 +38,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
   // 정이십면체 꼭짓점을 조금씩 흔들어 둥근 바윗덩이 모양을 만든다
   const shape = useMemo(() => {
-    const geo = new THREE.IcosahedronGeometry(1, 1)
-    const rand = seededRandom(7)
-    const pos = geo.attributes.position as THREE.BufferAttribute
-    const v = new THREE.Vector3()
-    const moved = new Map<string, number>() // 같은 자리 꼭짓점은 같은 만큼 움직여 틈이 생기지 않게
-    for (let i = 0; i < pos.count; i++) {
-      v.fromBufferAttribute(pos, i)
-      const key = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`
-      if (!moved.has(key)) moved.set(key, 0.75 + rand() * 0.45)
-      v.multiplyScalar(moved.get(key)!)
-      v.y *= 0.65 // 납작하게
-      pos.setXYZ(i, v.x, v.y, v.z)
-    }
+    const geo = jitterVertices(new THREE.IcosahedronGeometry(1, 1), seededRandom(7), 0.75, 0.45).scale(1, 0.65, 1) // 납작하게
     geo.computeVertexNormals()
     return geo
   }, [])
@@ -123,16 +112,7 @@ export function Rocks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 
     // 2) 바위가 드러난 곳에 흩어진 바위. 사진이 있으면 사진에서 바위인 곳에만 둔다
     for (let tries = 0; out.length < COUNT + SUMMIT_BOULDERS && tries < COUNT * 20; tries++) {
-      let x: number
-      let z: number
-      if (rand() < NEAR_TRAIL_SHARE) {
-        const p = trail.points[Math.floor(rand() * trail.points.length)]
-        x = p.x + (rand() * 2 - 1) * NEAR_TRAIL_RANGE
-        z = p.z + (rand() * 2 - 1) * NEAR_TRAIL_RANGE
-      } else {
-        x = THREE.MathUtils.lerp(terrain.minX, terrain.maxX, rand())
-        z = THREE.MathUtils.lerp(terrain.minZ, terrain.maxZ, rand())
-      }
+      const { x, z } = scatterPoint(rand, trail, terrain, NEAR_TRAIL_SHARE, NEAR_TRAIL_RANGE)
       if (nearTrail(x, z, TRAIL_CLEARANCE)) continue
       if (usePhoto) {
         const rgb = samplePhoto(layers, x, z)

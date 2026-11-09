@@ -176,16 +176,17 @@ function clearView(terrain: TerrainData, from: THREE.Vector3, to: THREE.Vector3)
  * 톤 매핑한 뒤 색을 조금 다듬고 가장자리를 살짝 어둡게 한다. 톤 매핑은 렌더러 대신 후처리에서 한 번 한다 (App 의 Canvas 는 NoToneMapping).
  */
 function PostEffects() {
+  // 색 보정은 톤 매핑 뒤(0~1 색)에서 한다. 앞에 두면 1을 넘는 밝은 HDR 색(햇빛 받은 노란 오리 등)에서 채도 계산이 깨져 새까맣게 된다
+  const grade = (
+    <>
+      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
+      <HueSaturation saturation={0.08} />
+      <BrightnessContrast contrast={0.06} />
+      <Vignette offset={0.3} darkness={0.45} />
+    </>
+  )
   // 폰·태블릿은 GPU 가 약해서 가장 무거운 앰비언트 오클루전(법선 버퍼까지 그린다)과 멀티샘플링을 뺀다
-  if (IS_TOUCH)
-    return (
-      <EffectComposer multisampling={0}>
-        <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-        <HueSaturation saturation={0.08} />
-        <BrightnessContrast contrast={0.06} />
-        <Vignette offset={0.3} darkness={0.45} />
-      </EffectComposer>
-    )
+  if (IS_TOUCH) return <EffectComposer multisampling={0}>{grade}</EffectComposer>
   return (
     // SSAO 는 법선 버퍼가 필요하다. (N8AO 2.0.1 은 three 0.187 에서 렌더 타깃 오류가 나서 postprocessing 의 SSAO 를 쓴다)
     <EffectComposer multisampling={4} enableNormalPass>
@@ -201,11 +202,7 @@ function PostEffects() {
         worldProximityThreshold={0.5}
         worldProximityFalloff={0.2}
       />
-      {/* 색 보정은 톤 매핑 뒤(0~1 색)에서 한다. 앞에 두면 1을 넘는 밝은 HDR 색(햇빛 받은 노란 오리 등)에서 채도 계산이 깨져 새까맣게 된다 */}
-      <ToneMapping mode={ToneMappingMode.ACES_FILMIC} />
-      <HueSaturation saturation={0.08} />
-      <BrightnessContrast contrast={0.06} />
-      <Vignette offset={0.3} darkness={0.45} />
+      {grade}
     </EffectComposer>
   )
 }
@@ -736,7 +733,7 @@ function WorldScene({ terrain, trail }: Props) {
     camera.position.copy(target).addScaledVector(dir, z.shown)
     // 마지막 안전망: 레이가 놓친 비탈(점프 중 낮은 기준점 등)에서도 카메라가 땅속에 들어가지 않게 올린다
     const floor = meshHeight(terrain, camera.position.x, camera.position.z) + CAMERA_GROUND_CLEARANCE
-    if (camera.position.y < floor) camera.position.y = floor
+    if (camera.position.y < floor) camera.position.setY(floor)
     occlusionUniforms.uOccCamera.value.copy(camera.position)
     // 캐릭터와 카메라가 자리 잡고 몇 프레임 그린 뒤 첫 화면을 걷어 내게 알린다
     if (drawnFrames.current < 5 && ++drawnFrames.current === 5) useGame.setState({ sceneReady: true })

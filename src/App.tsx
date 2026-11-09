@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { PerformanceMonitor, useProgress } from '@react-three/drei'
 import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
@@ -39,8 +39,9 @@ export default function App() {
   const courseId = useGame((s) => s.courseId)
   const [dpr, setDpr] = useState(() => clampDpr(DPR_RANGE[1]))
   // 화질 오르내림 기록. drei 의 flipflops 는 이미 최고 화질인데 올린 것도 세서 빠른 기기가 가장 낮은 화질로 떨어지므로 직접 센다
-  const [tuning] = useState(() => ({ factor: 1, dir: 0, flips: 0, frozen: false }))
+  const tuningRef = useRef({ factor: 1, dir: 0, flips: 0, frozen: false })
   const tune = (factor: number, dir: number) => {
+    const tuning = tuningRef.current
     // 이미 끝까지 올렸거나 내린 상태에서 또 올리고 내리는 신호는 무시한다
     if (tuning.frozen || factor === tuning.factor) return
     tuning.factor = factor
