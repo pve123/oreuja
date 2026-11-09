@@ -8,7 +8,7 @@ import type { Obstacle } from './obstacles'
  * - pass: 깔딱고개. 돌탑 옆에 숨 고르는 나무 벤치
  * - temple: 절·암자(인수암, 보리사, 대동사). 붉은 기둥, 기와지붕, 연등
  * - hut: 산장(백운산장). 굴뚝 있는 나무 산장
- * - gate: 성문(백운봉암문 위문). 등산로가 아치 사이로 지나간다
+ * - gate: 성문(백운봉암문 위문). 이름에 암문·성문이 든 곳. 등산로가 아치 사이로 지나간다
  * - ruins: 문터(수문터). 무너진 성벽 터
  * - waterfall: 폭포(개연폭포). 바위 절벽, 물줄기, 물웅덩이
  * - sign: 그 밖의 이름. 나무 표지판
@@ -36,7 +36,8 @@ export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('폭포')) return 'waterfall'
   if (name.includes('산장')) return 'hut'
   if (name.includes('문터')) return 'ruins'
-  if (name.includes('문')) return 'gate'
+  // 성문은 암문·성문만. 우이암 코스의 하늘문처럼 「문」이 든 다른 지점은 표지판으로 둔다
+  if (name.includes('암문') || name.includes('성문')) return 'gate'
   if (name.includes('깔딱')) return 'pass'
   if (name.endsWith('재') || name.includes('고개')) return 'cairn'
   if (name.endsWith('암') || name.endsWith('사')) return 'temple'

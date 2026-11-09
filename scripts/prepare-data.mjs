@@ -118,7 +118,10 @@ const DOBONGSAN_COURSES = [
     level: '쉬움',
     start: { name: '우이탐방지원센터', lat: 37.67773, lon: 127.00331 },
     summit: { name: '우이암', lat: 37.68372, lon: 127.00908 },
-    checkpoints: [],
+    checkpoints: [
+      { name: '상투바위', lat: 37.68058, lon: 127.00844, note: '상투를 튼 머리처럼 솟은 바위' },
+      { name: '하늘문', lat: 37.68406, lon: 127.00846, note: '우이암 바로 아래 이정표가 선 갈림목. 정상까지 얼마 남지 않았다' },
+    ],
   },
 ]
 
