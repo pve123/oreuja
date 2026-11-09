@@ -50,8 +50,14 @@ function useKeyboard() {
 
 export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
   useKeyboard()
-  // 코스 정보는 컴퓨터에서는 펼쳐 두고, 폰에서는 3D 화면을 가리지 않게 접어 둔다 (이름만 보인다)
-  const [courseFolded, toggleCourse] = useFolded('course', !OPEN_BY_DEFAULT)
+  // 코스 정보는 컴퓨터에서는 펼쳐 두고, 폰에서는 3D 화면을 가리지 않게 접어 둔다 (이름만 보인다).
+  // 컴퓨터라도 창이 작으면 접어 둔다. 작은 창에서 직접 펴거나 접은 것은 이번에 여는 동안 작은 창일 때만 따른다
+  const [storedFold, toggleStoredFold] = useFolded('course', !OPEN_BY_DEFAULT)
+  const smallWindow = useMediaQuery(SMALL_WINDOW) && !IS_TOUCH
+  // 작은 창에서 직접 고른 값. 지금 창이 크면 쓰지 않고 저장해 둔 값(storedFold)을 따른다
+  const [smallFold, setSmallFold] = useState<{ small: boolean; folded: boolean } | null>(null)
+  const courseFolded = smallFold?.small === smallWindow ? smallFold.folded : smallWindow || storedFold
+  const toggleCourse = () => (smallWindow ? setSmallFold({ small: true, folded: !courseFolded }) : toggleStoredFold())
   const distance = useGame((s) => s.distance)
   const mode = useGame((s) => s.mode)
   const controlMode = useGame((s) => s.controlMode)
@@ -173,6 +179,21 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 const FOLD_KEY = 'hiking-metaverse:folded3:'
 /** 코스·캐릭터 패널을 처음에 펼쳐 둘지. 폰·태블릿은 펼치면 3D 화면을 많이 가려 접어 둔다 */
 const OPEN_BY_DEFAULT = !IS_TOUCH
+/** 코스 패널을 접어 두는 작은 컴퓨터 창. 이보다 작으면 펼친 코스 패널이 산과 캐릭터를 가린다 */
+const SMALL_WINDOW = '(max-width: 1000px), (max-height: 700px)'
+
+/** 미디어 쿼리가 맞는지. 창 크기가 바뀌면 다시 그린다 */
+function useMediaQuery(query: string) {
+  const [match, setMatch] = useState(() => window.matchMedia(query).matches)
+  useEffect(() => {
+    const mq = window.matchMedia(query)
+    const on = () => setMatch(mq.matches)
+    on()
+    mq.addEventListener('change', on)
+    return () => mq.removeEventListener('change', on)
+  }, [query])
+  return match
+}
 
 /** 패널을 접었는지. 패널마다 브라우저에 기억하고, 기억이 없으면 foldedByDefault 를 따른다 */
 function useFolded(name: string, foldedByDefault = true): [boolean, () => void] {

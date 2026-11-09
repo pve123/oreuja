@@ -136,6 +136,8 @@ const LOBBY_PITCH = THREE.MathUtils.degToRad(9)
 const LOBBY_SHIFT_X = 0.2
 const LOBBY_SHIFT_UP = 0.16
 const LOBBY_SHIFT_UP_NARROW = 0.3
+/** 좁은 컴퓨터 창(760px 이하)에서 걷는 동안 화면을 내리는 비율. 위에 쌓인 코스·진행 패널 밑으로 캐릭터가 보이게 한다 */
+const NARROW_HIKE_SHIFT_DOWN = 0.12
 const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
 /**
  * 쉬운 조작의 저절로 걷기: 등산로에서 이만큼(m) 앞 지점을 향해 몸을 돌리며 걷는다. 길에서 비켜나 있어도 이 지점을 보고 걸어 가운데로 돌아온다
@@ -237,7 +239,7 @@ function WorldScene({ terrain, trail }: Props) {
   const looking = useRef(false)
   const lookEndedAt = useRef(0)
   /** 베이스캠프 창을 피해 화면을 옮긴 정도 (0~1) */
-  const lobbyView = useRef({ shift: 0 })
+  const lobbyView = useRef({ shift: 0, down: 0 })
   const size = useThree((s) => s.size)
   /** 휠로 고른 카메라 거리(arm)와 스프링 암이 실제로 보여 주는 거리(shown) */
   const zoom = useRef({ arm: CAMERA_START_DISTANCE, shown: CAMERA_START_DISTANCE })
@@ -711,14 +713,18 @@ function WorldScene({ terrain, trail }: Props) {
       camera.position.set(target.x + Math.sin(azimuth) * horizontal, y, target.z + Math.cos(azimuth) * horizontal)
     }
 
-    // 베이스캠프 창에 가리지 않게 화면을 옮긴다. 열고 닫을 때 부드럽게 미끄러진다
+    // 베이스캠프 창에 가리지 않게 화면을 옮긴다. 열고 닫을 때 부드럽게 미끄러진다.
+    // 좁은 컴퓨터 창에서 걷는 동안에는 위에 쌓인 패널에 캐릭터가 가리지 않게 화면을 조금 내린다 (폰은 아래에 조작 단추가 있어 그대로 둔다)
     const view = lobbyView.current
-    view.shift += ((lobby ? 1 : 0) - view.shift) * (1 - Math.exp(-4 * dt))
+    const { width: vw, height: vh } = size
+    const narrow = vw < 760
+    const ease = 1 - Math.exp(-4 * dt)
+    view.shift += ((lobby ? 1 : 0) - view.shift) * ease
+    view.down += ((!lobby && narrow && !IS_TOUCH ? 1 : 0) - view.down) * ease
     const persp = camera as THREE.PerspectiveCamera
-    if (view.shift > 0.002) {
-      const { width: w, height: h } = size
-      const narrow = w < 760
-      persp.setViewOffset(w, h, narrow ? 0 : -w * LOBBY_SHIFT_X * view.shift, h * (narrow ? LOBBY_SHIFT_UP_NARROW : LOBBY_SHIFT_UP) * view.shift, w, h)
+    if (view.shift > 0.002 || view.down > 0.002) {
+      const up = vh * (narrow ? LOBBY_SHIFT_UP_NARROW : LOBBY_SHIFT_UP) * view.shift - vh * NARROW_HIKE_SHIFT_DOWN * view.down
+      persp.setViewOffset(vw, vh, narrow ? 0 : -vw * LOBBY_SHIFT_X * view.shift, up, vw, vh)
     } else if (persp.view?.enabled) persp.clearViewOffset()
 
     controls.current.target.copy(target)
