@@ -95,6 +95,10 @@ function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail })
     case 'ropes':
     case 'ridge':
       return null
+    case 'junction':
+      return <Junction />
+    case 'spring':
+      return <Spring />
     case 'trailhead':
       return <Trailhead mountain={trail.data.mountain} park={trail.data.park} />
     default:
@@ -714,6 +718,89 @@ function Signpost(): ReactNode {
         <boxGeometry args={[1.3, 0.38, 0.06]} />
         <Std color="#a0794f" />
       </mesh>
+    </group>
+  )
+}
+
+/** 갈림길 이정표: 기둥 하나에 화살표 판 세 장이 높이와 방향을 달리해 붙는다 */
+function Junction() {
+  return (
+    <group>
+      <mesh position={[0, 1.2, 0]} castShadow>
+        <boxGeometry args={[0.14, 2.4, 0.14]} />
+        <Std color="#6b4a2f" />
+      </mesh>
+      {[
+        [2.05, 0.2],
+        [1.7, 2.3],
+        [1.35, -2],
+      ].map(([y, yaw]) => (
+        <group key={yaw} position={[0, y, 0]} rotation={[0, yaw, 0]}>
+          <mesh position={[0.6, 0, 0]} castShadow>
+            <boxGeometry args={[1, 0.26, 0.05]} />
+            <Std color="#a0794f" />
+          </mesh>
+          {/* 화살촉 */}
+          <mesh position={[1.18, 0, 0]} rotation={[Math.PI / 2, 0, -Math.PI / 2]}>
+            <coneGeometry args={[0.17, 0.2, 3]} />
+            <Std color="#a0794f" flatShading />
+          </mesh>
+          <mesh position={[0.55, 0, 0.03]}>
+            <boxGeometry args={[0.7, 0.05, 0.01]} />
+            <Std color="#f1e9da" />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  )
+}
+
+/** 샘터: 돌을 둘러 쌓은 물받이에 물이 고이고, 뒤 돌벽의 대롱에서 물이 떨어진다. 옆 기둥에 붉은 바가지를 건다 */
+function Spring() {
+  return (
+    <group>
+      {/* 뒤 돌벽과 물 대롱, 떨어지는 물줄기 */}
+      <mesh position={[0, 0.45, -0.95]} castShadow receiveShadow>
+        <boxGeometry args={[1.8, 1.2, 0.5]} />
+        <Std color="#9f988c" flatShading />
+      </mesh>
+      <mesh position={[0, 0.7, -0.55]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.35, 8]} />
+        <Std color="#8a8f94" metalness={0.5} roughness={0.4} />
+      </mesh>
+      <mesh position={[0, 0.42, -0.38]}>
+        <cylinderGeometry args={[0.025, 0.035, 0.55, 6]} />
+        <meshStandardMaterial color="#cfe9f7" transparent opacity={0.75} roughness={0.1} />
+      </mesh>
+      {/* 돌로 두른 물받이와 고인 물 */}
+      {Array.from({ length: 9 }, (_, i) => {
+        const a = (i / 9) * Math.PI * 2
+        return (
+          <mesh key={i} position={[Math.cos(a) * 0.62, 0.1, Math.sin(a) * 0.5]} rotation={[0, a, 0]} scale={[0.26, 0.2, 0.22]} castShadow>
+            <dodecahedronGeometry args={[1, 0]} />
+            <Std color={GRANITE[i % GRANITE.length]} flatShading />
+          </mesh>
+        )
+      })}
+      <mesh position={[0, 0.12, 0]} rotation={[-Math.PI / 2, 0, 0]} scale={[1, 0.8, 1]}>
+        <circleGeometry args={[0.52, 20]} />
+        <meshStandardMaterial color="#6fa9bf" roughness={0.1} metalness={0.2} />
+      </mesh>
+      {/* 바가지 건 기둥 */}
+      <mesh position={[1.1, 0.6, -0.5]} castShadow>
+        <boxGeometry args={[0.08, 1.2, 0.08]} />
+        <Std color="#6b4a2f" />
+      </mesh>
+      <group position={[1.1, 1.02, -0.38]} rotation={[0.5, 0, 0]}>
+        <mesh>
+          <sphereGeometry args={[0.13, 12, 8, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2]} />
+          <Std color="#d6453d" side={THREE.DoubleSide} />
+        </mesh>
+        <mesh position={[0, 0.02, -0.18]} rotation={[Math.PI / 2, 0, 0]}>
+          <cylinderGeometry args={[0.02, 0.02, 0.24, 6]} />
+          <Std color="#d6453d" />
+        </mesh>
+      </group>
     </group>
   )
 }
