@@ -16,7 +16,8 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
 
   const w = canvas.width
   const h = canvas.height
-  const bar = Math.round(h * 0.16)
+  // 글자 띠 높이. 화면 높이로만 정하면 폰 세로 사진에서 글자가 너비를 넘쳐 잘리므로 너비도 함께 본다 (가로 화면은 높이 기준 그대로)
+  const bar = Math.round(Math.min(h, w * 0.75) * 0.16)
   const grad = ctx.createLinearGradient(0, h - bar * 1.6, 0, h)
   grad.addColorStop(0, 'rgba(12,18,34,0)')
   grad.addColorStop(1, 'rgba(12,18,34,0.78)')
