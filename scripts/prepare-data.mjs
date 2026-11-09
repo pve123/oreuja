@@ -25,7 +25,7 @@ const ZOOM = 13
 // 코스 좌표는 OpenStreetMap 의 같은 이름 지점에서 가져왔다
 // summit 은 봉우리 노드(osmId)나 좌표(lat, lon) 중 하나로 준다. elevation 이 없으면 지형 높이를 쓴다
 // via 는 가장 짧은 길이 대표 코스가 아닐 때 반드시 거쳐 갈 지점들이다
-// checkpoints 는 가는 길에 지나는 이정표. 등산로에서 MAX_CHECKPOINT_OFFSET 보다 멀면 빼고 경고한다
+// checkpoints 는 가는 길에 지나는 이정표. 등산로에서 MAX_CHECKPOINT_OFFSET(이정표에 maxOffset 이 있으면 그 값)보다 멀면 빼고 경고한다
 const BUKHANSAN_COURSES = [
   {
     id: 'bukhansan-baegundae',
@@ -179,6 +179,54 @@ const GWANAKSAN_COURSES = [
   },
 ]
 
+// 수락산 정상 주봉(638m). 노원 쪽 수락산역, 의정부 쪽 장암, 당고개 쪽 학림사에서 오르는 세 길
+const SURAKSAN_COURSES = [
+  // 수락산역 쪽: 수락산광장에서 벽운계곡을 따라 매월정과 깔딱고개, 철모바위를 지나 주봉에 오른다
+  {
+    id: 'suraksan-surak',
+    mountain: '수락산',
+    name: '수락산역 코스',
+    level: '보통',
+    start: { name: '수락산광장', lat: 37.68918, lon: 127.05726 },
+    summit: { name: '주봉', osmId: 3803846068, elevation: 638 },
+    checkpoints: [
+      { name: '매월정', lat: 37.69551, lon: 127.07405, note: '능선 아래 쉼터 정자. 노원 시내가 내려다보인다' },
+      { name: '깔딱고개', lat: 37.69583, lon: 127.07635, note: '이름처럼 숨이 깔딱 넘어가는 오르막' },
+      { name: '철모바위', lat: 37.69749, lon: 127.08139, note: '군인 철모를 엎어 놓은 듯한 바위. 정상이 코앞이다' },
+    ],
+  },
+  // 의정부 장암 쪽: 석림사 입구에서 석림사를 지나 계곡을 거슬러 기차바위를 거쳐 주봉에 오른다
+  {
+    id: 'suraksan-jangam',
+    mountain: '수락산',
+    name: '장암 코스',
+    level: '어려움',
+    start: { name: '석림사 입구', lat: 37.69995, lon: 127.06353 },
+    summit: { name: '주봉', osmId: 3803846068, elevation: 638 },
+    // 가장 짧은 길은 석림사 뒤 계곡으로 정상에 곧장 올라 기차바위를 지나지 않아서 기차바위를 거쳐 가게 한다
+    via: [{ lat: 37.70311, lon: 127.08271 }],
+    checkpoints: [
+      { name: '석림사', lat: 37.70127, lon: 127.06654, note: '노강서원 위 계곡가의 절', maxOffset: 70 },
+      { name: '기차바위', lat: 37.70311, lon: 127.08271, note: '기차처럼 길게 누운 바위. 밧줄을 잡고 오른다' },
+    ],
+  },
+  // 당고개 쪽: 학림사에서 용굴암과 도솔봉을 지나 치마바위, 코끼리바위를 거쳐 주봉에 오른다
+  {
+    id: 'suraksan-dosol',
+    mountain: '수락산',
+    name: '도솔봉 코스',
+    level: '보통',
+    start: { name: '학림사', lat: 37.68213, lon: 127.07737 },
+    summit: { name: '주봉', osmId: 3803846068, elevation: 638 },
+    checkpoints: [
+      { name: '용굴암', lat: 37.68822, lon: 127.08175, note: '바위굴 옆에 자리한 작은 암자', maxOffset: 70 },
+      { name: '도솔봉', lat: 37.69059, lon: 127.08471, note: '수락산 남쪽 봉우리. 등산로는 봉우리 바로 아래를 지난다', maxOffset: 70 },
+      { name: '치마바위', lat: 37.69373, lon: 127.08439, note: '치마를 펼친 듯 넓게 누운 바위' },
+      { name: '코끼리바위', lat: 37.69509, lon: 127.08287, note: '코끼리 머리를 닮은 바위' },
+    ],
+  },
+]
+
 const MOUNTAINS = [
   {
     id: 'bukhansan',
@@ -205,6 +253,14 @@ const MOUNTAINS = [
     bbox: { south: 37.425, west: 126.945, north: 37.475, east: 127.0 },
     sheets: ['37612018', '37612019', '37612020', '37612028', '37612029', '37612030'],
     courses: GWANAKSAN_COURSES,
+  },
+  {
+    id: 'suraksan',
+    name: '수락산',
+    elevation: 638,
+    bbox: { south: 37.675, west: 127.05, north: 37.715, east: 127.1 },
+    sheets: ['37705013', '37705014', '37705023', '37705024'],
+    courses: SURAKSAN_COURSES,
   },
 ]
 const MAX_CHECKPOINT_OFFSET = 40 // m
@@ -586,7 +642,8 @@ function buildTrail(course, graph, sampleHeight) {
       const d = Math.hypot(x - p.x, z - p.z)
       if (d < bestD) { bestD = d; best = k }
     })
-    if (bestD > MAX_CHECKPOINT_OFFSET) {
+    // 절이나 봉우리처럼 등산로가 바로 아래를 비켜 지나는 곳은 이정표에 maxOffset 을 주어 더 멀리까지 받는다
+    if (bestD > (cp.maxOffset ?? MAX_CHECKPOINT_OFFSET)) {
       console.warn(`  ! ${cp.name} 은 등산로에서 ${bestD.toFixed(0)}m 떨어져 있어 뺐다`)
       continue
     }
