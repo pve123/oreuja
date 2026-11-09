@@ -5,8 +5,8 @@
 //  - 되짚기: 지나온 자리로 3m 안까지 되돌아오는 12~150m 구간이 있으면 갔다가 되짚어 온 것이다 (출발점 군더더기).
 //    그 구간 안에 이정표가 있으면 들렀다 나오는 길이라 괜찮다 (망월사 코스는 등산로에서 절 마당으로 들어가 망월사 앞에 섰다 나온다)
 //  - 출발 내리막: 첫 500m 안에 출발보다 25m 넘게 내려가면 등산로가 아닌 길로 돌아가는 것이다 (우이암 관리 도로)
-//  - 큰 내리막: 한 번에 60m 넘게 내려갔다 오르면 다른 능선으로 돌아가는 것이다 (망월사 다락능선 우회는 73m).
-//    관악산 사당 코스는 관악문에서 연주대로 바로 오르는 암벽 구간을 빼서 50m 를 내려갔다 돌아 오른다
+//  - 큰 내리막: 한 번에 60m 넘게 내려갔다 오르면 다른 능선으로 돌아가는 것이다 (망월사 다락능선 우회는 61m).
+//    일부러 돌아가는 코스는 DESCENT_ALLOWED 에 이유와 함께 적는다
 //  - 이정표·정상: 이정표는 코스 안에서 순서대로, 도착점은 코스에서 가장 높은 곳 근처여야 한다
 import fs from 'node:fs'
 import path from 'node:path'
@@ -22,6 +22,12 @@ const START_WINDOW = 500
 const START_DROP_MAX = 25
 const DESCENT_MAX = 60
 const SUMMIT_BELOW_MAX = 15
+/** 큰 내리막을 일부러 두는 코스와 그 한도(m) */
+const DESCENT_ALLOWED = {
+  // 관악문에서 연주대로 바로 오르는 마지막 구간이 OSM 에 암벽(alpine_hiking)으로 올라 있어 데이터 스크립트가 빼고,
+  // 연주암 쪽으로 내려갔다 돌아 오른다. 정밀 지형에서 61m 다
+  'gwanaksan-sadang': 70,
+}
 
 const mountains = JSON.parse(fs.readFileSync(path.join(DATA, 'mountains.json'), 'utf8'))
 const problems = []
@@ -81,7 +87,7 @@ for (const m of mountains) {
       if (ys[i] > peak) {
         peak = ys[i]
         peakAt = i
-      } else if (peak - ys[i] > DESCENT_MAX) {
+      } else if (peak - ys[i] > (DESCENT_ALLOWED[c.id] ?? DESCENT_MAX)) {
         say(`${cum[peakAt].toFixed(0)}m 에서 ${(peak - ys[i]).toFixed(0)}m 를 내려간다 (다른 길로 돌아간다?)`)
         break
       }
