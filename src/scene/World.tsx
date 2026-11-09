@@ -136,6 +136,16 @@ const LOBBY_SHIFT_X = 0.2
 const LOBBY_SHIFT_UP = 0.16
 const LOBBY_SHIFT_UP_NARROW = 0.3
 const FOLLOW_RATE = 5 // 카메라가 캐릭터 등 뒤로 돌아가는 빠르기 (클수록 빨리)
+/**
+ * 쉬운 조작의 저절로 걷기: 등산로에서 이만큼(m) 앞 지점을 향해 몸을 돌리며 걷는다. 길에서 비켜나 있어도 이 지점을 보고 걸어 가운데로 돌아온다
+ */
+const AUTO_LOOKAHEAD = 5
+/** 저절로 걸을 때 몸을 돌리는 가장 빠른 빠르기(rad/s). 굽은 길에서 부드럽게 돈다 */
+const AUTO_TURN_SPEED = 2.4
+/** 가야 할 쪽과 이 각도(rad)보다 많이 어긋나 있으면 거의 멈춘 채로 먼저 돈다 (뒤돌아 출발할 때 크게 원을 그리지 않게) */
+const AUTO_TURN_FIRST = THREE.MathUtils.degToRad(70)
+/** 저절로 걷는 동안 손가락·마우스로 둘러본 뒤 이 시간(ms)이 지나면 카메라가 다시 등 뒤로 돌아온다 */
+const AUTO_RECENTER_MS = 2500
 /** 기념사진 말풍선 꼬리 끝을 둘 높이(발에서 m). 만세 동작으로 든 스틱 끝보다 조금 위 */
 const PHOTO_BUBBLE_HEIGHT = 2.6
 const JUMP_SPEED = 5.5 // m/s, 약 1m 높이까지 뛴다
@@ -225,6 +235,9 @@ function WorldScene({ terrain, trail }: Props) {
   const lastTarget = useRef(new THREE.Vector3())
   /** 마우스로 카메라를 돌려 둘러보는 중. 다시 걷거나 몸을 돌리면 등 뒤로 돌아간다 */
   const freeLook = useRef(false)
+  // 손가락·마우스로 둘러보는 중인지와 마지막으로 손을 뗀 때 (저절로 걷기 중 카메라를 다시 등 뒤로 돌릴 때 쓴다)
+  const looking = useRef(false)
+  const lookEndedAt = useRef(0)
   /** 베이스캠프 창을 피해 화면을 옮긴 정도 (0~1) */
   const lobbyView = useRef({ shift: 0 })
   const size = useThree((s) => s.size)
@@ -427,6 +440,7 @@ function WorldScene({ terrain, trail }: Props) {
     let turn = 0
     let running = input.run
     let stick = false
+    let auto = false
     if (input.jump) {
       input.jump = false
       if (b.grounded && game.mode === 'hiking') {
@@ -438,6 +452,17 @@ function WorldScene({ terrain, trail }: Props) {
       turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
       move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
       b.yaw += turn * TURN_SPEED * dt
+      // 방향키를 누르면 저절로 걷기를 멈추고 직접 조작으로 넘어간다
+      if (game.autoWalk && (move !== 0 || turn !== 0)) game.setAutoWalk(false)
+      // 쉬운 조작의 저절로 걷기: 등산로 몇 미터 앞을 향해 몸을 돌리며 걷는다
+      if (game.autoWalk && move === 0 && turn === 0) {
+        const ahead = trail.positionAt(Math.min(distance + AUTO_LOOKAHEAD, trail.length))
+        const want = Math.atan2(ahead.x - b.x, ahead.z - b.z)
+        const diff = Math.atan2(Math.sin(want - b.yaw), Math.cos(want - b.yaw))
+        b.yaw += THREE.MathUtils.clamp(diff, -AUTO_TURN_SPEED * dt, AUTO_TURN_SPEED * dt)
+        move = Math.abs(diff) > AUTO_TURN_FIRST ? 0.15 : 1
+        auto = true
+      }
       // 터치 조이스틱: 좌우는 몸 돌리기, 위아래는 앞뒤로 걷기. 카메라가 등 뒤로 따라와 늘 가는 쪽이 화면 앞이다
       const { x: sx, y: sy } = input.stick
       if (Math.hypot(sx, sy) > STICK_DEAD && move === 0 && turn === 0) {
@@ -666,6 +691,8 @@ function WorldScene({ terrain, trail }: Props) {
     // 카메라는 캐릭터 등 뒤로 부드럽게 돌아간다. 손가락·마우스로 둘러보는 중이면 그 자리에 두고, 다시 걷거나 몸을 돌리면 따라간다
     // 베이스캠프에서는 캐릭터 앞쪽 비스듬히 돌아가 낮게 비춘다
     if (input.forward || input.backward || input.left || input.right || stick || lobby) freeLook.current = false
+    // 저절로 걷는 중에는 둘러보고 손을 뗀 뒤 잠깐 지나면 다시 등 뒤로 돌아와 가는 길을 보여 준다
+    if (auto && performance.now() - lookEndedAt.current > AUTO_RECENTER_MS && !looking.current) freeLook.current = false
     if (!freeLook.current) {
       const off = camera.position.clone().sub(target)
       const horizontal = Math.hypot(off.x, off.z)
@@ -746,6 +773,11 @@ function WorldScene({ terrain, trail }: Props) {
         dampingFactor={TOUCH_LOOK_DAMPING}
         onStart={() => {
           freeLook.current = true
+          looking.current = true
+        }}
+        onEnd={() => {
+          looking.current = false
+          lookEndedAt.current = performance.now()
         }}
       />
     </>
