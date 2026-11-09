@@ -137,7 +137,7 @@ const DOBONGSAN_COURSES = [
   },
 ]
 
-// 관악산 정상(연주대 옆 632m 봉우리). 수치지형도 없이 30m 지형으로 만든다 (sheets 가 비어 있다)
+// 관악산 정상(연주대 옆 632m 봉우리)
 const GWANAKSAN_COURSES = [
   // 사당 쪽 능선: 관음사에서 국기봉 둘과 하마바위, 마당바위, 관악문을 지나 연주대에 오른다. 사람이 가장 많이 다니는 길이다.
   // 사당역에서 관음사까지는 1km 가까이 도시 길이라 관음사에서 출발한다
@@ -148,6 +148,9 @@ const GWANAKSAN_COURSES = [
     level: '보통',
     start: { name: '관음사', lat: 37.46732, lon: 126.9771 },
     summit: { name: '연주대', osmId: 442878166, elevation: 632 },
+    // 관악문에서 연주대로 오르는 마지막 바위 구간(계단과 난간이 있다)이 OSM 에 암벽으로 올라 있다.
+    // 빼면 연주암 쪽으로 85m 를 내려갔다 돌아 올라서, 이 코스는 짧은 암벽 구간을 허용한다
+    allowAlpine: true,
     // 가장 짧은 길은 1.5km 쯤에서 동쪽 파이프능선으로 빠지고 마당바위 뒤에서도 능선을 벗어나서, 능선 위 세 곳을 거쳐 가게 한다
     via: [
       { lat: 37.45859, lon: 126.9679 }, // 하마바위
@@ -200,7 +203,7 @@ const MOUNTAINS = [
     name: '관악산',
     elevation: 632,
     bbox: { south: 37.425, west: 126.945, north: 37.475, east: 127.0 },
-    sheets: [],
+    sheets: ['37612018', '37612019', '37612020', '37612028', '37612029', '37612030'],
     courses: GWANAKSAN_COURSES,
   },
 ]
@@ -360,7 +363,9 @@ async function loadOsm() {
 }
 
 /** 등산로 그래프 (노드와 이웃 목록). 출입금지·비법정·암벽 구간은 뺀다 */
-function buildGraph(osm) {
+/** 코스에 allowAlpine 을 주면 암벽 구간도 길로 쓰되 이만큼 비싸게 매겨, 돌아가는 길보다 훨씬 짧을 때만 지나게 한다 */
+const ALPINE_PENALTY = 3
+function buildGraph(osm, { allowAlpine = false } = {}) {
   const nodes = new Map()
   const adj = new Map()
   for (const e of osm.elements) if (e.type === 'node') nodes.set(e.id, e)
@@ -373,9 +378,11 @@ function buildGraph(osm) {
     const t = e.tags ?? {}
     // 출입금지·비법정 탐방로는 제외
     if (t.access === 'no' || t.foot === 'no' || t.access === 'private' || /비법정/.test(t.name ?? '')) continue
-    if (t.sac_scale && /alpine/.test(t.sac_scale)) continue // 암벽·릿지 구간 제외
+    // 암벽·릿지 구간은 빼고, 허용한 코스에서만 비싸게 매겨 쓴다
+    const alpine = t.sac_scale && /alpine/.test(t.sac_scale)
+    if (alpine && !allowAlpine) continue
     // 정식 등산로(sac_scale 표시)를 우선: 표시 없는 길은 비용 1.5배
-    const penalty = t.sac_scale ? 1 : 1.5
+    const penalty = alpine ? ALPINE_PENALTY : t.sac_scale ? 1 : 1.5
     for (let k = 1; k < e.nodes.length; k++) {
       const a = nodes.get(e.nodes[k - 1]), b = nodes.get(e.nodes[k])
       if (!a || !b) continue
@@ -447,6 +454,8 @@ const SPUR_GAP = 3
 const SPUR_MIN = 12
 const SPUR_MAX = 150
 const START_SPUR_GAP = 5
+/** 길이 도착점에서 이 거리(m) 안을 지나면 거기서 끝낸다 */
+const GOAL_SNAP = 5
 /** 점 p 에서 선분 a-b 위 가장 가까운 점 */
 function nearestOnSegment(p, a, b) {
   const dx = b.x - a.x, dz = b.z - a.z
@@ -519,6 +528,34 @@ function buildTrail(course, graph, sampleHeight) {
     from = leg
   }
 
+  // 도착점이 길 노드가 아니면 가장 가까운 노드까지 간 뒤 도착점을 덧붙이는데, 길이 도착점 옆을 지나 그 너머 노드까지 가면
+  // 갔다가 되돌아오는 꼬리가 생긴다(관악산 사당 코스는 연주대 봉우리를 지나 6m 아래 노드까지 갔다 돌아왔다).
+  // 길이 도착점 5m 안을 지나면 그 자리에서 끝낸다
+  const goalLocal = toLocal(goal.lat, goal.lon)
+  let cutAt = -1
+  let cutPoint = null
+  let cutDist = GOAL_SNAP
+  for (let k = 1; k < route.length - 1; k++) {
+    const q = nearestOnSegment(goalLocal, route[k - 1], route[k])
+    const dd = Math.hypot(q.x - goalLocal.x, q.z - goalLocal.z)
+    if (dd < cutDist) {
+      cutDist = dd
+      cutAt = k
+      cutPoint = q
+    }
+  }
+  // 도착점 쪽으로 다가가다 끝나는 보통 경우는 그대로 둔다. 끊을 자리 뒤 꼬리가 도착점까지 거리의 두 배보다 3m 넘게 길 때만
+  // 지나쳤다 되돌아오는 것으로 본다
+  let tail = 0
+  if (cutAt > 0) {
+    tail = Math.hypot(route[cutAt].x - cutPoint.x, route[cutAt].z - cutPoint.z)
+    for (let k = cutAt + 1; k < route.length; k++) tail += Math.hypot(route[k].x - route[k - 1].x, route[k].z - route[k - 1].z)
+  }
+  if (cutAt > 0 && tail > cutDist * 2 + 3) {
+    console.log(`  ${course.name}: 길이 도착점 ${cutDist.toFixed(1)}m 옆을 지나 그 자리에서 끝낸다 (뒤 ${route.length - cutAt}개 노드를 뺐다)`)
+    route.splice(cutAt, route.length - cutAt, cutPoint)
+  }
+
   // 2m 간격으로 다시 나눠 부드럽게 만든다
   const raw = route
   const STEP = 2
@@ -585,8 +622,11 @@ for (const m of MOUNTAINS) {
   selectMountain(m)
   await fs.mkdir(OUT, { recursive: true })
   const sampleHeight = await buildTerrain(m.sheets)
-  const graph = buildGraph(await loadOsm())
-  const trails = m.courses.map((c) => ({ ...buildTrail(c, graph, sampleHeight), park: m.park }))
+  const osm = await loadOsm()
+  const graph = buildGraph(osm)
+  // 암벽 구간을 허용한 코스가 있을 때만 그 그래프를 따로 만든다
+  const alpineGraph = m.courses.some((c) => c.allowAlpine) ? buildGraph(osm, { allowAlpine: true }) : null
+  const trails = m.courses.map((c) => ({ ...buildTrail(c, c.allowAlpine ? alpineGraph : graph, sampleHeight), park: m.park }))
   await fs.writeFile(path.join(OUT, 'courses.json'), JSON.stringify(trails))
   console.log(`코스 ${trails.length}개를 ${m.id}/courses.json 에 썼다`)
 }
