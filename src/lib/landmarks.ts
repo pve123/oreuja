@@ -23,7 +23,7 @@ import type { Obstacle } from './obstacles'
  * - pavilion: 정자(매월정). 육각 정자에 붉은 기둥, 초록 단청, 기와지붕
  * - trailhead: 출발점(탐방지원센터). 등산로를 가로지르는 나무 입구 문과 등산 안내도. 이정표가 아니라 코스마다 하나 세운다
  */
-export type LandmarkKind =
+type LandmarkKind =
   | 'cairn'
   | 'pass'
   | 'temple'

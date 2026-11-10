@@ -36,12 +36,12 @@ const MAX_MESSAGES_PER_SEC = 30
 const NAME_MAX = 12
 const EMOTE_GAP_MS = 500 // 감정 표현 사이 최소 간격
 const AVATARS = new Set(['hiker', 'uncle', 'potato', 'duck', 'tofu', 'mini-beard', 'mini-girl', 'mini-kid', 'barbarian', 'ranger', 'knight'])
-// lobby 는 베이스캠프(출발 전 고르는 화면), hidden 은 혼자 오르기. 둘 다 다른 사람 화면에 그리지 않는다
+// lobby 는 베이스캠프(출발 전 고르는 화면). 다른 사람 화면에 그리지 않는다
 // 순서가 곧 위치 메시지의 모드 번호다. 클라이언트(src/lib/net.ts)의 MODES 와 같아야 한다
-const MODE_LIST = ['lobby', 'hidden', 'hiking', 'summit', 'photo', 'photoResult']
+const MODE_LIST = ['lobby', 'hiking', 'summit', 'photo', 'photoResult']
 const MODES = new Set(MODE_LIST)
 /** 산길 위에 그릴 사람인지 */
-const climbing = (p) => p.mode !== 'lobby' && p.mode !== 'hidden'
+const climbing = (p) => p.mode !== 'lobby'
 const EMOTES = new Set(['wave', 'thanks', 'yaho', 'cheer', 'summit', 'cheerup', 'fighting'])
 
 const ALLOWED_ORIGINS = new Set(

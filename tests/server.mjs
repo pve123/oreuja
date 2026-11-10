@@ -105,10 +105,10 @@ try {
   const pa = pos?.p.find(([id]) => id === a.welcome.id)
   check('같은 코스 사람의 이름·아바타를 알려 준다', ia?.[2] === 'duck' && pos?.c === C)
   check('닉네임의 꺾쇠를 뺀다', ia?.[1] === '시험b', ia?.[1])
-  check('위치는 짧은 배열로, 거리는 0.1m 단위로 보낸다', pa?.length === 6 && pa[1] === 123.5 && pa[5] === 2, JSON.stringify(pa))
+  check('위치는 짧은 배열로, 거리는 0.1m 단위로 보낸다', pa?.length === 6 && pa[1] === 123.5 && pa[5] === 1, JSON.stringify(pa))
   check('IP·내부 값은 보내지 않는다', !JSON.stringify(boxB).includes('10.0.0'))
   const ib = (await until(boxA, (m) => m.t === 'p' && m.p.length))?.p[0]
-  check('정상에 있는 사람 모드도 알려 준다', ib?.[5] === 3, JSON.stringify(ib))
+  check('정상에 있는 사람 모드도 알려 준다', ib?.[5] === 2, JSON.stringify(ib))
 
   const counts = await until(boxL, (m) => m.t === 'c' && m.c[C] === 2)
   check('베이스캠프에는 코스별 오르는 인원을 보낸다', !!counts, JSON.stringify(boxL.at(-1)))

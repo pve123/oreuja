@@ -189,7 +189,7 @@ export function currentPhase(): Phase {
 }
 
 /** 베이스캠프에서 고르는 하늘. now 는 실제 한국 시각을 따라가고 나머지는 해 높이를 고정한다 */
-export type SkyPreset = 'now' | 'dawn' | 'day' | 'sunset' | 'night'
+type SkyPreset = 'now' | 'dawn' | 'day' | 'sunset' | 'night'
 export const SKY_PRESETS: { kind: SkyPreset; label: string }[] = [
   { kind: 'now', label: '지금' },
   { kind: 'dawn', label: '새벽' },

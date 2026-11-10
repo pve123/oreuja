@@ -11,7 +11,7 @@ const LIFT = 0.06 // 길 띠를 지면에서 띄운 높이와 같게(m)
 const STEP_BURY = 0.5
 
 /** 돌계단 한 칸. distance 는 등산로를 따라 잰 자리, top 은 디딤판 윗면 높이, bottom 은 땅에 묻힌 아랫면 */
-export type Step = { distance: number; top: number; bottom: number; x: number; z: number; heading: number }
+type Step = { distance: number; top: number; bottom: number; x: number; z: number; heading: number }
 
 const cache = new WeakMap<Trail, Step[]>()
 
