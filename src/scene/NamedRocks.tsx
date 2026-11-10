@@ -423,7 +423,7 @@ function beside(terrain: Terrain, trail: Trail, d: number, t: number) {
  * - 마당바위: 앞뒤 14m 를 너른 화강암 판으로 덮고, 길옆에 이름 표지판과 낮은 바위를 둔다
  * - 기차바위: 앞뒤 18m 를 좁고 밝은 바위 비탈로 덮고, 길 오른쪽에 바위 틈, 양쪽에 쇠기둥과 밧줄을 놓는다
  */
-export type SlabMode = 'yard' | 'ropes' | 'ridge'
+type SlabMode = 'yard' | 'ropes' | 'ridge'
 
 export function TrailSlab({ terrain, trail, at, name, mode }: { terrain: Terrain; trail: Trail; at: number; name: string; mode: SlabMode }) {
   const ropes = mode === 'ropes'

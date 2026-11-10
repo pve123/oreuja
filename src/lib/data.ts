@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 
-export type TerrainMeta = {
+type TerrainMeta = {
   width: number
   height: number
   minX: number
@@ -51,7 +51,7 @@ export type TrailData = {
 export type Checkpoint = { name: string; note: string; distance: number }
 
 /** 출발점부터 정상까지 이정표로 나눈 한 구간 */
-export type Section = {
+type Section = {
   from: string
   to: string
   start: number
