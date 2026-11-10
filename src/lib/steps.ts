@@ -1,14 +1,27 @@
 import * as THREE from 'three'
 import { meshHeight, standHeight, type Terrain, type Trail } from './data'
 
-const STEP_EVERY = 1.3 // 계단 간격(m)
 export const STEP_SLOPE = 0.3 // 이보다 가파르면(30%) 돌계단을 놓는다
 export const STEP_WIDTH = 1.5 // 돌계단 폭(m). 길 폭보다 조금 좁다
-export const STEP_DEPTH = 0.42 // 디딤판 깊이(m)
-const STEP_RISE = 0.1 // 디딤판 윗면이 주변 지면보다 올라오는 높이(m)
+/**
+ * 한 칸 높이(m). 칸 깊이를 비탈에 맞춰 이 높이가 되게 정한다. 실제 산길 돌계단 턱 높이쯤
+ * (가파르면 칸이 얕고 촘촘하게, 완만하면 깊고 성기게 놓인다)
+ */
+const TARGET_RISE = 0.22
+/** 칸 깊이 범위(m). 아주 가파른 곳에서 발 디딜 곳이 없거나, 완만한 곳에서 한 칸이 너무 길어지지 않게 */
+const MIN_SPAN = 0.32
+const MAX_SPAN = 0.9
+/** 이보다 짧게 끊긴 완만한 틈은 이어진 계단으로 메운다(m) */
+const MERGE_GAP = 2
+/** 이보다 짧은 가파른 구간에는 계단을 놓지 않는다(m) */
+const MIN_RUN = 1.5
+/** 가파른 곳을 찾을 때 등산로를 따라 재는 간격(m) */
+const SAMPLE = 0.25
 const LIFT = 0.06 // 길 띠를 지면에서 띄운 높이와 같게(m)
-/** 디딤판 오르막 쪽 모서리가 땅에 묻혀도 되는 깊이(m) */
+/** 옆 경사를 다 따르지 못하는 곳에서 디딤판 오르막 쪽 모서리가 땅에 묻혀도 되는 깊이(m) */
 const STEP_BURY = 0.5
+/** 받침 아랫면을 가장 낮은 땅보다 이만큼 더 묻는다(m). 비탈 쪽 아래로 틈이 보이지 않게 */
+const BODY_SINK = 0.3
 /**
  * 디딤판을 옆 경사에 맞춰 기울이는 최대 기울기(1m 옆으로 갈 때 오르는 높이, 약 17°).
  * 수평으로만 놓으면 비탈을 옆으로 가로지르는 길에서 내리막 쪽 받침 옆면이 큰 회색 삼각형으로 드러난다
@@ -16,52 +29,95 @@ const STEP_BURY = 0.5
 const MAX_TILT = 0.3
 
 /**
- * 돌계단 한 칸. distance 는 등산로를 따라 잰 자리, top 은 디딤판 가운데 윗면 높이, bottom 은 땅에 묻힌 아랫면(가운데 기준).
+ * 돌계단 한 칸. 칸들은 빈틈없이 이어져, 디딤판이 다음 칸 앞까지 꽉 찬다.
+ * distance 는 칸 가운데 자리, depth 는 등산로를 따라 잰 칸 깊이, top 은 디딤판 가운데 윗면 높이, bottom 은 땅에 묻힌 아랫면(가운데 기준).
  * tilt 는 진행 방향 오른쪽으로 1m 갈 때 디딤판이 오르는 높이 (옆 경사를 따른다)
  */
-type Step = { distance: number; top: number; bottom: number; x: number; z: number; heading: number; tilt: number }
+type Step = { distance: number; depth: number; top: number; bottom: number; x: number; z: number; heading: number; tilt: number }
 
 const cache = new WeakMap<Trail, Step[]>()
 
-/** 경사가 급한 곳에 일정 간격으로 놓는 돌계단 목록 (거리 순). 그리기와 캐릭터 높이가 같은 값을 쓴다 */
+/** 등산로 d 지점 앞뒤 2m 로 잰 경사 */
+const slopeAt = (trail: Trail, d: number) => Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
+
+/** 가파른 구간 [시작, 끝] 목록. 짧은 틈은 메우고 너무 짧은 구간은 버린다 */
+function steepRuns(trail: Trail): [number, number][] {
+  const runs: [number, number][] = []
+  let open: number | null = null
+  for (let d = 2; d <= trail.length - 2; d += SAMPLE) {
+    const steep = slopeAt(trail, d) >= STEP_SLOPE
+    if (steep && open === null) open = d
+    if (!steep && open !== null) {
+      runs.push([open, d])
+      open = null
+    }
+  }
+  if (open !== null) runs.push([open, trail.length - 2])
+  const merged: [number, number][] = []
+  for (const r of runs) {
+    const last = merged[merged.length - 1]
+    if (last && r[0] - last[1] < MERGE_GAP) last[1] = r[1]
+    else merged.push([r[0], r[1]])
+  }
+  return merged.filter(([a, b]) => b - a >= MIN_RUN)
+}
+
+/**
+ * 경사가 급한 곳에 놓는 돌계단 목록 (거리 순). 그리기와 캐릭터 높이가 같은 값을 쓴다.
+ * 실제 산길 돌계단처럼 칸 높이가 고르고(TARGET_RISE) 디딤판이 다음 칸까지 이어져, 칸 사이로 비탈이 드러나지 않는다.
+ * 디딤판은 그 칸이 덮는 땅보다 위에 놓여 오르막 쪽이 땅에 묻히지 않고, 앞쪽에는 칸 높이만큼 돌 턱이 선다
+ */
 export function stoneSteps(terrain: Terrain, trail: Trail): Step[] {
   const hit = cache.get(trail)
   if (hit) return hit
   const out: Step[] = []
-  for (let d = 2; d < trail.length - 2; d += STEP_EVERY) {
-    const slope = Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
-    if (slope < STEP_SLOPE) continue
-    const p = trail.positionAt(d)
-    const heading = trail.headingAt(d)
-    const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading))
-    const right = new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
-    // 판 네 모서리와 가운데 아래 땅 높이를 잰다
-    const corners = [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([s, f]) => {
-      const x = p.x + right.x * s * (STEP_WIDTH / 2) + forward.x * f * (STEP_DEPTH / 2)
-      const z = p.z + right.z * s * (STEP_WIDTH / 2) + forward.z * f * (STEP_DEPTH / 2)
-      return { side: (s * STEP_WIDTH) / 2, h: meshHeight(terrain, x, z) + LIFT }
-    })
-    // 옆 경사: 오른쪽 두 모서리와 왼쪽 두 모서리 높이 차. 판을 이만큼 옆으로 기울여 땅을 따르게 한다
-    const rightH = (corners[3].h + corners[4].h) / 2
-    const leftH = (corners[1].h + corners[2].h) / 2
-    const tilt = THREE.MathUtils.clamp((rightH - leftH) / STEP_WIDTH, -MAX_TILT, MAX_TILT)
-    // 기울인 판을 기준으로 잰 높이 (옆 경사를 뺀 나머지만 남는다). 길이 옆으로 기울어도 판이 땅에 묻히지 않게
-    let low = Infinity
-    let high = -Infinity
-    for (const c of corners) {
-      const h = c.h - tilt * c.side
-      low = Math.min(low, h)
-      high = Math.max(high, h)
+  for (const [a, b] of steepRuns(trail)) {
+    let s = a
+    while (s < b - MIN_SPAN / 2) {
+      const span = THREE.MathUtils.clamp(TARGET_RISE / Math.max(slopeAt(trail, s), 0.05), MIN_SPAN, MAX_SPAN)
+      const e = Math.min(s + span, b)
+      out.push(makeStep(terrain, trail, s, e))
+      s = e
     }
-    // 윗면은 등산로 가운데 땅보다 살짝 위에 수평으로 놓는다. 실제 산길 돌계단처럼 비탈에 박혀, 오르막 쪽 모서리는 조금 묻힌다.
-    // (가장 높은 모서리에 맞추면 옆으로 기운 비탈에서 디딤판이 땅보다 1m 넘게 떠서 옆에서 오를 수 없는 벽이 된다)
-    // 아래는 가장 낮은 곳보다 조금 더 내려 경사면을 깎은 계단처럼
-    const center = meshHeight(terrain, p.x, p.z) + LIFT
-    const top = Math.max(center + STEP_RISE, high - STEP_BURY)
-    out.push({ distance: d, top, bottom: low - 0.05, x: p.x, z: p.z, heading, tilt })
   }
   cache.set(trail, out)
   return out
+}
+
+/** 등산로 [s, e] 를 덮는 한 칸 */
+function makeStep(terrain: Terrain, trail: Trail, s: number, e: number): Step {
+  const d = (s + e) / 2
+  const p = trail.positionAt(d)
+  const heading = trail.headingAt(d)
+  const right = new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
+  // 칸이 덮는 땅을 앞뒤·좌우로 재어 본다 (등산로를 따라 앞·가운데·뒤, 옆으로 왼쪽·가운데·오른쪽)
+  const samples: { side: number; h: number }[] = []
+  for (const along of [s, d, e]) {
+    const q = trail.positionAt(along)
+    for (const side of [-STEP_WIDTH / 2, 0, STEP_WIDTH / 2]) {
+      samples.push({ side, h: meshHeight(terrain, q.x + right.x * side, q.z + right.z * side) + LIFT })
+    }
+  }
+  // 옆 경사: 오른쪽과 왼쪽 땅 높이 차. 판을 이만큼 옆으로 기울여 땅을 따르게 한다
+  const avg = (side: number) => {
+    const hs = samples.filter((m) => m.side === side).map((m) => m.h)
+    return hs.reduce((x, y) => x + y, 0) / hs.length
+  }
+  const tilt = THREE.MathUtils.clamp((avg(STEP_WIDTH / 2) - avg(-STEP_WIDTH / 2)) / STEP_WIDTH, -MAX_TILT, MAX_TILT)
+  // 기울인 판을 기준으로 잰 높이 (옆 경사를 뺀 나머지만 남는다)
+  let low = Infinity
+  let high = -Infinity
+  let centerHigh = -Infinity
+  for (const m of samples) {
+    const h = m.h - tilt * m.side
+    low = Math.min(low, h)
+    high = Math.max(high, h)
+    if (m.side === 0) centerHigh = Math.max(centerHigh, h)
+  }
+  // 디딤판은 칸이 덮는 등산로 가운데 땅보다 늘 위에 둔다. 옆 경사를 다 따르지 못한 모서리는 STEP_BURY 까지 묻힌다
+  // (가장 높은 모서리에 맞추면 옆으로 기운 비탈에서 디딤판이 땅보다 1m 넘게 떠서 옆에서 오를 수 없는 벽이 된다)
+  const top = Math.max(centerHigh, high - STEP_BURY)
+  return { distance: d, depth: e - s, top, bottom: low - BODY_SINK, x: p.x, z: p.z, heading, tilt }
 }
 
 /** 디딤판 위를 평평하게 딛는 몫. 나머지 구간에서 다음 칸 높이로 올라선다 */
@@ -69,10 +125,10 @@ const TREAD = 0.35
 /** 다음 칸으로 올라서는 구간의 몫 */
 const RISE = 0.3
 
-/** 두 칸이 이 거리 안이면 이어진 계단으로 본다(m) */
-const LINKED = STEP_EVERY * 1.5
+/** 두 칸 가운데가 이 거리 안이면 이어진 계단으로 본다(m). 이어진 칸은 가운데끼리 MAX_SPAN 넘게 떨어지지 않고, 다른 구간과는 MERGE_GAP 넘게 떨어진다 */
+const LINKED = MAX_SPAN * 2
 /** 계단 구간 첫 칸 앞·마지막 칸 뒤에서 땅과 디딤판 높이를 잇는 길이(m). 짧으면 들어서는 오르막이 가팔라 막힌다 */
-const LEAD = STEP_EVERY * 2
+const LEAD = 2.6
 
 /**
  * 등산로 distance 지점에서 발이 딛는 계단 높이. 계단 구간이 아니면 null.
