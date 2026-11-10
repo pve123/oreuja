@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { EMOTES, isClimbing, sendEmote, useNet } from '../lib/net'
+import { EMOTES, othersClimbing, reclaimNet, sendEmote, useNet } from '../lib/net'
 import type { Trail } from '../lib/data'
 
 /** 왼쪽 아래 같이하기 패널: 접속 상태, 같은 코스 인원, 내 닉네임, 감정 표현 버튼 */
@@ -7,8 +7,8 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
   const status = useNet((s) => s.status)
   const name = useNet((s) => s.name)
   const setName = useNet((s) => s.setName)
-  const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id && isClimbing(p)).length)
-  const total = useNet((s) => s.peers.filter(isClimbing).length)
+  const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id).length)
+  const total = useNet((s) => Math.max(othersClimbing(s.counts), sameCourse))
   const [editing, setEditing] = useState(false)
   const [draft, setDraft] = useState(name)
 
@@ -32,7 +32,14 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
           ? `이 코스 ${sameCourse + 1}명${total > sameCourse ? ` · 다른 코스 ${total - sameCourse}명` : ''}`
           : status === 'connecting'
             ? '연결하는 중…'
-            : '혼자 오르는 중'}
+            : status === 'replaced'
+              ? '다른 창에서 같이하는 중'
+              : '혼자 오르는 중'}
+        {status === 'replaced' && (
+          <button type="button" className="together-reclaim" onClick={reclaimNet}>
+            이 창에서
+          </button>
+        )}
       </div>
       {editing ? (
         <form
