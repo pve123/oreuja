@@ -9,9 +9,17 @@ const STEP_RISE = 0.1 // 디딤판 윗면이 주변 지면보다 올라오는 �
 const LIFT = 0.06 // 길 띠를 지면에서 띄운 높이와 같게(m)
 /** 디딤판 오르막 쪽 모서리가 땅에 묻혀도 되는 깊이(m) */
 const STEP_BURY = 0.5
+/**
+ * 디딤판을 옆 경사에 맞춰 기울이는 최대 기울기(1m 옆으로 갈 때 오르는 높이, 약 17°).
+ * 수평으로만 놓으면 비탈을 옆으로 가로지르는 길에서 내리막 쪽 받침 옆면이 큰 회색 삼각형으로 드러난다
+ */
+const MAX_TILT = 0.3
 
-/** 돌계단 한 칸. distance 는 등산로를 따라 잰 자리, top 은 디딤판 윗면 높이, bottom 은 땅에 묻힌 아랫면 */
-type Step = { distance: number; top: number; bottom: number; x: number; z: number; heading: number }
+/**
+ * 돌계단 한 칸. distance 는 등산로를 따라 잰 자리, top 은 디딤판 가운데 윗면 높이, bottom 은 땅에 묻힌 아랫면(가운데 기준).
+ * tilt 는 진행 방향 오른쪽으로 1m 갈 때 디딤판이 오르는 높이 (옆 경사를 따른다)
+ */
+type Step = { distance: number; top: number; bottom: number; x: number; z: number; heading: number; tilt: number }
 
 const cache = new WeakMap<Trail, Step[]>()
 
@@ -27,13 +35,21 @@ export function stoneSteps(terrain: Terrain, trail: Trail): Step[] {
     const heading = trail.headingAt(d)
     const forward = new THREE.Vector3(Math.sin(heading), 0, Math.cos(heading))
     const right = new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
-    // 판 네 모서리와 가운데 아래 땅 높이를 잰다. 길이 옆으로 기울어도 판이 땅에 묻히지 않게
-    let low = Infinity
-    let high = -Infinity
-    for (const [s, f] of [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+    // 판 네 모서리와 가운데 아래 땅 높이를 잰다
+    const corners = [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]].map(([s, f]) => {
       const x = p.x + right.x * s * (STEP_WIDTH / 2) + forward.x * f * (STEP_DEPTH / 2)
       const z = p.z + right.z * s * (STEP_WIDTH / 2) + forward.z * f * (STEP_DEPTH / 2)
-      const h = meshHeight(terrain, x, z) + LIFT
+      return { side: (s * STEP_WIDTH) / 2, h: meshHeight(terrain, x, z) + LIFT }
+    })
+    // 옆 경사: 오른쪽 두 모서리와 왼쪽 두 모서리 높이 차. 판을 이만큼 옆으로 기울여 땅을 따르게 한다
+    const rightH = (corners[3].h + corners[4].h) / 2
+    const leftH = (corners[1].h + corners[2].h) / 2
+    const tilt = THREE.MathUtils.clamp((rightH - leftH) / STEP_WIDTH, -MAX_TILT, MAX_TILT)
+    // 기울인 판을 기준으로 잰 높이 (옆 경사를 뺀 나머지만 남는다). 길이 옆으로 기울어도 판이 땅에 묻히지 않게
+    let low = Infinity
+    let high = -Infinity
+    for (const c of corners) {
+      const h = c.h - tilt * c.side
       low = Math.min(low, h)
       high = Math.max(high, h)
     }
@@ -42,7 +58,7 @@ export function stoneSteps(terrain: Terrain, trail: Trail): Step[] {
     // 아래는 가장 낮은 곳보다 조금 더 내려 경사면을 깎은 계단처럼
     const center = meshHeight(terrain, p.x, p.z) + LIFT
     const top = Math.max(center + STEP_RISE, high - STEP_BURY)
-    out.push({ distance: d, top, bottom: low - 0.05, x: p.x, z: p.z, heading })
+    out.push({ distance: d, top, bottom: low - 0.05, x: p.x, z: p.z, heading, tilt })
   }
   cache.set(trail, out)
   return out
@@ -106,6 +122,28 @@ export function stairAt(
   return { index: entryT < TREAD + RISE / 2 ? -1 : lo + 1, y: entryY }
 }
 
+/**
+ * 등산로 distance 지점 디딤판의 옆 기울기 (stairAt 과 같은 구간에서 칸 사이를 곧게 잇고, 땅으로 내려서는 구간에서는 0 으로 줄인다).
+ * 계단 구간이 아니면 0
+ */
+export function tiltAt(steps: Step[], distance: number): number {
+  if (!steps.length) return 0
+  let lo = -1
+  let hi = steps.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    if (steps[mid].distance <= distance) lo = mid
+    else hi = mid - 1
+  }
+  const a = lo >= 0 ? steps[lo] : null
+  const b = steps[lo + 1] ?? null
+  if (a && b && b.distance - a.distance <= LINKED) return a.tilt + ((b.tilt - a.tilt) * (distance - a.distance)) / (b.distance - a.distance)
+  const exit = a ? 1 - (distance - a.distance) / LEAD : 0
+  const entry = b ? 1 - (b.distance - distance) / LEAD : 0
+  if (exit <= 0 && entry <= 0) return 0
+  return exit >= entry ? a!.tilt * exit : b!.tilt * entry
+}
+
 /** 계단 판정 폭: 디딤판 반폭에 조금 더 (m) */
 export const STAIR_HALF_WIDTH = STEP_WIDTH / 2 + 0.25
 
@@ -122,7 +160,8 @@ export const trailGround = (terrain: Terrain, trail: Trail) => (d: number) => {
  */
 export function groundAt(terrain: Terrain, trail: Trail, steps: Step[], distance: number, offset: number, x: number, z: number) {
   const step = Math.abs(offset) < STAIR_HALF_WIDTH ? stairAt(steps, distance, trailGround(terrain, trail)) : null
-  return { y: step ? step.y : standHeight(terrain, x, z), step }
+  // 디딤판은 옆으로 기울어 있으니 가운데에서 비킨 만큼 높이를 더한다
+  return { y: step ? step.y + tiltAt(steps, distance) * offset : standHeight(terrain, x, z), step }
 }
 
 /** 경사로 메시를 만들 때 등산로를 따라 자르는 간격(m) */
@@ -150,6 +189,7 @@ export function stairRampMesh(terrain: Terrain, trail: Trail): { vertices: Float
   const vertices: number[] = []
   const indices: number[] = []
   let prevRow = -1 // 이어지는 띠의 앞 줄 첫 꼭짓점 번호 (-1 은 띠가 끊김)
+  let tilt = 0 // 지금 줄의 옆 기울기 (디딤판과 같게 기울여 옆으로 비켜 걸어도 그림과 발이 맞는다)
 
   /** d 지점에 한 줄을 놓는다. y 가 null 이면 줄 전체를 땅속에 묻는다 (띠의 시작·끝) */
   const row = (d: number, y: number | null) => {
@@ -170,7 +210,7 @@ export function stairRampMesh(terrain: Terrain, trail: Trail): { vertices: Float
       const z = p.z + rz * o
       const g = meshHeight(terrain, x, z)
       const edge = Math.abs(o) > inner
-      vertices.push(x, edge ? g - RAMP_SINK : y === null ? g - RAMP_END_SINK : Math.max(y, g), z)
+      vertices.push(x, edge ? g - RAMP_SINK : y === null ? g - RAMP_END_SINK : Math.max(y + tilt * o, g), z)
     }
     if (prevRow >= 0) {
       for (let k = 0; k < 4; k++) {
@@ -186,6 +226,7 @@ export function stairRampMesh(terrain: Terrain, trail: Trail): { vertices: Float
   let last = -Infinity
   for (let d = Math.max(0, steps[0].distance - LEAD); d <= Math.min(trail.length, steps[steps.length - 1].distance + LEAD); d += RAMP_SAMPLE) {
     const ramp = stairAt(steps, d, ground, 'ramp')
+    tilt = tiltAt(steps, d)
     if (!ramp) {
       // 띠가 끝나면 한 칸 더 나가 땅속으로 묻고 끊는다
       if (prevRow >= 0) row(Math.min(trail.length, last + RAMP_SAMPLE * 3), null)
