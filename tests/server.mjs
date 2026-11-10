@@ -21,10 +21,10 @@ const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const health = async () => (await fetch(`http://localhost:${port}/health`)).json()
 
 /** 접속해서 welcome 을 받으면 소켓을, 거절되면 상태 코드를 돌려준다 */
-function connect({ origin = ORIGIN, ip = '10.0.0.1', autoPong = true } = {}) {
+function connect({ origin = ORIGIN, ip = '10.0.0.1', autoPong = true, cid = '' } = {}) {
   return new Promise((resolve) => {
     const headers = ip ? { 'x-forwarded-for': ip } : {}
-    const ws = new WebSocket(`ws://localhost:${port}`, { headers, autoPong, ...(origin ? { origin } : {}) })
+    const ws = new WebSocket(`ws://localhost:${port}${cid ? `?cid=${cid}` : ''}`, { headers, autoPong, ...(origin ? { origin } : {}) })
     ws.once('message', (m) => resolve({ ws, welcome: JSON.parse(String(m)) }))
     ws.once('unexpected-response', (_req, res) => resolve({ status: res.statusCode }))
     ws.once('error', () => {})
@@ -54,12 +54,19 @@ try {
   const none = await connect({ origin: null, ip: '10.0.0.4' })
   check('출처가 없는 접속은 거절한다', none.status === 403, `상태 ${none.status}`)
 
-  // 같은 IP 에서 셋까지만
+  // 같은 IP 에서 여섯까지만
   const same = []
-  for (let i = 0; i < 3; i++) same.push(await connect({ ip: '10.0.0.9' }))
-  const fourth = await connect({ ip: '10.0.0.9' })
-  check('같은 IP 에서 셋까지는 붙는다', same.every((c) => c.welcome))
-  check('같은 IP 넷째 접속은 거절한다', fourth.status === 429, `상태 ${fourth.status}`)
+  for (let i = 0; i < 6; i++) same.push(await connect({ ip: '10.0.0.9', cid: `browser-${i}` }))
+  const seventh = await connect({ ip: '10.0.0.9' })
+  check('같은 IP 에서 여섯까지는 붙는다', same.every((c) => c.welcome))
+  check('같은 IP 일곱째 접속은 거절한다', seventh.status === 429, `상태 ${seventh.status}`)
+  // 자리가 꽉 찬 IP 에서도 이미 붙은 브라우저의 새 창은 그 자리를 넘겨받는다
+  const oldClosed = new Promise((r) => same[5].ws.once('close', (code) => r(code)))
+  const newTab = await connect({ ip: '10.0.0.9', cid: 'browser-5' })
+  check('같은 브라우저 새 창은 IP 제한에 걸리지 않고 붙는다', newTab.welcome?.type === 'welcome')
+  check('같은 브라우저 이전 창은 4001 로 닫는다', (await Promise.race([oldClosed, wait(1000)])) === 4001)
+  check('같은 브라우저는 한 명으로 센다', (await health()).players === h.players + 3 + 6, JSON.stringify(await health()))
+  newTab.ws.close()
   same[0].ws.close()
   await wait(100)
   const again = await connect({ ip: '10.0.0.9' })

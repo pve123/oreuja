@@ -16,6 +16,9 @@
 //   TRUST_PROXY       1 이면 X-Forwarded-For 첫 주소를 접속한 사람 IP 로 본다. 호스팅의 프록시 뒤에 둘 때만 켠다
 //                     (프록시 없이 켜면 누구나 머리글을 꾸며 IP 제한을 피한다)
 //   HEARTBEAT_MS      끊긴 연결을 찾는 간격 (기본 15000). 시험에서만 줄인다
+//
+// 브라우저 하나에 접속 하나: 클라이언트는 브라우저마다 정한 번호를 주소에 붙여 온다(?cid=…).
+// 같은 번호로 새 창이 붙으면 이전 창 연결을 4001(replaced) 로 닫는다. 한 사람이 창을 여러 개 열어도 마지막 창 하나만 센다
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 
@@ -24,7 +27,10 @@ const TICK_MS = 200 // 위치를 나눠 주는 간격. 받는 쪽이 사이를 �
 const COUNT_MS = 1000 // 코스별 인원을 나눠 주는 간격
 const HEARTBEAT_MS = Number(process.env.HEARTBEAT_MS) || 15000
 const MAX_PLAYERS = 50
-const MAX_PER_IP = 3 // 같은 IP 에서 동시에 붙을 수 있는 수. 집·학교처럼 한 IP 를 나눠 쓰는 경우를 생각해 1 보다 넉넉히 둔다
+// 같은 IP 에서 동시에 붙을 수 있는 수. 집·학교처럼 한 IP 를 나눠 쓰는 경우를 생각해 넉넉히 둔다
+// (한 브라우저는 창을 여러 개 열어도 하나로 세니, 이 수는 거의 사람 수다)
+const MAX_PER_IP = 6
+const REPLACED = 4001 // 같은 브라우저 다른 창이 붙어서 닫는 연결의 닫힘 코드
 const MAX_MESSAGE = 512 // 한 메시지 최대 크기(바이트). 위치 메시지는 200바이트 안팎이다
 const MAX_MESSAGES_PER_SEC = 30
 const NAME_MAX = 12
@@ -75,10 +81,23 @@ function clientIp(req) {
   return req.socket.remoteAddress ?? ''
 }
 
+/** 주소에 붙어 온 브라우저 번호. 모양이 틀리면 없는 것으로 본다 */
+function clientId(req) {
+  const cid = new URL(req.url ?? '/', 'http://x').searchParams.get('cid') ?? ''
+  return /^[A-Za-z0-9-]{8,64}$/.test(cid) ? cid : ''
+}
+
+/** 같은 브라우저에서 이미 붙어 있는 연결 */
+function sameBrowser(cid) {
+  if (!cid) return null
+  for (const [ws, p] of players) if (p.cid === cid) return ws
+  return null
+}
+
 /** 내 컴퓨터에서 온 접속. 개발 중 창을 여러 개 띄워도 막히지 않게 IP 제한에서 뺀다 */
 const isLoopback = (ip) => ip === '127.0.0.1' || ip === '::1' || ip === '::ffff:127.0.0.1'
 
-/** @type {Map<import('ws').WebSocket, { id: string, name: string, avatar: string, course: string, distance: number, offset: number, facing: number, jump: number, mode: string, budget: number, ip: string, alive: boolean, emoteAt: number, info: number, known: Map<string, number>, sentCourse: string, sentPeers: string, sentCounts: string }>} */
+/** @type {Map<import('ws').WebSocket, { id: string, name: string, avatar: string, course: string, distance: number, offset: number, facing: number, jump: number, mode: string, budget: number, ip: string, cid: string, alive: boolean, emoteAt: number, info: number, known: Map<string, number>, sentCourse: string, sentPeers: string, sentCounts: string }>} */
 const players = new Map()
 /** IP 마다 붙어 있는 연결 수 */
 const perIp = new Map()
@@ -108,9 +127,11 @@ const wss = new WebSocketServer({
   // 연결을 맺기 전에 거른다: 다른 사이트, 자리 없음, 같은 IP 에서 너무 많이
   verifyClient: ({ origin, req }, done) => {
     if (!originAllowed(origin)) return done(false, 403, 'origin')
-    if (players.size >= MAX_PLAYERS) return done(false, 503, 'full')
+    // 같은 브라우저의 다른 창이 붙어 있으면 그 자리를 넘겨받으니 인원 제한에 걸리지 않는다
+    const prev = sameBrowser(clientId(req))
+    if (players.size >= MAX_PLAYERS && !prev) return done(false, 503, 'full')
     const ip = clientIp(req)
-    if (!isLoopback(ip) && (perIp.get(ip) ?? 0) >= MAX_PER_IP) return done(false, 429, 'too many')
+    if (!isLoopback(ip) && (perIp.get(ip) ?? 0) >= MAX_PER_IP && players.get(prev)?.ip !== ip) return done(false, 429, 'too many')
     done(true)
   },
 })
@@ -127,6 +148,12 @@ function drop(ws) {
 
 wss.on('connection', (ws, req) => {
   const ip = clientIp(req)
+  const cid = clientId(req)
+  const prev = sameBrowser(cid)
+  if (prev) {
+    drop(prev)
+    prev.close(REPLACED, 'replaced')
+  }
   perIp.set(ip, (perIp.get(ip) ?? 0) + 1)
   const me = {
     id: String(nextId++),
@@ -140,6 +167,7 @@ wss.on('connection', (ws, req) => {
     mode: 'lobby',
     budget: MAX_MESSAGES_PER_SEC,
     ip,
+    cid,
     alive: true,
     emoteAt: 0,
     info: 0, // 이름·아바타가 바뀔 때마다 늘린다
