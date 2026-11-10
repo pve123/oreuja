@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { estimateMinutes, formatDuration, formatMinutes, type Trail, type TrailData } from '../lib/data'
 import { useGame, type ClimbRecord, type ControlMode } from '../lib/store'
 import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
-import { isClimbing, useNet } from '../lib/net'
+import { othersClimbing, useNet } from '../lib/net'
 import { AVATARS } from '../lib/avatars'
 import { AvatarChips } from './AvatarChips'
 import { playHudEnter } from '../lib/splash'
@@ -199,7 +199,7 @@ function CourseCard({
   best: number | null
   onPick: () => void
 }) {
-  const climbing = useNet((s) => (s.status === 'online' ? s.peers.filter((p) => p.course === course.id && isClimbing(p)).length : 0))
+  const climbing = useNet((s) => (s.status === 'online' ? othersClimbing(s.counts, course.id) : 0))
   const minutes = estimateMinutes(course.length, course.elevationGain)
   return (
     <button role="radio" aria-checked={selected} className={selected ? 'course-card selected' : 'course-card'} onClick={onPick}>
