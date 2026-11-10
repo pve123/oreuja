@@ -10,7 +10,7 @@ import type { Mode } from './store'
  * 서버가 꺼져 있으면 혼자 오르기로 동작하고 몇 초마다 다시 붙어 본다.
  */
 
-export type Emote = 'wave' | 'thanks' | 'yaho' | 'cheer' | 'summit' | 'cheerup' | 'fighting'
+type Emote = 'wave' | 'thanks' | 'yaho' | 'cheer' | 'summit' | 'cheerup' | 'fighting'
 /** 감정 표현. 버튼에는 그림(icon)을, 머리 위 말풍선에는 그림과 말(label)을 띄운다. 숫자 키(key)로도 보낸다 */
 export const EMOTES: { kind: Emote; icon: string; label: string; key: string }[] = [
   { kind: 'wave', icon: '👋', label: '안녕하세요', key: '1' },
@@ -38,17 +38,16 @@ export type Peer = {
   offset: number
   facing: number
   jump: number
-  /** hidden 은 혼자 오르기를 고른 사람 (화면에 그리지 않는다) */
-  mode: Mode | 'hidden'
+  mode: Mode
   /** at 은 받은 순간의 내 시계 */
   emote: { kind: Emote; at: number } | null
 }
 
 // 순서가 곧 위치 메시지의 모드 번호다. 서버(server/index.mjs)의 MODE_LIST 와 같아야 한다
-const MODES: Peer['mode'][] = ['lobby', 'hidden', 'hiking', 'summit', 'photo', 'photoResult']
+const MODES: Mode[] = ['lobby', 'hiking', 'summit', 'photo', 'photoResult']
 
 /** replaced 는 같은 브라우저의 다른 창이 같이하기를 넘겨받은 상태 (이 창은 다시 붙지 않는다) */
-export type NetStatus = 'connecting' | 'online' | 'offline' | 'replaced'
+type NetStatus = 'connecting' | 'online' | 'offline' | 'replaced'
 
 const SEND_MS = 200
 const RETRY_MS = 5000
@@ -57,8 +56,8 @@ const CLIENT_KEY = 'hiking-metaverse:client-id'
 /** 서버가 같은 브라우저 다른 창이 붙었다며 닫을 때 쓰는 코드 (server/index.mjs 의 REPLACED) */
 const REPLACED = 4001
 
-/** 산길 위에 그릴 사람인지. 베이스캠프에 있는 사람과 숨김(hidden)으로 알린 사람은 빼고 센다 */
-export const isClimbing = (p: Pick<Peer, 'mode'>) => p.mode !== 'lobby' && p.mode !== 'hidden'
+/** 산길 위에 그릴 사람인지. 베이스캠프에 있는 사람은 빼고 센다 */
+export const isClimbing = (p: Pick<Peer, 'mode'>) => p.mode !== 'lobby'
 
 /**
  * 나를 뺀, 산을 오르는 사람 수. course 를 주면 그 코스만 센다.

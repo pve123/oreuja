@@ -5,7 +5,7 @@ import { VWORLD_KEY, type LocalRect } from './satellite'
 export type PhotoLayer = { rect: LocalRect; width: number; height: number; data: Uint8ClampedArray }
 
 /** 'none' 인증키 없음, 'loading' 받는 중, 'ready' 받음, 'failed' 실패 */
-export type PhotoStatus = 'none' | 'loading' | 'ready' | 'failed'
+type PhotoStatus = 'none' | 'loading' | 'ready' | 'failed'
 
 type State = {
   base: PhotoLayer | null
@@ -53,7 +53,7 @@ export function samplePhoto(layers: (PhotoLayer | null)[], x: number, z: number)
   return null
 }
 
-export type Ground = 'forest' | 'rock' | 'other'
+type Ground = 'forest' | 'rock' | 'other'
 
 /**
  * 사진 색으로 땅의 종류를 가른다.

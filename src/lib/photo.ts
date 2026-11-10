@@ -1,7 +1,7 @@
 import type { TrailData } from './data'
 
 /** 사진 속 캐릭터 머리 위에 그릴 말풍선. x, y 는 화면 비율(0~1)로 준 말풍선 꼬리 끝 자리 */
-export type PhotoBubble = { text: string; x: number; y: number }
+type PhotoBubble = { text: string; x: number; y: number }
 
 /**
  * 3D 캔버스를 그대로 복사하고 기념 문구 띠를 얹어 PNG 데이터 URL 로 돌려준다.
