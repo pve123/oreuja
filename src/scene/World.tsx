@@ -8,7 +8,7 @@ import * as THREE from 'three'
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib'
 import { IS_TOUCH } from '../lib/device'
 import { meshHeight, standHeight, type Terrain as TerrainData, type Trail } from '../lib/data'
-import { input, TURN_SPEED_GAIN, useGame } from '../lib/store'
+import { input, useGame } from '../lib/store'
 import { Terrain } from './Terrain'
 import { SummitFlag } from './SummitFlag'
 import { SummitRock } from './SummitRock'
@@ -70,7 +70,7 @@ const STEP_VISUAL_RATE = 30
 const STAIR_UP_SPEED = 0.8
 /** 카메라 높이가 캐릭터 높이를 따라가는 빠르기. 계단에서 카메라가 덜컹거리지 않게 몸보다 느리게 */
 const CAMERA_Y_RATE = 6
-const TURN_SPEED = 1.75 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 100도 (베이스캠프의 회전 빠르기를 곱한다)
+const TURN_SPEED = 1.75 // ←/→ 로 몸을 돌리는 빠르기(rad/s), 1초에 약 100도. 폰 조이스틱도 이 값을 쓴다
 /**
  * 몸을 돌리는 빠르기가 목표 빠르기를 따라가는 정도. 누르자마자 최고 빠르기로 돌거나 떼자마자 딱 멈추면 뻣뻣해 보여,
  * 0.1초쯤 걸려 붙고 멈추게 한다
@@ -82,13 +82,13 @@ const TURN_EASE = 12
  */
 const STICK_DEAD = 0.14
 const STICK_RUN = 0.82
-/** 조이스틱을 옆으로 끝까지 밀었을 때 몸을 돌리는 빠르기(rad/s) */
-const STICK_TURN_SPEED = 3.0
+/** 조이스틱을 옆으로 끝까지 밀었을 때 몸을 돌리는 빠르기(rad/s). 컴퓨터 방향키와 같은 감도로 맞춘다 */
+const STICK_TURN_SPEED = TURN_SPEED
 /**
  * 조이스틱 좌우 반응 곡선의 지수. 1 이면 기울기에 정비례하고 2 면 제곱이라, 조금 기울이면 아주 천천히 돌고 끝으로 갈수록 빨라진다.
  * 끝까지 밀었을 때 빠르기(STICK_TURN_SPEED)는 그대로다. 콘솔 게임 스틱의 응답 곡선과 같은 방식
  */
-const STICK_TURN_CURVE = 1.5
+const STICK_TURN_CURVE = 1.2
 /** 조이스틱을 조금만 기울였을 때 걷는 빠르기 비율. 여기서부터 STICK_RUN 까지 기울일수록 빨라진다 */
 const STICK_WALK_MIN = 0.4
 /** 점프 중 카메라가 바라보는 높이를 발밑 땅보다 이만큼 아래로는 내리지 않는다(m). 오르막에서 기준점이 땅속에 들어가 땅 밑이 보이지 않게 */
@@ -302,7 +302,7 @@ function WorldScene({ terrain, trail }: Props) {
     const el = gl.domElement
     const fingers = new Map<number, { x: number; y: number; t: number }>()
     const look = { speed: TOUCH_LOOK_REF_SPEED }
-    const base = () => (TOUCH_LOOK_DEG_PER_PX * TURN_SPEED_GAIN[useGame.getState().turnSpeed] * el.clientHeight) / 360
+    const base = () => (TOUCH_LOOK_DEG_PER_PX * el.clientHeight) / 360
     const onDown = (e: PointerEvent) => {
       if (e.pointerType !== 'touch' || e.target !== el) return
       fingers.set(e.pointerId, { x: e.clientX, y: e.clientY, t: e.timeStamp })
@@ -464,11 +464,10 @@ function WorldScene({ terrain, trail }: Props) {
     }
     // 직접 돌리는 목표 빠르기(rad/s). 방향키나 조이스틱이 정하고, 실제 빠르기(b.turnRate)는 TURN_EASE 로 따라간다
     let turnTarget = 0
-    const turnGain = TURN_SPEED_GAIN[game.turnSpeed]
     if (game.mode === 'hiking') {
       turn = (input.left ? 1 : 0) - (input.right ? 1 : 0) // yaw 가 커지면 왼쪽으로 돈다
       move = (input.forward ? 1 : 0) - (input.backward ? 1 : 0)
-      turnTarget = turn * TURN_SPEED * turnGain
+      turnTarget = turn * TURN_SPEED
       // 방향키를 누르면 저절로 걷기를 멈추고 직접 조작으로 넘어간다
       if (game.autoWalk && (move !== 0 || turn !== 0)) game.setAutoWalk(false)
       // 쉬운 조작의 저절로 걷기: 등산로 몇 미터 앞을 향해 몸을 돌리며 걷는다
@@ -487,7 +486,7 @@ function WorldScene({ terrain, trail }: Props) {
         const axis = (v: number) => Math.sign(v) * THREE.MathUtils.clamp((Math.abs(v) - STICK_DEAD) / (1 - STICK_DEAD), 0, 1)
         const ax = axis(sx)
         const steer = -Math.sign(ax) * Math.abs(ax) ** STICK_TURN_CURVE // 오른쪽으로 밀면 yaw 가 작아진다
-        turnTarget = steer * STICK_TURN_SPEED * turnGain
+        turnTarget = steer * STICK_TURN_SPEED
         if (steer !== 0) turn = steer
         if (sy > STICK_DEAD) {
           // 조금 기울이면 천천히, 많이 기울일수록 빨리 걷고 끝까지 밀면 뛴다

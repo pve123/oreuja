@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { estimateMinutes, formatDuration, formatMinutes, type Trail, type TrailData } from '../lib/data'
-import { useGame, type ClimbRecord, type ControlMode, type TurnSpeed } from '../lib/store'
+import { useGame, type ClimbRecord, type ControlMode } from '../lib/store'
 import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
 import { othersClimbing, useNet } from '../lib/net'
 import { AVATARS } from '../lib/avatars'
@@ -298,19 +298,10 @@ const CONTROL_MODES: [ControlMode, string, string][] = [
   ['free', '자유 조작', '길 밖까지 마음대로 걸어요'],
 ]
 
-/** 회전 빠르기 [값, 이름] */
-const TURN_SPEEDS: [TurnSpeed, string][] = [
-  ['slow', '느리게'],
-  ['normal', '보통'],
-  ['fast', '빠르게'],
-]
-
-/** 조작 방식 고르기. 쉬운 조작은 큰 「걷기」 버튼 하나로 등산로를 따라 저절로 걷는다. 아래에서 몸·화면을 돌리는 빠르기도 고른다 */
+/** 조작 방식 고르기. 쉬운 조작은 큰 「걷기」 버튼 하나로 등산로를 따라 저절로 걷는다 */
 function ControlSwitch() {
   const controlMode = useGame((s) => s.controlMode)
   const setControlMode = useGame((s) => s.setControlMode)
-  const turnSpeed = useGame((s) => s.turnSpeed)
-  const setTurnSpeed = useGame((s) => s.setTurnSpeed)
   return (
     <div className="panel lobby-control">
       <div className="lobby-label">
@@ -321,14 +312,6 @@ function ControlSwitch() {
           <button key={mode} role="radio" aria-checked={controlMode === mode} className={controlMode === mode ? 'selected' : ''} onClick={() => setControlMode(mode)}>
             <span className="segmented-title">{title}</span>
             <span className="segmented-sub">{desc}</span>
-          </button>
-        ))}
-      </div>
-      <div className="turn-speed" role="radiogroup" aria-label="회전 빠르기 고르기">
-        <span className="turn-speed-label">회전 빠르기</span>
-        {TURN_SPEEDS.map(([speed, title]) => (
-          <button key={speed} role="radio" aria-checked={turnSpeed === speed} className={turnSpeed === speed ? 'selected' : ''} onClick={() => setTurnSpeed(speed)}>
-            {title}
           </button>
         ))}
       </div>
