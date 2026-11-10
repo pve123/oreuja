@@ -82,13 +82,13 @@ const TURN_EASE = 12
  */
 const STICK_DEAD = 0.14
 const STICK_RUN = 0.82
-/** 조이스틱을 옆으로 끝까지 밀었을 때 몸을 돌리는 빠르기(rad/s) */
-const STICK_TURN_SPEED = 3.0
+/** 조이스틱을 옆으로 끝까지 밀었을 때 몸을 돌리는 빠르기(rad/s). 컴퓨터 방향키와 같은 감도로 맞춘다 */
+const STICK_TURN_SPEED = TURN_SPEED
 /**
  * 조이스틱 좌우 반응 곡선의 지수. 1 이면 기울기에 정비례하고 2 면 제곱이라, 조금 기울이면 아주 천천히 돌고 끝으로 갈수록 빨라진다.
  * 끝까지 밀었을 때 빠르기(STICK_TURN_SPEED)는 그대로다. 콘솔 게임 스틱의 응답 곡선과 같은 방식
  */
-const STICK_TURN_CURVE = 1.5
+const STICK_TURN_CURVE = 1.2
 /** 조이스틱을 조금만 기울였을 때 걷는 빠르기 비율. 여기서부터 STICK_RUN 까지 기울일수록 빨라진다 */
 const STICK_WALK_MIN = 0.4
 /** 점프 중 카메라가 바라보는 높이를 발밑 땅보다 이만큼 아래로는 내리지 않는다(m). 오르막에서 기준점이 땅속에 들어가 땅 밑이 보이지 않게 */
