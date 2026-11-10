@@ -47,11 +47,15 @@ export type Peer = {
 // 순서가 곧 위치 메시지의 모드 번호다. 서버(server/index.mjs)의 MODE_LIST 와 같아야 한다
 const MODES: Peer['mode'][] = ['lobby', 'hidden', 'hiking', 'summit', 'photo', 'photoResult']
 
-export type NetStatus = 'connecting' | 'online' | 'offline'
+/** replaced 는 같은 브라우저의 다른 창이 같이하기를 넘겨받은 상태 (이 창은 다시 붙지 않는다) */
+export type NetStatus = 'connecting' | 'online' | 'offline' | 'replaced'
 
 const SEND_MS = 200
 const RETRY_MS = 5000
 const NAME_KEY = 'hiking-metaverse:nickname'
+const CLIENT_KEY = 'hiking-metaverse:client-id'
+/** 서버가 같은 브라우저 다른 창이 붙었다며 닫을 때 쓰는 코드 (server/index.mjs 의 REPLACED) */
+const REPLACED = 4001
 
 /** 산길 위에 그릴 사람인지. 베이스캠프에 있는 사람과 숨김(hidden)으로 알린 사람은 빼고 센다 */
 export const isClimbing = (p: Pick<Peer, 'mode'>) => p.mode !== 'lobby' && p.mode !== 'hidden'
@@ -123,13 +127,29 @@ export const localPlayer = {
   mode: 'hiking' as Mode,
 }
 
+/**
+ * 브라우저마다 한 번 정해 두는 번호. 서버는 같은 번호로 붙은 창을 한 사람으로 보고 마지막 창 하나만 남긴다.
+ * 비밀이 아니라 창을 묶는 데만 쓴다. localStorage 를 못 쓰면 창마다 새 번호가 된다
+ */
+function clientId() {
+  const saved = readStored(CLIENT_KEY)
+  if (saved && /^[A-Za-z0-9-]{8,64}$/.test(saved)) return saved
+  // randomUUID 는 https·localhost 에서만 있다. 폰으로 내부 IP(http) 에 붙을 때를 위해 대신할 값을 둔다
+  const id = crypto.randomUUID?.() ?? `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`
+  writeStored(CLIENT_KEY, id)
+  return id
+}
+
 /** 같이하기 서버 주소. null 이면 서버 없이 혼자 오르기로만 동작한다 */
 function serverUrl(): string | null {
   const fromEnv = import.meta.env.VITE_MULTIPLAYER_URL as string | undefined
-  if (fromEnv) return fromEnv
   // 개발 서버만 /ws 를 같이하기 서버로 넘겨준다(vite.config.ts).
   // Vercel 같은 정적 호스팅에는 웹소켓 서버가 없어서, 주소를 따로 주지 않은 배포본은 붙어 보지 않는다
-  return import.meta.env.DEV ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws` : null
+  const base = fromEnv || (import.meta.env.DEV ? `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}/ws` : null)
+  if (!base) return null
+  const url = new URL(base)
+  url.searchParams.set('cid', clientId())
+  return url.toString()
 }
 
 let socket: WebSocket | null = null
@@ -180,14 +200,22 @@ function connect(url: string) {
     }
     receive(msg)
   }
-  ws.onclose = () => {
+  ws.onclose = (e) => {
     if (socket === ws) socket = null
     window.clearInterval(sendTimer)
     profiles.clear()
     emotes.clear()
-    useNet.setState({ status: 'offline', peers: [], counts: {}, myId: null })
-    scheduleRetry()
+    // 다른 창이 넘겨받았으면 다시 붙지 않는다 (붙으면 그 창을 밀어내 서로 번갈아 끊긴다)
+    const replaced = e.code === REPLACED
+    useNet.setState({ status: replaced ? 'replaced' : 'offline', peers: [], counts: {}, myId: null })
+    if (!replaced) scheduleRetry()
   }
+}
+
+/** 다른 창에 넘겨준 같이하기를 이 창으로 다시 가져온다 */
+export function reclaimNet() {
+  const url = serverUrl()
+  if (url && useNet.getState().status === 'replaced') connect(url)
 }
 
 type ServerMessage =
