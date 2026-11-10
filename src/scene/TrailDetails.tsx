@@ -33,6 +33,18 @@ type Props = { terrain: Terrain; trail: Trail }
 /** 진행 방향의 오른쪽 단위 벡터 */
 const rightOf = (heading: number) => new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
 
+const UP = new THREE.Vector3(0, 1, 0)
+const FORWARD = new THREE.Vector3(0, 0, 1)
+/**
+ * 디딤판 방향: 진행 방향(heading)으로 돌리고, 오른쪽이 tilt 만큼 오르게 앞뒤 축으로 기울인다.
+ * 상자의 +x 는 진행 방향 왼쪽이라, 오른쪽이 오르려면 +x 쪽이 내려가게 돌린다
+ */
+function stepRotation(heading: number, tilt: number) {
+  const yaw = new THREE.Quaternion().setFromAxisAngle(UP, heading)
+  const roll = new THREE.Quaternion().setFromAxisAngle(FORWARD, -Math.atan(tilt))
+  return yaw.multiply(roll)
+}
+
 /** 흙길, 가파른 구간의 돌계단, 길가 자갈, 위문~정상 바위 구간의 철제 난간 (위문을 지나는 코스만) */
 export function TrailDetails({ terrain, trail }: Props) {
   return (
@@ -178,12 +190,10 @@ function StoneSteps({ terrain, trail }: Props) {
 
   // 받침: 자리와 높이는 lib/steps 에서 계산한다 (캐릭터가 같은 디딤판 높이를 밟는다)
   const { matrices, colors } = useMemo(() => {
-    const q = new THREE.Quaternion()
-    const up = new THREE.Vector3(0, 1, 0)
     const rand = seededRandom(5)
     const colors: THREE.Color[] = []
     const matrices = steps.map((st) => {
-      q.setFromAxisAngle(up, st.heading)
+      const q = stepRotation(st.heading, st.tilt)
       const top = st.top - BODY_BELOW_TOP
       const center = new THREE.Vector3(st.x, (top + st.bottom) / 2, st.z)
       colors.push(new THREE.Color().setHSL(0.08, 0.1, 0.4 + rand() * 0.06))
@@ -196,15 +206,17 @@ function StoneSteps({ terrain, trail }: Props) {
   const slabs = useMemo<NearItem[]>(() => {
     const rand = seededRandom(9)
     const out: NearItem[] = []
-    const q = new THREE.Quaternion()
+    const spin = new THREE.Quaternion()
     const up = new THREE.Vector3(0, 1, 0)
     for (const st of steps) {
       const right = rightOf(st.heading)
+      const base = stepRotation(st.heading, st.tilt)
       for (const side of [-1, 1]) {
-        const turn = st.heading + (rand() < 0.5 ? 0 : Math.PI) + (rand() - 0.5) * 0.08
-        q.setFromAxisAngle(up, turn)
+        // 디딤판 기울기 안에서 돌린다: 앞뒤 뒤집기와 살짝 비뚤어짐
+        spin.setFromAxisAngle(up, (rand() < 0.5 ? 0 : Math.PI) + (rand() - 0.5) * 0.08)
+        const q = base.clone().multiply(spin)
         const lateral = side * (STEP_WIDTH / 4 + (rand() - 0.5) * 0.04)
-        const pos = new THREE.Vector3(st.x + right.x * lateral, st.top - SLAB_THICK, st.z + right.z * lateral)
+        const pos = new THREE.Vector3(st.x + right.x * lateral, st.top - SLAB_THICK + st.tilt * lateral, st.z + right.z * lateral)
         const scale = new THREE.Vector3(STEP_WIDTH / 2 - 0.03, SLAB_THICK / 0.15, STEP_DEPTH + 0.12)
         const shade = 0.88 + rand() * 0.24
         out.push({
