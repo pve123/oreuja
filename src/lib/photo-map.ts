@@ -1,10 +1,10 @@
 import { create } from 'zustand'
-import { MAPBOX_TOKEN, type LocalRect } from './satellite'
+import { VWORLD_KEY, type LocalRect } from './satellite'
 
 /** 위성사진 한 장의 픽셀. 숲·바위를 어디에 둘지와 무슨 색으로 칠할지 정하는 데 쓴다 */
 export type PhotoLayer = { rect: LocalRect; width: number; height: number; data: Uint8ClampedArray }
 
-/** 'none' 토큰 없음, 'loading' 받는 중, 'ready' 받음, 'failed' 실패 */
+/** 'none' 인증키 없음, 'loading' 받는 중, 'ready' 받음, 'failed' 실패 */
 export type PhotoStatus = 'none' | 'loading' | 'ready' | 'failed'
 
 type State = {
@@ -18,9 +18,9 @@ type State = {
 export const usePhotos = create<State>((set) => ({
   base: null,
   detail: null,
-  // 토큰이 있으면 처음부터 받는 중으로 둬서, 숲·바위가 사진 없이 한 번 놓였다가 다시 놓이며 튀지 않게 한다
-  baseStatus: MAPBOX_TOKEN ? 'loading' : 'none',
-  detailStatus: MAPBOX_TOKEN ? 'loading' : 'none',
+  // 인증키가 있으면 처음부터 받는 중으로 둬서, 숲·바위가 사진 없이 한 번 놓였다가 다시 놓이며 튀지 않게 한다
+  baseStatus: VWORLD_KEY ? 'loading' : 'none',
+  detailStatus: VWORLD_KEY ? 'loading' : 'none',
   setLayer: (key, status, layer) =>
     set(key === 'base' ? { baseStatus: status, base: layer ?? null } : { detailStatus: status, detail: layer ?? null }),
 }))

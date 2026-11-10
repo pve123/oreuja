@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 import type { Terrain as TerrainData, Trail } from '../lib/data'
-import { MAPBOX_TOKEN, loadSatelliteTexture, type LocalRect } from '../lib/satellite'
+import { VWORLD_KEY, loadSatelliteTexture, type LocalRect } from '../lib/satellite'
 import { layerFromCanvas, usePhotos } from '../lib/photo-map'
 import { daylight } from '../lib/daylight'
 
@@ -11,10 +11,10 @@ const FOREST = new THREE.Color('#3f6b2e')
 const HIGH = new THREE.Color('#7a7d5a')
 const ROCK = new THREE.Color('#9a958c')
 
-/** 지형 전체 위성사진 확대 단계 (1px ≈ 1.9m) */
-const BASE_ZOOM = 15
-/** 등산로 주변 선명한 위성사진 확대 단계 (1px ≈ 0.5m) */
-const DETAIL_ZOOM = 17
+/** 지형 전체 위성사진 확대 단계 (256px 타일, 1px ≈ 1.9m) */
+const BASE_ZOOM = 16
+/** 등산로 주변 선명한 위성사진 확대 단계 (256px 타일, 1px ≈ 0.5m) */
+const DETAIL_ZOOM = 18
 /** 등산로에서 이만큼까지 선명한 사진을 덮는다(m) */
 const DETAIL_MARGIN = 200
 
@@ -42,14 +42,14 @@ function useSatellite(rect: LocalRect | null, origin: TerrainData['origin'], zoo
 
   useEffect(() => {
     const { setLayer } = usePhotos.getState()
-    if (!MAPBOX_TOKEN || !rect) {
+    if (!VWORLD_KEY || !rect) {
       setLayer(key, 'none')
       return
     }
     setLayer(key, 'loading')
     let cancelled = false
     let loaded: THREE.Texture | null = null
-    loadSatelliteTexture(rect, origin, MAPBOX_TOKEN, zoom)
+    loadSatelliteTexture(rect, origin, VWORLD_KEY, zoom)
       .then((t) => {
         loaded = t
         if (!cancelled) setLayer(key, 'ready', layerFromCanvas(t.image as HTMLCanvasElement, rect))
