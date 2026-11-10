@@ -6,7 +6,7 @@ import { loadData, type Terrain, type Trail } from './lib/data'
 import { DEFAULT_MOUNTAIN, loadMountain, loadMountains, type Mountain } from './lib/mountains'
 import { useGame } from './lib/store'
 import { World } from './scene/World'
-import { MAPBOX_TOKEN } from './lib/satellite'
+import { VWORLD_KEY } from './lib/satellite'
 import { AvatarThumbnails } from './ui/AvatarThumbnails'
 import { Hud, SummitModal } from './ui/Hud'
 import { Lobby } from './ui/Lobby'
@@ -121,10 +121,10 @@ export default function App() {
       <div className="attribution">
         지도 © <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors · 지형 국토지리정보원 수치지형도, AWS Terrain Tiles · 나무{' '}
         <a href="https://quaternius.com">Quaternius</a>
-        {MAPBOX_TOKEN && (
+        {VWORLD_KEY && (
           <>
             {' · 위성사진 © '}
-            <a href="https://www.mapbox.com/about/maps/">Mapbox</a> © <a href="https://www.maxar.com/">Maxar</a>
+            <a href="https://www.vworld.kr">브이월드</a>
           </>
         )}
       </div>

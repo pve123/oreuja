@@ -73,24 +73,26 @@ npm run dev      # 다른 터미널에서. 개발 서버가 /ws 를 같이하기
 |---|---|
 | `PORT` | 듣는 포트. 호스팅 서비스가 정해 주면 그 값을 쓴다 (기본 5200) |
 | `ALLOWED_ORIGINS` | 접속을 받을 페이지 주소, 쉼표로 여럿. 배포 주소를 바꾸면 여기에 넣는다 |
-| `TRUST_PROXY` | `1` 이면 `X-Forwarded-For` 첫 주소를 접속한 사람 IP 로 본다. 호스팅 프록시 뒤에 둘 때(Railway, Fly.io, Render 모두 그렇다) 반드시 켠다. 안 켜면 모두가 프록시 IP 하나로 보여 전체가 세 명으로 막히고, 서버가 경고를 남긴다. 프록시 없이 켜면 누구나 머리글을 꾸며 IP 제한을 피한다 |
+| `TRUST_PROXY` | `1` 이면 `X-Forwarded-For` 첫 주소를 접속한 사람 IP 로 본다. 호스팅 프록시 뒤에 둘 때(Railway, Fly.io, Render 모두 그렇다) 반드시 켠다. 안 켜면 모두가 프록시 IP 하나로 보여 전체가 여섯 명으로 막히고, 서버가 경고를 남긴다. 프록시 없이 켜면 누구나 머리글을 꾸며 IP 제한을 피한다 |
 
 ## 위성사진 (선택)
 
-`.env.example` 을 `.env.local` 로 복사하고 Mapbox 공개 토큰(`pk.` 로 시작)을 넣으면 지형에 위성사진을 입힌다. 토큰이 없거나 타일을 받지 못하면 고도와 경사로 칠한 색을 쓴다. Vite는 서버를 켤 때 이 파일을 읽으니 바꾼 뒤에는 `npm run dev` 를 다시 실행한다.
+`.env.example` 을 `.env.local` 로 복사하고 브이월드 인증키를 넣으면 지형에 항공사진(브이월드 영상지도)을 입힌다. 인증키가 없거나 타일을 받지 못하면 고도와 경사로 칠한 색을 쓴다. Vite는 서버를 켤 때 이 파일을 읽으니 바꾼 뒤에는 `npm run dev` 를 다시 실행한다.
 
 ```bash
-cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
+cp .env.example .env.local   # VITE_VWORLD_KEY=... 를 채운다
 ```
 
-토큰은 빌드 결과에 들어가는 공개 토큰이라, Mapbox 계정 화면에서 쓸 주소(URL)를 제한해 둔다. 위성 타일은 Static Tiles API(`mapbox/satellite-v9` 스타일)로 받는다. 새 계정에서는 v4 Raster Tiles API가 `429` 로 막혀 있었다. 위성사진을 쓰면 화면 오른쪽 아래에 Mapbox와 Maxar 출처를 표시해야 한다.
+인증키는 [브이월드](https://www.vworld.kr)에 가입해 「인증키 발급」에서 받는다. 활용 API 는 WMTS/TMS API 와 배경지도 API 를 고르고, 서비스 URL 에 쓸 주소를 넣는다. 인증키는 빌드 결과에 들어가는 공개 키지만 등록한 주소에서만 통한다. 운영 주소(`https://www.oreuja.com`)와 개발 주소(`http://localhost:5173`)를 한 키에 넣지 못하면 키를 둘 받아 `.env.local` 과 Vercel 에 따로 넣는다. PR 미리보기 주소는 등록하지 않았으니 위성사진 없이 나온다.
+
+타일은 WMTS(`api.vworld.kr/req/wmts/1.0.0/{키}/Satellite/{확대}/{행}/{열}.jpeg`, 256px)로 받아 화면을 열 때마다 이어 붙이기만 하고 따로 저장하지 않는다. 인증키가 틀리거나 등록하지 않은 주소면 브이월드는 그림 대신 오류 XML 을 돌려준다. 받은 타일의 20% 넘게 실패하면 그 사진은 쓰지 않는다. 위성사진을 쓰면 화면 오른쪽 아래에 브이월드 출처를 표시한다.
 
 ## Vercel 에 올리기
 
 정적 파일만 올리는 배포라 혼자 오르기만 된다. Vercel 에는 웹소켓 서버를 둘 수 없어서 `VITE_MULTIPLAYER_URL` 을 비워 두면 배포본은 같이하기 서버를 찾지 않고 베이스캠프의 「같이」 아래에 「서버 없음」이 보인다.
 
 1. Vercel 대시보드에서 「Add New Project」를 누르고 GitHub 의 `pve123/trailverse` 저장소를 고른다. `vercel.json` 이 Vite 프리셋과 `npm run build`, `dist` 를 알려 주니 빌드 설정은 그대로 둔다.
-2. Environment Variables 에 `VITE_MAPBOX_TOKEN` 을 넣는다. 비우면 위성사진 없이 고도 색으로 지형을 그린다. 토큰은 빌드 결과에 들어가니 Mapbox 계정 화면에서 쓸 주소를 Vercel 도메인으로 제한한다.
+2. Environment Variables 에 `VITE_VWORLD_KEY`(운영 주소를 등록한 브이월드 인증키)와 `SITE_URL`(`https://www.oreuja.com`, 미리보기 카드의 주소)을 Production 으로 넣는다. 인증키를 비우면 위성사진 없이 고도 색으로 지형을 그린다.
 3. 「Deploy」를 누른다. 이후에는 main 에 올라갈 때마다 자동으로 다시 배포하고 PR 브랜치는 미리보기 주소를 받는다.
 
 같이하기까지 열려면 `server/index.mjs` 를 Railway·Fly.io·Render 같은 곳에 올리고(시작 명령 `npm run server`, 상태 확인 `/health`, 환경변수 `TRUST_PROXY=1`) Vercel 환경변수 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣은 뒤 다시 배포한다. 환경변수는 빌드할 때 들어가므로 넣은 뒤 꼭 다시 배포해야 한다.
@@ -136,7 +138,7 @@ cp .env.example .env.local   # VITE_MAPBOX_TOKEN=pk.... 를 채운다
 | `src/scene/Colliders.tsx` | 물리 충돌체를 만든다. 등산로 둘레 40m 지형(화면 지형과 같은 삼각형), 돌계단 경사로, 나무 줄기·바위·랜드마크 원기둥 |
 | `src/lib/collider-mesh.ts` | 등산로 둘레 지형 충돌 메시 |
 | `src/scene/Terrain.tsx` | 지형 메시를 고도와 경사에 따라 칠한다 |
-| `src/lib/satellite.ts`, `src/lib/photo-map.ts` | Mapbox 위성 타일을 이어 붙여 지형에 입히고, 그 픽셀로 숲·바위 자리와 색을 정한다 |
+| `src/lib/satellite.ts`, `src/lib/photo-map.ts` | 브이월드 영상지도 타일을 이어 붙여 지형에 입히고, 그 픽셀로 숲·바위 자리와 색을 정한다 |
 | `src/lib/placement.ts`, `src/lib/random.ts` | 숲·바위 배치 도우미. 등산로에서 떨어진 거리 판정, 매번 같은 자리가 나오는 시드 난수 |
 | `src/lib/occlusion.ts` | 카메라와 캐릭터 사이에 낀 나무·바위를 점무늬로 비치게 하고, 정밀 모델과 가벼운 도형이 겹쳐 그려지지 않게 나눈다 |
 | `src/lib/geometry.ts` | 압축한 glTF 모양을 월드 좌표로 굽는다 (아래 「모델 압축」) |
@@ -276,7 +278,7 @@ npx @gltf-transform/cli meshopt public/models/trees/Pine_2.glb public/models/tre
 | 등산로 | © OpenStreetMap contributors | ODbL 라이선스라 화면 오른쪽 아래에 출처를 꼭 표시해야 한다 |
 | 정밀 지형 | 국토지리정보원 1:5,000 수치지형도 | 등고선과 표고점으로 만든다. 도엽 밖은 아래 AWS 지형을 쓴다 |
 | 지형 | AWS Terrain Tiles | SRTM 같은 공개 DEM을 바탕으로 한다 |
-| 위성사진 | © Mapbox, © Maxar | 토큰이 있을 때만 쓰고 화면에 출처를 표시한다 |
+| 위성사진 | © 브이월드(국토교통부 공간정보 오픈플랫폼) 영상지도 | 인증키가 있을 때만 쓰고 화면에 출처를 표시한다 |
 | 캐릭터 모델 | Kenney Mini Characters, KayKit Adventurers (Kay Lousberg) | CC0 1.0. 출처 표시 의무는 없다. `public/models/avatars/` |
 | 나무 모델 | Quaternius Stylized Nature MegaKit (무료판) | CC0 1.0. 출처 표시 의무는 없지만 화면에 적는다. `public/models/trees/` 에 6개만 넣었다 |
 | 바위·판석·자갈 모델 | Quaternius Stylized Nature MegaKit (무료판) | CC0 1.0. `node scripts/prepare-nature.mjs "<팩 폴더>"` 로 `public/models/nature/` 에 11개와 텍스처(1024px JPG)를 넣는다 |
