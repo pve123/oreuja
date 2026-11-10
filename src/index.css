@@ -1716,36 +1716,6 @@ kbd {
 .control-segmented .segmented-sub {
   font-size: 12px;
 }
-/* 회전 빠르기: 조작 방식 아래 작은 세 칸 */
-.turn-speed {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-top: 8px;
-}
-.turn-speed-label {
-  margin-right: auto;
-  font-size: 12px;
-  color: var(--muted);
-}
-.turn-speed button {
-  padding: 4px 10px;
-  border: 1px solid rgba(255, 255, 255, 0.18);
-  border-radius: 999px;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-.turn-speed button:hover {
-  border-color: rgba(255, 255, 255, 0.38);
-}
-.turn-speed button.selected {
-  border-color: var(--accent-2);
-  background: rgba(255, 213, 138, 0.13);
-  font-weight: 700;
-}
 /* 하늘 다섯 가지는 한 줄에. 타일마다 그 하늘의 미니 그라데이션을 보여 준다 */
 .sky-segmented {
   grid-template-columns: repeat(5, 1fr);

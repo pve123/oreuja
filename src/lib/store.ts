@@ -12,11 +12,6 @@ export type Mode = 'lobby' | 'hiking' | 'summit' | 'photo' | 'photoResult'
  */
 export type ControlMode = 'easy' | 'free'
 
-/** 몸을 돌리는 빠르기. 사람마다 편한 빠르기가 달라 베이스캠프에서 고른다 */
-export type TurnSpeed = 'slow' | 'normal' | 'fast'
-/** 빠르기별 배율 (방향키·조이스틱·터치 둘러보기에 곱한다) */
-export const TURN_SPEED_GAIN: Record<TurnSpeed, number> = { slow: 0.7, normal: 1, fast: 1.35 }
-
 export type ClimbRecord = {
   trailId: string
   finishedAt: string
@@ -64,9 +59,6 @@ type State = {
   /** 조작 방식 (브라우저에 기억). 폰은 쉬운 조작, 컴퓨터는 자유 조작이 기본 */
   controlMode: ControlMode
   setControlMode: (mode: ControlMode) => void
-  /** 몸을 돌리는 빠르기 (브라우저에 기억) */
-  turnSpeed: TurnSpeed
-  setTurnSpeed: (speed: TurnSpeed) => void
   /** 쉬운 조작에서 등산로를 따라 저절로 걷는 중인지 */
   autoWalk: boolean
   setAutoWalk: (on: boolean) => void
@@ -76,12 +68,6 @@ export const AUTOSTART_STORAGE_KEY = 'hiking-metaverse:autostart'
 const RECORDS_KEY = 'hiking-metaverse:climbs'
 const COURSE_KEY = 'hiking-metaverse:course'
 const CONTROL_KEY = 'hiking-metaverse:control'
-const TURN_KEY = 'hiking-metaverse:turn-speed'
-
-function loadTurnSpeed(): TurnSpeed {
-  const saved = readStored(TURN_KEY)
-  return saved === 'slow' || saved === 'fast' ? saved : 'normal'
-}
 
 function loadControl(): ControlMode {
   const saved = readStored(CONTROL_KEY)
@@ -161,11 +147,6 @@ export const useGame = create<State>((set, get) => ({
   setControlMode: (controlMode) => {
     writeStored(CONTROL_KEY, controlMode)
     set({ controlMode, autoWalk: false })
-  },
-  turnSpeed: loadTurnSpeed(),
-  setTurnSpeed: (turnSpeed) => {
-    writeStored(TURN_KEY, turnSpeed)
-    set({ turnSpeed })
   },
   setAutoWalk: (autoWalk) => set({ autoWalk }),
 }))
