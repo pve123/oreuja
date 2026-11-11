@@ -2,7 +2,7 @@ import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { meshHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
-import { STEP_DEPTH, STEP_SLOPE, STEP_WIDTH, stoneSteps } from '../lib/steps'
+import { STEP_SLOPE, STEP_WIDTH, stoneSteps } from '../lib/steps'
 import { NearModels, type NearItem } from './NearModels'
 
 const PATH_WIDTH = 1.6 // 흙길 폭(m)
@@ -181,8 +181,8 @@ function PathSurface({ terrain, trail }: Props) {
 }
 
 /**
- * 경사가 급한 곳의 돌계단. 멀리서는 흙빛 받침만 보이고, 캐릭터 둘레 70m 안에서는 받침 위에
- * 화강암 판석 두 장을 나란히 얹는다 (칸마다 모양·방향·색이 조금씩 다르다).
+ * 경사가 급한 곳의 돌계단. 칸마다 다음 칸 앞까지 꽉 차는 받침을 놓아 칸 사이로 비탈이 드러나지 않는다.
+ * 멀리서는 흙빛 받침만 보이고, 캐릭터 둘레 70m 안에서는 받침 위에 화강암 판석 두 장을 나란히 얹는다 (칸마다 모양·방향·색이 조금씩 다르다).
  */
 function StoneSteps({ terrain, trail }: Props) {
   const ref = useRef<THREE.InstancedMesh>(null!)
@@ -197,7 +197,8 @@ function StoneSteps({ terrain, trail }: Props) {
       const top = st.top - BODY_BELOW_TOP
       const center = new THREE.Vector3(st.x, (top + st.bottom) / 2, st.z)
       colors.push(new THREE.Color().setHSL(0.08, 0.1, 0.4 + rand() * 0.06))
-      return new THREE.Matrix4().compose(center, q, new THREE.Vector3(1, Math.max(0.05, top - st.bottom), 1))
+      // 앞뒤로 조금 겹쳐 칸 사이에 틈이 보이지 않게 한다
+      return new THREE.Matrix4().compose(center, q, new THREE.Vector3(1, Math.max(0.05, top - st.bottom), st.depth + 0.02))
     })
     return { matrices, colors }
   }, [steps])
@@ -217,7 +218,7 @@ function StoneSteps({ terrain, trail }: Props) {
         const q = base.clone().multiply(spin)
         const lateral = side * (STEP_WIDTH / 4 + (rand() - 0.5) * 0.04)
         const pos = new THREE.Vector3(st.x + right.x * lateral, st.top - SLAB_THICK + st.tilt * lateral, st.z + right.z * lateral)
-        const scale = new THREE.Vector3(STEP_WIDTH / 2 - 0.03, SLAB_THICK / 0.15, STEP_DEPTH + 0.12)
+        const scale = new THREE.Vector3(STEP_WIDTH / 2 - 0.03, SLAB_THICK / 0.15, st.depth + 0.04)
         const shade = 0.88 + rand() * 0.24
         out.push({
           matrix: new THREE.Matrix4().compose(pos, q, scale),
@@ -229,8 +230,8 @@ function StoneSteps({ terrain, trail }: Props) {
     return out
   }, [steps])
 
-  // 높이 1짜리 판을 칸마다 위아래 길이에 맞춰 늘린다
-  const shape = useMemo(() => new THREE.BoxGeometry(STEP_WIDTH, 1, STEP_DEPTH), [])
+  // 높이·깊이 1짜리 판을 칸마다 위아래 길이와 칸 깊이에 맞춰 늘린다
+  const shape = useMemo(() => new THREE.BoxGeometry(STEP_WIDTH, 1, 1), [])
 
   useLayoutEffect(() => {
     matrices.forEach((m, i) => {
@@ -245,11 +246,12 @@ function StoneSteps({ terrain, trail }: Props) {
 
   return (
     <group>
-      <instancedMesh ref={ref} args={[shape, undefined, Math.max(1, matrices.length)]} castShadow receiveShadow>
+      {/* 받침은 그림자를 드리우지 않는다. 비탈에 긴 검은 쐐기가 생겨 계단이 땅에 박힌 판처럼 보였다 (판석은 그림자를 드리운다) */}
+      <instancedMesh ref={ref} args={[shape, undefined, Math.max(1, matrices.length)]} receiveShadow>
         <meshStandardMaterial roughness={1} />
       </instancedMesh>
       <Suspense fallback={null}>
-        <NearModels urls={SLABS} items={slabs} capacity={600} tint={PATH_ROCK_TINT} />
+        <NearModels urls={SLABS} items={slabs} capacity={1200} tint={PATH_ROCK_TINT} />
       </Suspense>
     </group>
   )
