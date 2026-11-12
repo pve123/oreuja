@@ -65,6 +65,7 @@ export function hideSplash() {
   const splash = $('splash')
   if (!splash || splash.classList.contains('done')) return
   setSplash('정상 도착! 출발해요', 1)
+  splash.classList.add('summit') // 깃발 펄럭, 선글라스 반짝 (index.html)
   setTimeout(() => {
     splash.classList.add('done')
     playHudEnter()
