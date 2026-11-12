@@ -44,7 +44,7 @@
       })()
     </script>
     <!--
-      첫 화면: 새벽 산을 오르는 등산객 (봉우리 그림은 모든 산이 같이 쓴다). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
+      첫 화면: 새벽 하늘 아래 앱 아이콘과 같은 선글라스 산을 오르는 등산객 (모든 산이 같이 쓴다). JS 번들을 받기 전에 바로 보이도록 HTML·CSS 를 여기에 직접 둔다.
       로딩 진행만큼 등산객이 등산로를 따라 정상으로 오른다 (src/lib/splash.ts).
       장면이 그려지면 걷히고, 그때 화면 패널들이 차례로 들어온다 (src/index.css 의 hud-enter).
     -->
@@ -107,25 +107,77 @@
         text-align: center;
       }
       .splash-climb {
-        width: 100%;
+        width: 78%;
         height: auto;
         overflow: visible;
       }
+      /* 링크 카드와 같은 검정 둥근 배지 */
       .splash-eyebrow {
-        margin: 6px 0 0;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.2em;
-        padding-left: 0.2em;
-        color: var(--trail);
-      }
-      .splash-title {
-        margin: 6px 0 0;
-        font-size: 34px;
+        margin: 10px 0 0;
+        padding: 5px 12px;
+        border-radius: 999px;
+        background: #141414;
+        font-size: 12px;
         font-weight: 800;
-        letter-spacing: 0.14em;
-        padding-left: 0.14em;
-        text-shadow: 0 2px 18px rgba(20, 28, 48, 0.35);
+        letter-spacing: 0.04em;
+        color: #ffe14d;
+      }
+      /* 앱 아이콘처럼 굵은 검정 테두리를 두른 스티커 글자. 한글은 text-stroke 로 두르면 획이 겹친 곳이 덩어리지므로 둥글게 놓은 그림자로 테두리를 만든다 */
+      .splash-title {
+        margin: 8px 0 0;
+        font-size: 44px;
+        font-weight: 900;
+        letter-spacing: 0.02em;
+        text-shadow:
+          2.0px 0.0px 0 #141414,
+          1.8px 0.8px 0 #141414,
+          1.4px 1.4px 0 #141414,
+          0.8px 1.8px 0 #141414,
+          0.0px 2.0px 0 #141414,
+          -0.8px 1.8px 0 #141414,
+          -1.4px 1.4px 0 #141414,
+          -1.8px 0.8px 0 #141414,
+          -2.0px 0.0px 0 #141414,
+          -1.8px -0.8px 0 #141414,
+          -1.4px -1.4px 0 #141414,
+          -0.8px -1.8px 0 #141414,
+          -0.0px -2.0px 0 #141414,
+          0.8px -1.8px 0 #141414,
+          1.4px -1.4px 0 #141414,
+          1.8px -0.8px 0 #141414,
+          4.0px 0.0px 0 #141414,
+          3.7px 1.5px 0 #141414,
+          2.8px 2.8px 0 #141414,
+          1.5px 3.7px 0 #141414,
+          0.0px 4.0px 0 #141414,
+          -1.5px 3.7px 0 #141414,
+          -2.8px 2.8px 0 #141414,
+          -3.7px 1.5px 0 #141414,
+          -4.0px 0.0px 0 #141414,
+          -3.7px -1.5px 0 #141414,
+          -2.8px -2.8px 0 #141414,
+          -1.5px -3.7px 0 #141414,
+          -0.0px -4.0px 0 #141414,
+          1.5px -3.7px 0 #141414,
+          2.8px -2.8px 0 #141414,
+          3.7px -1.5px 0 #141414,
+          5.0px 0.0px 0 #141414,
+          4.6px 1.9px 0 #141414,
+          3.5px 3.5px 0 #141414,
+          1.9px 4.6px 0 #141414,
+          0.0px 5.0px 0 #141414,
+          -1.9px 4.6px 0 #141414,
+          -3.5px 3.5px 0 #141414,
+          -4.6px 1.9px 0 #141414,
+          -5.0px 0.0px 0 #141414,
+          -4.6px -1.9px 0 #141414,
+          -3.5px -3.5px 0 #141414,
+          -1.9px -4.6px 0 #141414,
+          -0.0px -5.0px 0 #141414,
+          1.9px -4.6px 0 #141414,
+          3.5px -3.5px 0 #141414,
+          4.6px -1.9px 0 #141414,
+          0 8px 18px rgba(20, 28, 48, 0.4);
       }
       .splash-meta {
         display: flex;
@@ -176,6 +228,31 @@
           content: '...';
         }
       }
+      /* 정상에 닿으면 깃발이 펄럭이고 선글라스가 반짝한다 (src/lib/splash.ts hideSplash 가 summit 을 붙인다) */
+      #splash-flag,
+      .splash-glint {
+        transform-box: fill-box;
+      }
+      #splash-flag {
+        transform-origin: left center;
+      }
+      #splash.summit #splash-flag {
+        animation: splash-flag 0.3s ease-in-out 3 alternate;
+      }
+      #splash.summit .splash-glint {
+        animation: splash-glint 0.45s ease-out;
+      }
+      @keyframes splash-flag {
+        to {
+          transform: scaleX(0.7) skewY(-8deg);
+        }
+      }
+      @keyframes splash-glint {
+        50% {
+          stroke: #ffe14d;
+          stroke-width: 6px;
+        }
+      }
       @keyframes splash-bob {
         50% {
           transform: translateY(-1.5px);
@@ -206,6 +283,8 @@
         .splash-mist,
         .splash-bob,
         .splash-glow,
+        #splash.summit #splash-flag,
+        #splash.summit .splash-glint,
         #splash-sub::after {
           animation: none;
         }
@@ -228,19 +307,40 @@
       <div class="splash-mist m2" aria-hidden="true"></div>
 
       <div class="splash-center">
-        <!-- 백운대·인수봉·만경대 세 봉우리와 정상까지 지그재그 등산로. 진행만큼 등산객이 오르고 길이 채워진다 -->
-        <svg class="splash-climb" viewBox="0 0 320 170" aria-hidden="true">
-          <path fill="rgba(253,246,236,0.1)" stroke="rgba(253,246,236,0.85)" stroke-width="2" stroke-linejoin="round" d="M6 160 L74 92 L98 108 L150 30 L176 58 L196 44 L246 104 L268 92 L314 160 Z" />
-          <path id="splash-route" fill="none" stroke="rgba(253,246,236,0.35)" stroke-width="2" stroke-dasharray="2 5" stroke-linecap="round" d="M40 158 L96 140 L70 124 L128 106 L112 92 L148 70 L140 52 L150 32" />
-          <path id="splash-walked" stroke-dasharray="0 1000" fill="none" stroke="var(--trail)" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" d="M40 158 L96 140 L70 124 L128 106 L112 92 L148 70 L140 52 L150 32" />
-          <!-- 정상 깃발 -->
-          <path d="M150 30 V12" stroke="rgba(253,246,236,0.9)" stroke-width="1.6" />
-          <path d="M150 12 L164 16 L150 21 Z" fill="#ff6b6b" />
+        <!-- 앱 아이콘과 같은 선글라스 낀 산. 진행만큼 등산객이 왼쪽 능선을 따라 오르고 지나온 길이 채워진다 -->
+        <svg class="splash-climb" viewBox="0 0 320 200" aria-hidden="true">
+          <defs>
+            <radialGradient id="splash-halo">
+              <stop offset="0" stop-color="#ffe9c4" stop-opacity="0.55" />
+              <stop offset="1" stop-color="#ffe9c4" stop-opacity="0" />
+            </radialGradient>
+            <radialGradient id="splash-shadow">
+              <stop offset="0" stop-color="#141c30" stop-opacity="0.55" />
+              <stop offset="1" stop-color="#141c30" stop-opacity="0" />
+            </radialGradient>
+          </defs>
+          <!-- 산 뒤로 번지는 새벽빛과 발밑 그림자: 스티커가 풍경 위에 떠 보이지 않고 그 자리에 서 있게 -->
+          <circle cx="170" cy="96" r="120" fill="url(#splash-halo)" />
+          <ellipse cx="170" cy="194" rx="128" ry="12" fill="url(#splash-shadow)" />
+          <g stroke="#141414" stroke-width="5" stroke-linejoin="round" stroke-linecap="round">
+            <path d="M70 190 L170 30 L270 190 Z" fill="#7be495" />
+            <path d="M170 30 L192 66 L181 61 L170 70 L159 61 L148 66 Z" fill="#fff" />
+            <!-- 선글라스와 씩 웃는 입 -->
+            <path d="M128 118 H212" fill="none" />
+            <path d="M127 116 h36 q0 26 -18 26 q-18 0 -18 -26 Z M177 116 h36 q0 26 -18 26 q-18 0 -18 -26 Z" fill="#141414" stroke="none" />
+            <path class="splash-glint" d="M135 123 l9 -3 M185 123 l9 -3" stroke="#fff" stroke-width="3" />
+            <path d="M152 160 q18 12 36 -4" fill="none" />
+            <!-- 정상 깃발 -->
+            <path d="M170 32 V4" />
+            <path id="splash-flag" d="M170 4 L198 12 L170 21 Z" fill="#ff4d4d" />
+          </g>
+          <path id="splash-route" fill="none" stroke="rgba(20,20,20,0.6)" stroke-width="3.5" stroke-dasharray="1 7" stroke-linecap="round" d="M84 184 L106 168 L98 156 L118 140 L110 128 L130 106 L124 94 L148 68 L162 46" />
+          <path id="splash-walked" stroke-dasharray="0 1000" fill="none" stroke="#ff4d8b" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" d="M84 184 L106 168 L98 156 L118 140 L110 128 L130 106 L124 94 L148 68 L162 46" />
           <!-- 등산객 -->
-          <g id="splash-hiker" transform="translate(40 158)">
+          <g id="splash-hiker" transform="translate(84 184)">
             <g class="splash-bob">
-              <circle class="splash-glow" r="7" fill="rgba(255,213,138,0.3)" />
-              <circle r="3.6" fill="var(--trail)" />
+              <circle class="splash-glow" r="9" fill="rgba(255,77,139,0.35)" />
+              <circle r="5" fill="#ff4d8b" stroke="#141414" stroke-width="2.5" />
             </g>
           </g>
         </svg>
