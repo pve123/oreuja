@@ -13,7 +13,15 @@ const TARGET_HEIGHT = 1.9
 const STRIDE_RAD_PER_M = 2.2
 /** 동작이 바뀔 때 섞이는 빠르기 (클수록 빨리 바뀐다) */
 const BLEND = 10
+/** 멈춘 뒤 걷기 동작이 1초에 줄어드는 양. 약 0.3초 만에 쉬는 자세가 된다 */
+const SWING_DECAY = 3
+/** 1m 걸을 때 걷기 동작이 늘어나는 양. 0.5m 만 걸어도 다 걷는 자세가 된다 */
+const SWING_GAIN = 2
 
+/**
+ * 몸의 움직임 상태. phase 는 걸은 거리로 센 걸음 주기(rad), swing 은 걷는 정도(0~1),
+ * ready 는 GLB 를 다 받아 그릴 수 있는지
+ */
 type Motion = { phase: number; swing: number; cheering: boolean; airborne: boolean; ready: boolean }
 const REST: Motion = { phase: 0, swing: 0, cheering: false, airborne: false, ready: false }
 
@@ -24,7 +32,7 @@ const REST: Motion = { phase: 0, swing: 0, cheering: false, airborne: false, rea
 export const Avatar = forwardRef<HikerHandle, { kind: AvatarKind }>(function Avatar({ kind }, ref) {
   const group = useRef<THREE.Group>(null!)
   const shape = useRef<HikerHandle>(null)
-  const motion = useRef<Motion>({ phase: 0, swing: 0, cheering: false, airborne: false, ready: false })
+  const motion = useRef<Motion>({ ...REST })
   const model = AVATAR_MODELS[kind]
   const setReady = useCallback((on: boolean) => {
     motion.current.ready = on
@@ -32,7 +40,7 @@ export const Avatar = forwardRef<HikerHandle, { kind: AvatarKind }>(function Ava
 
   // 멈추면 서서히 쉬는 자세로
   useFrame((_, dt) => {
-    motion.current.swing = Math.max(0, motion.current.swing - Math.min(dt, 0.1) * 3)
+    motion.current.swing = Math.max(0, motion.current.swing - Math.min(dt, 0.1) * SWING_DECAY)
   })
 
   useImperativeHandle(ref, () => ({
@@ -40,7 +48,7 @@ export const Avatar = forwardRef<HikerHandle, { kind: AvatarKind }>(function Ava
     stride: (m) => {
       shape.current?.stride(m)
       motion.current.phase += m * STRIDE_RAD_PER_M
-      motion.current.swing = Math.min(1, motion.current.swing + Math.abs(m) * 2)
+      motion.current.swing = Math.min(1, motion.current.swing + Math.abs(m) * SWING_GAIN)
     },
     setCheering: (on) => {
       shape.current?.setCheering(on)
@@ -50,6 +58,7 @@ export const Avatar = forwardRef<HikerHandle, { kind: AvatarKind }>(function Ava
       shape.current?.setAirborne(on)
       motion.current.airborne = on
     },
+    // 도형 아바타는 바로 그려진다
     ready: () => (model ? motion.current.ready : true),
   }))
 
@@ -57,12 +66,7 @@ export const Avatar = forwardRef<HikerHandle, { kind: AvatarKind }>(function Ava
     <group ref={group}>
       {model ? (
         <Suspense fallback={null}>
-          <ModelBody
-            key={kind}
-            model={model}
-            motion={motion}
-            onReady={setReady}
-          />
+          <ModelBody key={kind} model={model} motion={motion} onReady={setReady} />
         </Suspense>
       ) : (
         <Hiker key={kind} ref={shape} kind={kind} />
@@ -122,6 +126,7 @@ function ModelBody({ model, motion, onReady }: { model: AvatarModel; motion: Ref
     const dt = Math.min(rawDt, 0.1)
     const m = motion.current
     animator.update(dt, m)
+    // 점프·만세 중에는 스틱을 짚지 않고 손에 든다
     poles.update(dt, m.phase, m.airborne || m.cheering ? 0 : m.swing)
   })
 
@@ -133,6 +138,7 @@ function ModelBody({ model, motion, onReady }: { model: AvatarModel; motion: Ref
   )
 }
 
+/** 섞는 동작 네 가지. AvatarModel.clips 가 슬롯마다 GLB 의 동작 이름을 정한다 */
 type Slot = 'idle' | 'walk' | 'air' | 'cheer'
 const SLOTS: Slot[] = ['idle', 'walk', 'air', 'cheer']
 
@@ -159,6 +165,7 @@ function createAnimator(root: THREE.Object3D, clips: THREE.AnimationClip[], mode
         weights[slot] += (target[slot] - weights[slot]) * k
         actions[slot]?.setEffectiveWeight(weights[slot])
       }
+      // 걷기 동작 시간을 걸음 주기에 맞춘다 (한 바퀴 = 동작 하나)
       if (actions.walk) {
         const cycle = (((m.phase / (Math.PI * 2)) % 1) + 1) % 1
         actions.walk.time = cycle * actions.walk.getClip().duration

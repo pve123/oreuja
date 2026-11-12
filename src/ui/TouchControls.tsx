@@ -7,8 +7,9 @@ import { readStored, writeStored } from '../lib/storage'
 const RADIUS = 60
 
 /**
- * 터치 조이스틱. 요즘 모바일 3D 게임처럼 화면 왼쪽 아래 빈 곳 아무 데나 엄지를 대면 그 자리에 조이스틱이 생기고,
- * 좌우로 기울이면 몸을 돌리고 위로 밀면 걷는다(조금 기울이면 천천히, 끝까지 밀면 뛴다). 카메라는 늘 등 뒤에서 앞을 본다. 오른쪽 빈 곳은 그대로 3D 화면이라 끌어서 둘러보고 두 손가락으로 확대·축소한다.
+ * 터치 조이스틱. 요즘 모바일 3D 게임처럼 화면 왼쪽 아래 빈 곳 아무 데나 엄지를 대면 그 자리에 조이스틱이 생긴다.
+ * 좌우로 기울이면 몸을 돌리고 위로 밀면 걷는다(조금 기울이면 천천히, 끝까지 밀면 뛴다). 카메라는 늘 등 뒤에서 앞을 본다.
+ * 오른쪽 빈 곳은 그대로 3D 화면이라 끌어서 둘러보고 두 손가락으로 확대·축소한다.
  * 기울기는 input.stick 에 넣고 World 가 매 프레임 읽는다. 마우스 기기에서는 CSS 가 숨긴다
  */
 export function TouchControls() {
@@ -20,7 +21,7 @@ export function TouchControls() {
     const el = zone.current
     // 누르고 있는 손가락과 처음 댄 자리 (effect 안에서만 바뀌는 값이라 객체에 둔다)
     const touch = { id: null as number | null, ox: 0, oy: 0 }
-    const set = (x: number, y: number) => {
+    const setStick = (x: number, y: number) => {
       input.stick.x = x
       input.stick.y = y
     }
@@ -35,29 +36,31 @@ export function TouchControls() {
       base.current.style.bottom = 'auto'
       base.current.classList.add('on')
       knob.current.style.transform = 'translate(0px, 0px)'
-      set(0, 0)
+      setStick(0, 0)
     }
     const move = (e: PointerEvent) => {
       if (e.pointerId !== touch.id) return
       let dx = e.clientX - touch.ox
       let dy = e.clientY - touch.oy
       const len = Math.hypot(dx, dy)
+      // 테두리 밖으로 밀어도 손잡이는 테두리에 멈춘다
       if (len > RADIUS) {
         dx *= RADIUS / len
         dy *= RADIUS / len
       }
       knob.current.style.transform = `translate(${dx}px, ${dy}px)`
-      set(dx / RADIUS, -dy / RADIUS)
+      setStick(dx / RADIUS, -dy / RADIUS)
     }
     const up = (e: PointerEvent) => {
       if (e.pointerId !== touch.id) return
       touch.id = null
+      // 제자리(CSS 가 정한 자리)로 돌려 놓는다
       base.current.classList.remove('on')
       base.current.style.left = ''
       base.current.style.top = ''
       base.current.style.bottom = ''
       knob.current.style.transform = 'translate(0px, 0px)'
-      set(0, 0)
+      setStick(0, 0)
     }
     el.addEventListener('pointerdown', down)
     el.addEventListener('pointermove', move)
@@ -68,7 +71,7 @@ export function TouchControls() {
       el.removeEventListener('pointermove', move)
       el.removeEventListener('pointerup', up)
       el.removeEventListener('pointercancel', up)
-      set(0, 0)
+      setStick(0, 0)
     }
   }, [])
 
@@ -82,6 +85,7 @@ export function TouchControls() {
   )
 }
 
+/** 조작 안내를 한 번 봤는지 기억하는 저장소 키 */
 const GUIDE_KEY = 'hiking-metaverse:touch-guide'
 /** 조작 안내를 띄워 두는 가장 긴 시간(ms) */
 const GUIDE_MS = 8000
@@ -105,14 +109,14 @@ export function TouchGuide() {
       // 저장소를 못 쓰면 다음에 또 보여 준다
       writeStored(GUIDE_KEY, '1')
     }
-    const onDown = () => {
+    const hideOnPress = () => {
       if (performance.now() - shownAt > GUIDE_MIN_MS) hide()
     }
     const t = setTimeout(hide, GUIDE_MS)
-    window.addEventListener('pointerdown', onDown, true)
+    window.addEventListener('pointerdown', hideOnPress, true)
     return () => {
       clearTimeout(t)
-      window.removeEventListener('pointerdown', onDown, true)
+      window.removeEventListener('pointerdown', hideOnPress, true)
     }
   }, [show])
 

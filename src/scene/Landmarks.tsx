@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
@@ -9,47 +9,44 @@ import { seededRandom } from '../lib/random'
 import { useGame } from '../lib/store'
 import { Boulder, Pavilion, Peak, RockGate, TrailSlab } from './NamedRocks'
 
-const LABEL_RANGE = 300 // 이 거리 안의 랜드마크만 이름을 띄운다(m)
+/** 이 등산로 거리(m) 안의 랜드마크만 이름을 띄운다 */
+const LABEL_RANGE = 300
 /** 캐릭터에서 이 직선거리(m) 안의 랜드마크만 모형을 그린다. 폰에서 그리기 횟수를 줄인다 (충돌은 거리와 상관없이 둔다) */
 export const DRAW_RANGE = 350
 
+/** 등산로를 따라 지형 위에 까는 바위(마당바위·기차바위·능선)면 TrailSlab 모양, 아니면 null */
+function trailSlabMode(kind: Landmark['kind']) {
+  if (kind === 'slab') return 'yard'
+  if (kind === 'ropes' || kind === 'ridge') return kind
+  return null
+}
 
 /** 이정표마다 이름에 맞는 랜드마크(돌탑, 암자, 산장, 성문, 폭포…)를 세우고, 가까운 것만 이름을 띄운다 */
 export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   const list = useMemo(() => landmarks(terrain, trail), [terrain, trail])
   // 50m 단위로만 다시 그려서 걸을 때마다 렌더링하지 않게 한다
-  const near = useGame((s) => Math.floor(s.distance / 50)) * 50
+  const walked = useGame((s) => Math.floor(s.distance / 50)) * 50
   // 그릴지는 등산로 거리가 아니라 직선거리로 정한다. 갈지자 길에서 가까이 보이는 모형이 갑자기 나타나지 않게
-  const here = useMemo(() => trail.positionAt(near), [trail, near])
-  const drawn = (p: THREE.Vector3) => p.distanceTo(here) < DRAW_RANGE + 50
+  const here = useMemo(() => trail.positionAt(walked), [trail, walked])
+  const isNear = (p: THREE.Vector3) => p.distanceTo(here) < DRAW_RANGE + 50
 
   useEffect(() => {
-    setObstacles(
-      'landmarks',
-      list.flatMap((l) => l.colliders),
-    )
+    setObstacles('landmarks', list.flatMap((l) => l.colliders))
     return () => setObstacles('landmarks', [])
   }, [list])
 
   return (
     <group>
-      {/* 마당바위·기차바위·능선은 등산로를 따라 지형 위에 까는 바위라 세계 좌표로 그린다 */}
-      {list
-        .filter((l) => (l.kind === 'slab' || l.kind === 'ropes' || l.kind === 'ridge') && drawn(l.position))
-        .map((l) => (
-          <TrailSlab
-            key={`${l.name}-slab`}
-            terrain={terrain}
-            trail={trail}
-            at={l.distance}
-            name={l.name}
-            mode={l.kind === 'ropes' ? 'ropes' : l.kind === 'ridge' ? 'ridge' : 'yard'}
-          />
-        ))}
+      {/* 지형 위에 까는 바위는 등산로를 따라 세계 좌표로 그린다 */}
+      {list.map((l) => {
+        const mode = trailSlabMode(l.kind)
+        if (!mode || !isNear(l.position)) return null
+        return <TrailSlab key={`${l.name}-slab`} terrain={terrain} trail={trail} at={l.distance} name={l.name} mode={mode} />
+      })}
       {list.map((l) => (
         <group key={l.name} position={l.position} rotation={[0, l.rotation, 0]}>
-          {drawn(l.position) && <LandmarkBody landmark={l} trail={trail} />}
-          {Math.abs(l.distance - near) < LABEL_RANGE && (
+          {isNear(l.position) && <LandmarkBody landmark={l} trail={trail} />}
+          {Math.abs(l.distance - walked) < LABEL_RANGE && (
             <Html position={[0, l.label, 0]} center distanceFactor={16} zIndexRange={[10, 0]}>
               <div className="landmark-label">
                 <span className="landmark-icon" aria-hidden>
@@ -65,6 +62,7 @@ export function Landmarks({ terrain, trail }: { terrain: Terrain; trail: Trail }
   )
 }
 
+/** 랜드마크 종류에 맞는 모형. 기준 좌표 +z 가 정면이다 */
 function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail }) {
   switch (landmark.kind) {
     case 'cairn':
@@ -99,6 +97,7 @@ function LandmarkBody({ landmark, trail }: { landmark: Landmark; trail: Trail })
     case 'slab':
     case 'ropes':
     case 'ridge':
+      // Landmarks 에서 TrailSlab 으로 따로 그린다
       return null
     case 'junction':
       return <Junction />
@@ -116,7 +115,23 @@ function Std({ color, ...rest }: { color: string } & Partial<THREE.MeshStandardM
   return <meshStandardMaterial color={color} roughness={0.9} {...rest} />
 }
 
+/** 돌탑·성벽 돌에 돌아가며 칠하는 화강암 색 */
 const GRANITE = ['#b9b2a6', '#a8a197', '#c4bdb0', '#9d978d']
+/** 유리문·창 재질 */
+const GLASS = { color: '#a9c2cc', roughness: 0.15, metalness: 0.3 }
+
+/** 바위 하나를 놓을 자리와 크기 */
+type RockPlacement = { pos: [number, number, number]; scale: [number, number, number] }
+
+/** 사각뿔을 45° 돌려 만든 우진각 지붕 (위에서 크기를 늘려 쓴다) */
+function hipRoofGeometry() {
+  return new THREE.ConeGeometry(1, 1, 4).rotateY(Math.PI / 4)
+}
+
+/** 단면이 삼각형인 기둥을 눕혀 만든 박공지붕 (꼭짓점 하나가 위로) */
+function gableRoofGeometry() {
+  return new THREE.CylinderGeometry(1, 1, 1, 3, 1, false, Math.PI / 2).rotateZ(Math.PI / 2)
+}
 
 /** 납작한 돌을 크기 순으로 쌓은 돌탑. 둘레에 작은 돌을 흩어 둔다 */
 function Cairn({ seed }: { seed: number }) {
@@ -175,12 +190,12 @@ function Bench({ position }: { position: [number, number, number] }) {
   )
 }
 
+/** 암자 처마 밑 연등 색 */
 const LANTERN_COLORS = ['#ff5d73', '#ffd166', '#06d6a0', '#ff9f1c', '#c77dff', '#4cc9f0']
 
 /** 작은 암자: 돌 기단, 붉은 기둥, 단청 띠, 기와 지붕, 처마 밑 연등 */
 function Temple() {
-  // 사각뿔을 눕혀 늘린 우진각 지붕
-  const roof = useMemo(() => new THREE.ConeGeometry(1, 1, 4).rotateY(Math.PI / 4), [])
+  const roof = useMemo(() => hipRoofGeometry(), [])
   const lantern = useRef<THREE.Group>(null!)
   useFrame(({ clock }) => {
     // 연등이 바람에 조금씩 흔들린다
@@ -246,7 +261,7 @@ function Temple() {
   )
 }
 
-/** 막돌을 쌓은 벽 무늬 (백운산장). 크기가 제각각인 밝은 화강암 돌 사이에 회색 줄눈이 보인다. 한 장이 2.5m */
+/** 막돌을 쌓은 벽 무늬 (백운산장). 크기가 제각각인 밝은 화강암 돌 사이에 회색 줄눈이 보인다. 산장 벽에서 한 장이 2.5m 너비다 */
 function rubbleTexture() {
   return canvasTexture(256, 256, (g) => {
     const rand = seededRandom(29)
@@ -280,8 +295,7 @@ const UPPER_FLOOR = 2.6
  * twoStory 면 대피소(도봉산대피소)처럼 막돌 1층 위에 흰 창이 줄지은 연두색 2층을 얹고 그 위에 지붕을 올린다
  */
 function Hut({ twoStory = false }: { twoStory?: boolean }) {
-  // 단면이 삼각형인 기둥을 눕혀 박공지붕을 만든다 (꼭짓점 하나가 위로)
-  const roof = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 3, 1, false, Math.PI / 2).rotateZ(Math.PI / 2), [])
+  const roof = useMemo(() => gableRoofGeometry(), [])
   const stone = useMemo(() => {
     const tex = rubbleTexture()
     tex.wrapS = tex.wrapT = THREE.RepeatWrapping
@@ -344,7 +358,7 @@ function Hut({ twoStory = false }: { twoStory?: boolean }) {
           </mesh>
           <mesh position={[0, 0.05, 0.02]}>
             <boxGeometry args={[0.68, 1.8, 0.04]} />
-            <Std color="#a9c2cc" roughness={0.15} metalness={0.3} />
+            <Std {...GLASS} />
           </mesh>
         </group>
       ))}
@@ -355,7 +369,7 @@ function Hut({ twoStory = false }: { twoStory?: boolean }) {
         </mesh>
         <mesh position={[0, 0, 0.02]}>
           <boxGeometry args={[1.3, 0.9, 0.04]} />
-          <Std color="#a9c2cc" roughness={0.15} metalness={0.3} />
+          <Std {...GLASS} />
         </mesh>
       </group>
       <Bench position={[1.2, 0, 2.9]} />
@@ -366,21 +380,33 @@ function Hut({ twoStory = false }: { twoStory?: boolean }) {
 /** 성문 문구멍 반폭과 높이(m). 북한산성 위문처럼 위가 평평한 네모 문 */
 const GATE_HALF = 1.3
 const GATE_TOP = 3
+/** 성문 벽 반폭, 높이, 두께(m) */
+const GATE_WALL_HALF = 3.5
+const GATE_WALL_TOP = 4.6
+const GATE_WALL_DEPTH = 2.6
 
 /** 성문 단면: 네모 문구멍이 뚫린 벽 (가운데가 등산로). 바닥은 비탈에 묻히게 2m 내린다 */
 function gateShape() {
   const s = new THREE.Shape()
-  s.moveTo(-3.5, -2)
+  s.moveTo(-GATE_WALL_HALF, -2)
   s.lineTo(-GATE_HALF, -2)
   s.lineTo(-GATE_HALF, GATE_TOP)
   s.lineTo(GATE_HALF, GATE_TOP)
   s.lineTo(GATE_HALF, -2)
-  s.lineTo(3.5, -2)
-  s.lineTo(3.5, 4.6)
-  s.lineTo(-3.5, 4.6)
+  s.lineTo(GATE_WALL_HALF, -2)
+  s.lineTo(GATE_WALL_HALF, GATE_WALL_TOP)
+  s.lineTo(-GATE_WALL_HALF, GATE_WALL_TOP)
   s.closePath()
-  return new THREE.ExtrudeGeometry(s, { depth: 2.6, bevelEnabled: false }).translate(0, 0, -1.3)
+  return new THREE.ExtrudeGeometry(s, { depth: GATE_WALL_DEPTH, bevelEnabled: false }).translate(0, 0, -GATE_WALL_DEPTH / 2)
 }
+
+/** 성문 양옆 바위. src/lib/landmarks.ts 의 gate 충돌 원과 맞춘다 */
+const GATE_ROCKS: RockPlacement[] = [
+  { pos: [-4.7, 1.2, 0.2], scale: [1.6, 3.4, 1.9] },
+  { pos: [-3.9, 0.1, 2], scale: [1, 1.4, 1] },
+  { pos: [4.8, 1.5, -0.1], scale: [1.8, 3.8, 2.1] },
+  { pos: [4, 0.4, 2], scale: [1.1, 1.8, 1.1] },
+]
 
 /** 화강암 마름돌을 줄 맞춰 쌓은 벽 무늬. 한 장이 2.4m 이고, 줄마다 돌 너비와 밝기가 조금씩 다르다 */
 function ashlarTexture() {
@@ -416,6 +442,7 @@ function ashlarTexture() {
 function Gate() {
   const wall = useMemo(() => gateShape(), [])
   const ashlar = useMemo(() => ashlarTexture(), [])
+  useEffect(() => () => ashlar.dispose(), [ashlar])
   return (
     <group>
       <mesh geometry={wall} castShadow receiveShadow>
@@ -449,7 +476,7 @@ function Gate() {
       ))}
       {/* 벽 위로 들쭉날쭉 남은 맨 윗줄 돌 */}
       {[-3.1, -2.2, -1.2, -0.3, 0.7, 1.6, 2.6].map((x, i) => (
-        <mesh key={x} position={[x, 4.6 + (0.18 + (i % 3) * 0.06) / 2, 0]} castShadow>
+        <mesh key={x} position={[x, GATE_WALL_TOP + (0.18 + (i % 3) * 0.06) / 2, 0]} castShadow>
           <boxGeometry args={[0.86, 0.18 + (i % 3) * 0.06, 2.5]} />
           <Std color={GRANITE[i % GRANITE.length]} flatShading />
         </mesh>
@@ -495,7 +522,7 @@ export function FortressGate() {
   const wall = useMemo(() => fortressShape(), [])
   const ashlar = useMemo(() => ashlarTexture(), [])
   useEffect(() => () => ashlar.dispose(), [ashlar])
-  const hip = useMemo(() => new THREE.ConeGeometry(1, 1, 4).rotateY(Math.PI / 4), [])
+  const hip = useMemo(() => hipRoofGeometry(), [])
   const board = useMemo(
     () =>
       canvasTexture(192, 64, (g) => {
@@ -562,14 +589,6 @@ export function FortressGate() {
   )
 }
 
-/** 성문 양옆 바위 [위치, 크기]. src/lib/landmarks.ts 의 gate 충돌 원과 맞춘다 */
-const GATE_ROCKS: { pos: [number, number, number]; scale: [number, number, number] }[] = [
-  { pos: [-4.7, 1.2, 0.2], scale: [1.6, 3.4, 1.9] },
-  { pos: [-3.9, 0.1, 2], scale: [1, 1.4, 1] },
-  { pos: [4.8, 1.5, -0.1], scale: [1.8, 3.8, 2.1] },
-  { pos: [4, 0.4, 2], scale: [1.1, 1.8, 1.1] },
-]
-
 /** 무너진 성벽 터: 길 양옆에 높이가 들쭉날쭉한 돌무더기 */
 function Ruins({ seed }: { seed: number }) {
   const blocks = useMemo(() => {
@@ -635,13 +654,13 @@ function fallGeometry() {
   return geo
 }
 
-/** 너럭바위 둘레를 감싸는 바위 [위치, 크기] */
-const FALL_ROCKS: { pos: [number, number, number]; scale: [number, number, number] }[] = [
-  { pos: [-3.4, 0.9, -2], scale: [1.9, 1.5, 1.8] },
-  { pos: [3.3, 1.1, -2.4], scale: [1.8, 1.7, 1.9] },
-  { pos: [-3, 3.1, -4.5], scale: [1.7, 1.6, 1.7] },
-  { pos: [3.1, 3.4, -4.8], scale: [1.6, 1.5, 1.6] },
-  { pos: [0, 5, -6.4], scale: [3.6, 1.1, 2] },
+/** 너럭바위 둘레를 감싸는 바위. src/lib/landmarks.ts 의 waterfall 충돌 원과 맞춘다 */
+const FALL_ROCKS: (RockPlacement & { color: string })[] = [
+  { pos: [-3.4, 0.9, -2], scale: [1.9, 1.5, 1.8], color: '#a69b8a' },
+  { pos: [3.3, 1.1, -2.4], scale: [1.8, 1.7, 1.9], color: '#b9ae9d' },
+  { pos: [-3, 3.1, -4.5], scale: [1.7, 1.6, 1.7], color: '#a1978a' },
+  { pos: [3.1, 3.4, -4.8], scale: [1.6, 1.5, 1.6], color: '#ada291' },
+  { pos: [0, 5, -6.4], scale: [3.6, 1.1, 2], color: '#9f9586' },
 ]
 
 /**
@@ -683,7 +702,7 @@ function Waterfall() {
       {FALL_ROCKS.map((r, i) => (
         <mesh key={i} position={r.pos} scale={r.scale} rotation={[0.3 * i, 0.7 * i, 0.15]} castShadow receiveShadow>
           <dodecahedronGeometry args={[1, 0]} />
-          <Std color={['#a69b8a', '#b9ae9d', '#a1978a', '#ada291', '#9f9586'][i]} flatShading />
+          <Std color={r.color} flatShading />
         </mesh>
       ))}
       {/* 얕은 물웅덩이와 물보라 */}
@@ -712,7 +731,7 @@ function Waterfall() {
 }
 
 /** 이름에 맞는 랜드마크가 없을 때의 나무 표지판 */
-function Signpost(): ReactNode {
+function Signpost() {
   return (
     <group>
       <mesh position={[0, 1.1, 0]} castShadow>
@@ -810,6 +829,9 @@ function Spring() {
   )
 }
 
+/** 캔버스에 한글을 쓸 때의 글꼴. 앞에서부터 기기에 있는 것을 쓴다 */
+const KOREAN_FONT = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+
 /** 글씨나 그림을 캔버스에 그려 텍스처로 만든다 */
 function canvasTexture(width: number, height: number, draw: (g: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas')
@@ -822,7 +844,6 @@ function canvasTexture(width: number, height: number, draw: (g: CanvasRenderingC
   return tex
 }
 
-/** 현판: 짙은 나무 바탕에 흰 글씨 */
 /** 입구 현판: 산 이름을 크게, 그 산이 속한 국립공원을 작게 쓴다 (도봉산도 북한산국립공원에 속한다) */
 function plaqueTexture(mountain: string, park?: string) {
   return canvasTexture(512, 128, (g) => {
@@ -832,7 +853,7 @@ function plaqueTexture(mountain: string, park?: string) {
     g.lineWidth = 6
     g.strokeRect(8, 8, 496, 112)
     g.fillStyle = '#f6efe2'
-    const font = (px: number) => `bold ${px}px "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif`
+    const font = (px: number) => `bold ${px}px ${KOREAN_FONT}`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     if (park) {
@@ -857,7 +878,7 @@ function guideMapTexture() {
     g.fillStyle = '#2f5d3a'
     g.fillRect(0, 0, 320, 40)
     g.fillStyle = '#ffffff'
-    g.font = 'bold 24px "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
+    g.font = `bold 24px ${KOREAN_FONT}`
     g.textAlign = 'center'
     g.textBaseline = 'middle'
     g.fillText('등산 안내도', 160, 21)

@@ -17,30 +17,30 @@ const URLS = [...BROADLEAF, ...PINE].map((name) => `/models/trees/${name}.glb`)
 export const DETAIL_VARIANTS = BROADLEAF.length
 
 const DETAIL_RADIUS = 70 // 정밀 모델로 그리는 반경(m)
-const BUFFER = 12 // 반경보다 이만큼 넉넉히 담아 두고, 바깥은 재질이 숨긴다
+const RADIUS_MARGIN = 12 // 반경보다 이만큼 넉넉히 담아 두고, 바깥은 재질이 숨긴다(m)
 const REBUILD_MOVE = 6 // 아바타가 이만큼 움직이면 담을 나무를 다시 고른다(m)
 const CAPACITY = 1500 // 모델 하나에 담을 수 있는 최대 그루 수
+/** 판정 중심 높이(모델 단위). 수관 가운데 */
+const CANOPY_CENTER = 4
 
-type Part = { mesh: THREE.InstancedMesh }
-
-/** 모델마다 껍질·잎 부분을 InstancedMesh 로 만든다 */
+/** 모델마다 껍질·잎 같은 부분을 하나씩 InstancedMesh 로 만든다 */
 function useModelParts() {
   const gltfs = useGLTF(URLS)
   const models = useMemo(
     () =>
       gltfs.map((gltf) => {
-        const parts: Part[] = []
+        const parts: THREE.InstancedMesh[] = []
         gltf.scene.updateMatrixWorld(true)
         gltf.scene.traverse((o) => {
           if (!(o instanceof THREE.Mesh)) return
           const geometry = bakeGeometry(o)
-          // 아바타 가까이만 보이게(반경 밖은 숨김) + 카메라 가림 숨기기. 판정 중심은 수관 가운데
-          const material = withOcclusionFade((o.material as THREE.Material).clone(), 4, { ring: 'near' })
+          // 아바타 가까이만 보이게(반경 밖은 숨김) + 카메라를 가리면 비쳐 보이게
+          const material = withOcclusionFade((o.material as THREE.Material).clone(), CANOPY_CENTER, { ring: 'near' })
           const mesh = new THREE.InstancedMesh(geometry, material, CAPACITY)
           mesh.count = 0
           mesh.castShadow = true
           mesh.receiveShadow = true
-          parts.push({ mesh })
+          parts.push(mesh)
         })
         return parts
       }),
@@ -49,7 +49,7 @@ function useModelParts() {
   useEffect(
     () => () => {
       for (const parts of models)
-        for (const { mesh } of parts) {
+        for (const mesh of parts) {
           mesh.geometry.dispose()
           ;(mesh.material as THREE.Material).dispose()
           mesh.dispose()
@@ -85,20 +85,21 @@ export function DetailTrees({ trees }: { trees: Tree[] }) {
     if (Math.hypot(cx - lastCenter.current.x, cz - lastCenter.current.y) < REBUILD_MOVE) return
     lastCenter.current.set(cx, cz)
 
-    const reach = (DETAIL_RADIUS + BUFFER) ** 2
+    const reach = (DETAIL_RADIUS + RADIUS_MARGIN) ** 2
     const counts = models.map(() => 0)
     for (const tree of trees) {
       const e = tree.matrix.elements // 12, 14 번이 위치 x, z
       if ((e[12] - cx) ** 2 + (e[14] - cz) ** 2 > reach) continue
-      const m = (tree.pine ? BROADLEAF.length : 0) + tree.variant
-      const k = counts[m]
+      // 모델 순서는 활엽수들 다음 소나무들 (URLS)
+      const model = (tree.pine ? BROADLEAF.length : 0) + tree.variant
+      const k = counts[model]
       if (k >= CAPACITY) continue
-      for (const { mesh } of models[m]) mesh.setMatrixAt(k, tree.matrix)
-      counts[m] = k + 1
+      for (const mesh of models[model]) mesh.setMatrixAt(k, tree.matrix)
+      counts[model] = k + 1
     }
-    models.forEach((parts, m) => {
-      for (const { mesh } of parts) {
-        mesh.count = counts[m]
+    models.forEach((parts, model) => {
+      for (const mesh of parts) {
+        mesh.count = counts[model]
         mesh.instanceMatrix.needsUpdate = true
         mesh.computeBoundingSphere()
       }
@@ -107,7 +108,7 @@ export function DetailTrees({ trees }: { trees: Tree[] }) {
 
   return (
     <group>
-      {models.flat().map(({ mesh }) => (
+      {models.flat().map((mesh) => (
         <primitive key={mesh.uuid} object={mesh} />
       ))}
     </group>

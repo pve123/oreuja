@@ -6,9 +6,10 @@ import { VWORLD_KEY, loadSatelliteTexture, type LocalRect } from '../lib/satelli
 import { layerFromCanvas, usePhotos } from '../lib/photo-map'
 import { daylight } from '../lib/daylight'
 
-const GRASS_LOW = new THREE.Color('#5d7f3a')
+// 위성사진이 없을 때 칠하는 색: 낮은 풀밭 → 숲 → 높은 곳, 가파른 곳은 바위
+const LOW_GRASS = new THREE.Color('#5d7f3a')
 const FOREST = new THREE.Color('#3f6b2e')
-const HIGH = new THREE.Color('#7a7d5a')
+const HIGH_GROUND = new THREE.Color('#7a7d5a')
 const ROCK = new THREE.Color('#9a958c')
 
 /** 지형 전체 위성사진 확대 단계 (256px 타일, 1px ≈ 1.9m) */
@@ -29,11 +30,11 @@ const PHOTO_LIGHTING = {
   roughness: 1,
   color: new THREE.Color(0.8, 0.8, 0.8),
   emissive: new THREE.Color(1, 1, 1),
-  emissiveIntensity: 0.45,
+  emissiveIntensity: 0.45, // 첫 화면 값. 매 프레임 daylight.photoEmissive 로 바꾼다
 }
 
 /**
- * 범위만큼 위성사진을 받아 텍스처로 돌려준다. 토큰이 없거나 실패하면 null.
+ * 범위만큼 위성사진을 받아 텍스처로 돌려준다. 인증키가 없거나 실패하면 null.
  * 받은 사진의 픽셀은 숲·바위 배치에 쓰도록 usePhotos 에도 올린다.
  */
 function useSatellite(rect: LocalRect | null, origin: TerrainData['origin'], zoom: number, key: 'base' | 'detail') {
@@ -52,11 +53,9 @@ function useSatellite(rect: LocalRect | null, origin: TerrainData['origin'], zoo
     loadSatelliteTexture(rect, origin, VWORLD_KEY, zoom)
       .then((t) => {
         loaded = t
-        if (!cancelled) setLayer(key, 'ready', layerFromCanvas(t.image as HTMLCanvasElement, rect))
-        if (import.meta.env.DEV) {
-          const img = t.image as HTMLCanvasElement
-          console.info(`위성사진 확대 ${zoom}: ${img.width}x${img.height}px`)
-        }
+        const canvas = t.image as HTMLCanvasElement
+        if (!cancelled) setLayer(key, 'ready', layerFromCanvas(canvas, rect))
+        if (import.meta.env.DEV) console.info(`위성사진 확대 ${zoom}: ${canvas.width}x${canvas.height}px`)
         // 비스듬히 볼 때 사진이 뭉개지지 않게
         t.anisotropy = gl.capabilities.getMaxAnisotropy()
         if (cancelled) t.dispose()
@@ -92,8 +91,9 @@ export function Terrain({ terrain, trail }: Props) {
     const c = new THREE.Color()
     for (let i = 0; i < pos.count; i++) {
       const h = (heights[i] - minHeight) / (maxHeight - minHeight)
-      c.copy(GRASS_LOW).lerp(FOREST, Math.min(1, h * 2))
-      if (h > 0.55) c.lerp(HIGH, (h - 0.55) / 0.45)
+      c.copy(LOW_GRASS).lerp(FOREST, Math.min(1, h * 2))
+      // 위쪽 45% 높이부터 덜 푸르게
+      if (h > 0.55) c.lerp(HIGH_GROUND, (h - 0.55) / 0.45)
       const steep = THREE.MathUtils.smoothstep(1 - normals.getY(i), 0.25, 0.45)
       c.lerp(ROCK, steep)
       colors.set([c.r, c.g, c.b], i * 3)
@@ -107,11 +107,10 @@ export function Terrain({ terrain, trail }: Props) {
     const { width, height, minX, maxX, minZ, maxZ } = terrain
     const cellX = (maxX - minX) / (width - 1)
     const cellZ = (maxZ - minZ) / (height - 1)
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
-    for (const p of trail.points) {
-      x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x)
-      z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z)
-    }
+    // 등산로가 차지하는 사각형에 DETAIL_MARGIN 을 더해 격자 칸 번호(i0~i1, j0~j1)로 바꾼다
+    const xs = trail.points.map((p) => p.x)
+    const zs = trail.points.map((p) => p.z)
+    const [x0, x1, z0, z1] = [Math.min(...xs), Math.max(...xs), Math.min(...zs), Math.max(...zs)]
     const i0 = THREE.MathUtils.clamp(Math.floor((x0 - DETAIL_MARGIN - minX) / cellX), 0, width - 2)
     const i1 = THREE.MathUtils.clamp(Math.ceil((x1 + DETAIL_MARGIN - minX) / cellX), i0 + 1, width - 1)
     const j0 = THREE.MathUtils.clamp(Math.floor((z0 - DETAIL_MARGIN - minZ) / cellZ), 0, height - 2)

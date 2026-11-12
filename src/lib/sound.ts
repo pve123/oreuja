@@ -7,8 +7,10 @@ import { readStored, writeStored } from './storage'
  */
 
 const MUTED_KEY = 'hiking-metaverse:muted'
+/** 소리를 켰을 때 전체 음량 (0~1) */
+const MASTER_VOLUME = 0.7
 
-
+/** 소리 끄기 (브라우저에 기억) */
 export const useSound = create<{ muted: boolean; toggle: () => void }>((set, get) => ({
   muted: readStored(MUTED_KEY) === '1',
   toggle: () => {
@@ -19,12 +21,12 @@ export const useSound = create<{ muted: boolean; toggle: () => void }>((set, get
   },
 }))
 
-const MASTER_VOLUME = 0.7
-
 let ctx: AudioContext | null = null
 let master: GainNode | null = null
+/** 발소리·바람·셔터가 함께 쓰는 흰 소음 */
 let noise: AudioBuffer | null = null
 let wind: { gain: GainNode; filter: BiquadFilterNode } | null = null
+/** 새가 지저귈 확률이자 새소리 크기 (0~1). 높이 오를수록 줄어든다 */
 let birdsLevel = 0
 let birdTimer: number | undefined
 
@@ -34,9 +36,10 @@ export function unlockAudio() {
     if (ctx.state === 'suspended') void ctx.resume()
     return
   }
-  const AC = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
-  if (!AC) return
-  ctx = new AC()
+  // 오래된 사파리는 webkit 이름으로만 있다
+  const AudioContextClass = window.AudioContext ?? (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+  if (!AudioContextClass) return
+  ctx = new AudioContextClass()
   master = ctx.createGain()
   master.gain.value = useSound.getState().muted ? 0 : MASTER_VOLUME
   master.connect(ctx.destination)
@@ -91,6 +94,7 @@ function scheduleBird() {
   )
 }
 
+/** 새 한 마리가 2~5음을 짧게 지저귄다. 왼쪽·오른쪽 아무 데서나 들린다 */
 function chirp() {
   if (!ctx || !master) return
   const t0 = ctx.currentTime

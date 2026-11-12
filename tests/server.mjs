@@ -16,7 +16,7 @@ const server = spawn(process.execPath, ['server/index.mjs'], {
 })
 await new Promise((r) => server.stdout.once('data', r))
 
-const ORIGIN = 'https://trailverse-seven.vercel.app'
+const ORIGIN = 'https://www.oreuja.com'
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const health = async () => (await fetch(`http://localhost:${port}/health`)).json()
 
@@ -42,7 +42,7 @@ try {
   check('상태 확인 주소가 접속 인원을 알려 준다', h.ok === true && h.players === 0, JSON.stringify(h))
 
   const a = await connect()
-  check('배포 주소에서 붙으면 welcome 을 받는다', a.welcome?.type === 'welcome')
+  check('운영 주소에서 붙으면 welcome 을 받는다', a.welcome?.type === 'welcome')
   const preview = await connect({ origin: 'https://trailverse-git-feature-x-hsl-labs.vercel.app', ip: '10.0.0.2' })
   check('Vercel 미리보기 주소도 받는다', preview.welcome?.type === 'welcome')
   const local = await connect({ origin: 'http://localhost:5173', ip: '10.0.0.3' })

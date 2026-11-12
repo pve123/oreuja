@@ -1,7 +1,10 @@
 import * as THREE from 'three'
 
 const TILE = 256 // 타일 한 장 크기(px)
-const R = 6378137
+/** 웹 메르카토르가 쓰는 지구 반지름(m) */
+const EARTH_RADIUS = 6378137
+/** 사진이 너무 커도 이 확대 단계 아래로는 내리지 않는다 */
+const MIN_ZOOM = 10
 /** 그래픽 카드가 무리 없이 다루는 텍스처 한 변 최대 크기(px) */
 const MAX_TEXTURE = 4096
 
@@ -22,7 +25,8 @@ function loadImage(url: string) {
     const img = new Image()
     img.crossOrigin = 'anonymous' // WebGL 텍스처로 쓰려면 CORS 허용 이미지여야 한다
     img.onload = () => resolve(img)
-    // 인증키가 틀리거나 등록하지 않은 주소면 브이월드는 그림 대신 오류 XML 을 돌려줘서 여기로 온다
+    // 인증키가 틀리거나 등록하지 않은 주소면 브이월드는 그림 대신 오류 XML 을 돌려줘서 여기로 온다.
+    // 오류 문구에 인증키가 찍히지 않게 주소의 키 자리를 *** 로 가린다
     img.onerror = () => reject(new Error(`위성 타일을 받지 못했어요: ${url.replace(/1\.0\.0\/[^/]+\//, '1.0.0/***/')}`))
     img.src = url
   })
@@ -39,12 +43,12 @@ function loadImage(url: string) {
 export async function loadSatelliteTexture(rect: LocalRect, origin: { lat: number; lon: number }, key: string, zoom: number) {
   const cosLat = Math.cos((origin.lat * Math.PI) / 180)
   // 로컬 좌표 → 위경도
-  const lonOf = (x: number) => origin.lon + ((x / (R * cosLat)) * 180) / Math.PI
-  const latOf = (z: number) => origin.lat - ((z / R) * 180) / Math.PI
+  const lonOf = (x: number) => origin.lon + ((x / (EARTH_RADIUS * cosLat)) * 180) / Math.PI
+  const latOf = (z: number) => origin.lat - ((z / EARTH_RADIUS) * 180) / Math.PI
 
-  let z = zoom
-  const pixels = (zz: number) => {
-    const world = 2 ** zz * TILE
+  /** 확대 단계 level 의 세계 지도에서 rect 가 차지하는 픽셀 범위 */
+  const pixelRect = (level: number) => {
+    const world = 2 ** level * TILE
     const lon2px = (lon: number) => ((lon + 180) / 360) * world
     const lat2px = (lat: number) => {
       const r = (lat * Math.PI) / 180
@@ -57,8 +61,9 @@ export async function loadSatelliteTexture(rect: LocalRect, origin: { lat: numbe
       py1: lat2px(latOf(rect.maxZ)),
     }
   }
-  let p = pixels(z)
-  while (Math.max(p.px1 - p.px0, p.py1 - p.py0) > MAX_TEXTURE && z > 10) p = pixels(--z)
+  let level = zoom
+  let p = pixelRect(level)
+  while (Math.max(p.px1 - p.px0, p.py1 - p.py0) > MAX_TEXTURE && level > MIN_ZOOM) p = pixelRect(--level)
 
   const canvas = document.createElement('canvas')
   canvas.width = Math.round(p.px1 - p.px0)
@@ -71,7 +76,7 @@ export async function loadSatelliteTexture(rect: LocalRect, origin: { lat: numbe
   for (let tx = Math.floor(p.px0 / TILE); tx <= Math.floor(p.px1 / TILE); tx++) {
     for (let ty = Math.floor(p.py0 / TILE); ty <= Math.floor(p.py1 / TILE); ty++) {
       // WMTS 주소 순서는 확대 단계/행(y)/열(x). Satellite 는 항공사진 레이어다
-      const url = `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/${z}/${ty}/${tx}.jpeg`
+      const url = `https://api.vworld.kr/req/wmts/1.0.0/${key}/Satellite/${level}/${ty}/${tx}.jpeg`
       jobs.push(
         loadImage(url)
           .then((img) => ctx.drawImage(img, tx * TILE - p.px0, ty * TILE - p.py0, TILE, TILE))

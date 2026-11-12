@@ -9,6 +9,7 @@ import { playChime, playFanfare, playShutter, unlockAudio, useSound } from '../l
 export function SoundControls() {
   const muted = useSound((s) => s.muted)
   const toggle = useSound((s) => s.toggle)
+  const label = muted ? '소리 켜기' : '소리 끄기'
 
   useEffect(() => {
     const unlock = () => unlockAudio()
@@ -20,6 +21,7 @@ export function SoundControls() {
     }
   }, [])
 
+  // 게임 상태가 바뀌는 순간에 맞춰 소리를 낸다
   useEffect(
     () =>
       useGame.subscribe((s, prev) => {
@@ -34,8 +36,8 @@ export function SoundControls() {
     <button
       className="sound-toggle"
       aria-pressed={!muted}
-      aria-label={muted ? '소리 켜기' : '소리 끄기'}
-      title={muted ? '소리 켜기' : '소리 끄기'}
+      aria-label={label}
+      title={label}
       onClick={toggle}
     >
       <svg viewBox="0 0 24 24" width="20" height="20" aria-hidden>

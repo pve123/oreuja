@@ -18,18 +18,38 @@ export type HikerHandle = {
   ready: () => boolean
 }
 
-/** 캐릭터마다 다른 골격 치수와 몸통. 원점은 발바닥, 앞쪽이 +z */
+/** 1m 걸을 때 걸음 주기가 도는 양(rad). 2π 가 두 걸음이다 (Avatar·World 와 같은 값) */
+const STRIDE_RAD_PER_M = 2.2
+/** 멈춘 뒤 걷기 동작이 1초에 줄어드는 양. 약 0.3초 만에 차렷 자세가 된다 */
+const SWING_DECAY = 3
+/** 1m 걸을 때 걷기 동작이 늘어나는 양. 0.5m 만 걸어도 다 걷는 자세가 된다 */
+const SWING_GAIN = 2
+/** 걸을 때 팔다리를 앞뒤로 흔드는 가장 큰 각도(rad, 약 40°) */
+const LIMB_SWING = 0.7
+/** 걸을 때 몸이 통통 튀는 높이(m) */
+const BOUNCE = 0.06
+/** 만세 자세에서 팔을 드는 각도(rad, 약 155°) */
+const CHEER_ARM = 2.7
+
+/** 캐릭터마다 다른 골격 치수와 몸통. 원점은 발바닥, 앞쪽이 +z. 길이는 m */
 type Rig = {
+  /** 엉덩이(다리 관절) 높이 */
   hipY: number
+  /** 다리가 몸 가운데서 옆으로 떨어진 거리 */
   legX: number
   legLen: number
+  /** 다리 굵기(반지름) */
   legR: number
   legColor: string
+  /** 발 모양. shoe 는 신발, web 은 오리발, null 은 발 없음 */
   foot: 'shoe' | 'web' | null
   footColor: string
+  /** 어깨(팔 관절) 높이 */
   shoulderY: number
+  /** 팔이 몸 가운데서 옆으로 떨어진 거리 */
   shoulderX: number
   armLen: number
+  /** 팔 굵기(반지름) */
   armR: number
   armColor: string
   /** 걸을 때 몸을 좌우로 뒤뚱거리는 정도(라디안) */
@@ -39,6 +59,7 @@ type Rig = {
   body: ReactNode
 }
 
+/** 기본 재질 (조금 거친 무광) */
 const std = (color: string, extra: Partial<THREE.MeshStandardMaterialParameters> = {}) => (
   <meshStandardMaterial color={color} roughness={0.8} {...extra} />
 )
@@ -50,6 +71,7 @@ function potatoGeometry() {
   return geo
 }
 
+/** 캐릭터 종류에 맞는 골격과 몸통. potato 는 감자 몸통에 쓰는 도형이다 */
 function rigOf(kind: AvatarKind, potato: THREE.BufferGeometry): Rig {
   switch (kind) {
     case 'uncle':
@@ -157,7 +179,7 @@ function rigOf(kind: AvatarKind, potato: THREE.BufferGeometry): Rig {
             </mesh>
             {/* 볼터치 */}
             {[-0.25, 0.25].map((x) => (
-              <mesh key={x} position={[x, 0.98, 0.41]} rotation={[0, 0, 0]}>
+              <mesh key={x} position={[x, 0.98, 0.41]}>
                 <circleGeometry args={[0.06, 16]} />
                 {std('#ff9eb5')}
               </mesh>
@@ -245,6 +267,7 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
   const armL = useRef<THREE.Group>(null)
   const armR = useRef<THREE.Group>(null)
   const pupils = useRef<THREE.Mesh[]>([])
+  /** phase 는 걸음 주기(rad), swing 은 걷는 정도(0~1), time 은 흔들기에 쓰는 흐른 시간(s) */
   const state = useRef({ phase: 0, swing: 0, cheering: false, airborne: false, time: 0 })
   const potato = useMemo(() => potatoGeometry(), [])
   const rig = useMemo(() => rigOf(kind, potato), [kind, potato])
@@ -262,8 +285,8 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
   useImperativeHandle(ref, () => ({
     group: group.current,
     stride: (m) => {
-      state.current.phase += m * 2.2
-      state.current.swing = Math.min(1, state.current.swing + Math.abs(m) * 2)
+      state.current.phase += m * STRIDE_RAD_PER_M
+      state.current.swing = Math.min(1, state.current.swing + Math.abs(m) * SWING_GAIN)
     },
     setCheering: (on) => {
       state.current.cheering = on
@@ -277,41 +300,45 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
   useFrame((_, dt) => {
     const s = state.current
     s.time += dt
-    s.swing = Math.max(0, s.swing - dt * 3) // 멈추면 서서히 차렷
-    const a = Math.sin(s.phase) * 0.7 * s.swing
+    s.swing = Math.max(0, s.swing - dt * SWING_DECAY) // 멈추면 서서히 차렷
+    const swingAngle = Math.sin(s.phase) * LIMB_SWING * s.swing
     if (!legL.current || !legR.current || !armL.current || !armR.current) return
     if (s.airborne) {
       // 점프 중: 한쪽 다리는 앞으로 접고 다른 쪽은 뒤로
       legL.current.rotation.x = -0.9
       legR.current.rotation.x = 0.4
     } else {
-      legL.current.rotation.x = a
-      legR.current.rotation.x = -a
+      legL.current.rotation.x = swingAngle
+      legR.current.rotation.x = -swingAngle
     }
     if (s.cheering) {
       // 만세 + 신나서 몸을 흔든다
-      armL.current.rotation.set(0, 0, 2.7 + Math.sin(s.time * 10) * 0.15)
-      armR.current.rotation.set(0, 0, -2.7 - Math.sin(s.time * 10) * 0.15)
+      const wiggle = Math.sin(s.time * 10) * 0.15
+      armL.current.rotation.set(0, 0, CHEER_ARM + wiggle)
+      armR.current.rotation.set(0, 0, -CHEER_ARM - wiggle)
       upper.current.rotation.z = Math.sin(s.time * 6) * rig.waddle
     } else {
-      armL.current.rotation.set(-a, 0, 0.12)
-      armR.current.rotation.set(a, 0, -0.12)
-      // 걸을 때 몸이 통통 튀고 좌우로 뒤뚱거린다
+      // 팔은 다리와 반대로 흔들고, 몸에서 살짝 벌린다
+      armL.current.rotation.set(-swingAngle, 0, 0.12)
+      armR.current.rotation.set(swingAngle, 0, -0.12)
+      // 걸을 때 좌우로 뒤뚱거린다
       upper.current.rotation.z = Math.sin(s.phase) * rig.waddle * s.swing
     }
-    upper.current.position.y = Math.abs(Math.sin(s.phase)) * 0.06 * s.swing
-    // 왕눈이 눈동자가 걸음에 맞춰 덜렁거린다
+    // 한 걸음마다 몸이 한 번 통통 튄다
+    upper.current.position.y = Math.abs(Math.sin(s.phase)) * BOUNCE * s.swing
+    // 왕눈이 눈동자가 덜렁거린다. 서 있을 때도 조금, 걸으면 더 크게
     if (rig.eyes) {
-      const e = rig.eyes.size * 0.35
-      pupils.current.forEach((p, i) => {
-        if (!p) return
-        const jiggle = 0.3 + s.swing * 0.7
-        p.position.x = Math.sin(s.time * 11 + i * 2) * e * jiggle
-        p.position.y = Math.cos(s.time * 13 + i) * e * jiggle
+      const reach = rig.eyes.size * 0.35
+      const jiggle = 0.3 + s.swing * 0.7
+      pupils.current.forEach((pupil, i) => {
+        if (!pupil) return
+        pupil.position.x = Math.sin(s.time * 11 + i * 2) * reach * jiggle
+        pupil.position.y = Math.cos(s.time * 13 + i) * reach * jiggle
       })
     }
   })
 
+  const { eyes } = rig
   return (
     <group ref={group}>
       <Limb limbRef={legL} x={-rig.legX} y={rig.hipY} len={rig.legLen} r={rig.legR} color={rig.legColor} foot={rig.foot} footColor={rig.footColor} />
@@ -324,20 +351,20 @@ export const Hiker = forwardRef<HikerHandle, { kind: AvatarKind }>(function Hike
         <Limb limbRef={armR} x={rig.shoulderX} y={rig.shoulderY} len={rig.armLen} r={rig.armR} color={rig.armColor}>
           <primitive object={poles[1]} />
         </Limb>
-        {rig.eyes &&
+        {eyes &&
           [-1, 1].map((side, i) => (
-            <group key={side} position={[side * rig.eyes!.x, rig.eyes!.y, rig.eyes!.z]}>
+            <group key={side} position={[side * eyes.x, eyes.y, eyes.z]}>
               <mesh>
-                <sphereGeometry args={[rig.eyes!.size, 16, 12]} />
+                <sphereGeometry args={[eyes.size, 16, 12]} />
                 {std('#ffffff', { roughness: 0.3 })}
               </mesh>
-              <group position={[0, 0, rig.eyes!.size * 0.75]}>
+              <group position={[0, 0, eyes.size * 0.75]}>
                 <mesh
                   ref={(m) => {
                     if (m) pupils.current[i] = m
                   }}
                 >
-                  <sphereGeometry args={[rig.eyes!.size * 0.45, 12, 10]} />
+                  <sphereGeometry args={[eyes.size * 0.45, 12, 10]} />
                   {std('#111111', { roughness: 0.2 })}
                 </mesh>
               </group>

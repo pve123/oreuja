@@ -12,6 +12,7 @@ export type Mode = 'lobby' | 'hiking' | 'summit' | 'photo' | 'photoResult'
  */
 export type ControlMode = 'easy' | 'free'
 
+/** 정상까지 한 번 오른 기록 */
 export type ClimbRecord = {
   trailId: string
   finishedAt: string
@@ -31,9 +32,13 @@ type State = {
   avatar: AvatarKind
   setAvatar: (kind: AvatarKind) => void
   mode: Mode
+  /** 처음 걸음을 뗀 시각(ms). 출발점에 서 있기만 하면 null 이다 */
   startedAt: number | null
+  /** 정상에 닿은 시각(ms) */
   finishedAt: number | null
+  /** 정상 기념사진 (이미지 주소) */
   photo: string | null
+  /** 지금까지 오른 기록 (브라우저에 기억) */
   records: ClimbRecord[]
   /** 지금까지 지난 마지막 이정표 번호 (-1 은 아직 없음) */
   reachedCheckpoint: number
@@ -69,6 +74,7 @@ const RECORDS_KEY = 'hiking-metaverse:climbs'
 const COURSE_KEY = 'hiking-metaverse:course'
 const CONTROL_KEY = 'hiking-metaverse:control'
 
+/** 저장된 조작 방식. 없거나 깨졌으면 폰은 쉬운 조작, 컴퓨터는 자유 조작 */
 function loadControl(): ControlMode {
   const saved = readStored(CONTROL_KEY)
   return saved === 'easy' || saved === 'free' ? saved : IS_TOUCH ? 'easy' : 'free'
@@ -101,7 +107,7 @@ const freshClimb = {
   autoWalk: false,
 }
 
-// 기록은 우선 브라우저에만 저장한다 (나중에 Supabase 로 옮김)
+/** 브라우저에 저장된 오르기 기록 */
 function loadRecords(): ClimbRecord[] {
   try {
     return JSON.parse(readStored(RECORDS_KEY) ?? '[]')
@@ -127,8 +133,8 @@ export const useGame = create<State>((set, get) => ({
   },
   records: loadRecords(),
   setRoam: (roam) => set({ roam }),
-  setDistance: (distance) =>
-    set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
+  // 처음 앞으로 나아간 순간을 출발 시각으로 잡는다
+  setDistance: (distance) => set((s) => ({ distance, startedAt: s.startedAt ?? (distance > 0 ? Date.now() : null) })),
   setOffset: (offset) => set({ offset }),
   reachCheckpoint: (index) => set({ reachedCheckpoint: index, arrival: { index, at: Date.now() } }),
   reachSummit: (record) => {

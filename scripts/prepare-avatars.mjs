@@ -26,6 +26,12 @@ const KAYKIT_CLIPS = [
   ['Rig_Medium_MovementBasic.glb', 'Jump_Full_Short'],
 ]
 
+// GLB 파일 구조: 머리(12바이트: 'glTF' 표시, 버전, 전체 길이) 뒤에 조각 두 개(JSON, BIN)가 온다.
+// 조각마다 앞 8바이트에 길이와 종류를 적는다
+const GLB_MAGIC = 0x46546c67 // 'glTF'
+const CHUNK_JSON = 0x4e4f534a // 'JSON'
+const CHUNK_BIN = 0x004e4942 // 'BIN'
+
 function copy(from, to) {
   fs.mkdirSync(path.dirname(to), { recursive: true })
   fs.copyFileSync(from, to)
@@ -34,7 +40,7 @@ function copy(from, to) {
 
 function readGlb(file) {
   const b = fs.readFileSync(file)
-  if (b.readUInt32LE(0) !== 0x46546c67) throw new Error(`GLB 파일이 아니다: ${file}`)
+  if (b.readUInt32LE(0) !== GLB_MAGIC) throw new Error(`GLB 파일이 아니다: ${file}`)
   const jsonLen = b.readUInt32LE(12)
   const json = JSON.parse(b.subarray(20, 20 + jsonLen).toString('utf8'))
   const binStart = 20 + jsonLen
@@ -43,6 +49,7 @@ function readGlb(file) {
 }
 
 function writeGlb(file, json, bin) {
+  // 조각 길이는 4바이트 배수여야 한다. JSON 은 빈칸, BIN 은 0 으로 채운다
   const pad = (buf, fill) => {
     const extra = (4 - (buf.length % 4)) % 4
     return extra ? Buffer.concat([buf, Buffer.alloc(extra, fill)]) : buf
@@ -50,7 +57,7 @@ function writeGlb(file, json, bin) {
   const jsonBuf = pad(Buffer.from(JSON.stringify(json), 'utf8'), 0x20)
   const binBuf = pad(bin, 0)
   const header = Buffer.alloc(12)
-  header.writeUInt32LE(0x46546c67, 0)
+  header.writeUInt32LE(GLB_MAGIC, 0)
   header.writeUInt32LE(2, 4)
   header.writeUInt32LE(12 + 8 + jsonBuf.length + 8 + binBuf.length, 8)
   const chunk = (buf, type) => {
@@ -59,7 +66,7 @@ function writeGlb(file, json, bin) {
     h.writeUInt32LE(type, 4)
     return Buffer.concat([h, buf])
   }
-  fs.writeFileSync(file, Buffer.concat([header, chunk(jsonBuf, 0x4e4f534a), chunk(binBuf, 0x004e4942)]))
+  fs.writeFileSync(file, Buffer.concat([header, chunk(jsonBuf, CHUNK_JSON), chunk(binBuf, CHUNK_BIN)]))
 }
 
 /** 여러 GLB 에서 고른 동작만 모아, 뼈대 노드와 애니메이션만 든 GLB 를 만든다 */
@@ -73,10 +80,10 @@ function buildAnimations(srcDir, picks, outFile) {
   // 뼈대는 첫 파일의 노드를 그대로 쓰되 메시·스킨 연결은 뺀다. 다른 파일의 노드는 이름으로 맞춘다
   const base = load(picks[0][0]).json
   const nodes = base.nodes.map((n) => {
-    const copy = { ...n }
-    delete copy.mesh
-    delete copy.skin
-    return copy
+    const bone = { ...n }
+    delete bone.mesh
+    delete bone.skin
+    return bone
   })
   const nodeIndex = new Map(nodes.map((n, i) => [n.name, i]))
   const keptNodes = new Set()
@@ -93,6 +100,7 @@ function buildAnimations(srcDir, picks, outFile) {
     const acc = glb.json.accessors[index]
     const view = glb.json.bufferViews[acc.bufferView]
     const start = (view.byteOffset ?? 0) + (acc.byteOffset ?? 0)
+    // 값 하나의 성분 수와 성분 하나의 바이트 수 (5126 float, 5123 unsigned short, 5121 unsigned byte, 5125 unsigned int, 5122 short, 5120 byte)
     const comps = { SCALAR: 1, VEC2: 2, VEC3: 3, VEC4: 4, MAT4: 16 }[acc.type]
     const bytes = { 5126: 4, 5123: 2, 5121: 1, 5125: 4, 5122: 2, 5120: 1 }[acc.componentType]
     if (view.byteStride && view.byteStride !== comps * bytes) throw new Error('interleaved 애니메이션 데이터는 지원하지 않는다')
@@ -101,9 +109,9 @@ function buildAnimations(srcDir, picks, outFile) {
     out.bufferViews.push({ buffer: 0, byteOffset: offset, byteLength: data.length })
     chunks.push(padded)
     offset += padded.length
-    const copy = { ...acc, bufferView: out.bufferViews.length - 1 }
-    delete copy.byteOffset
-    out.accessors.push(copy)
+    const copied = { ...acc, bufferView: out.bufferViews.length - 1 }
+    delete copied.byteOffset
+    out.accessors.push(copied)
     return out.accessors.length - 1
   }
 

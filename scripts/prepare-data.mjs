@@ -14,8 +14,8 @@ const RAW = path.join(ROOT, 'scripts/raw')
 const NGII = path.join(RAW, 'ngii')
 const CONTOUR_SPACING = 7.5 // 정밀 지형 격자 간격(m)
 const DATA = path.join(ROOT, 'public/data')
-const UA = 'hiking-metaverse-dev'
-const ZOOM = 13
+const UA = 'oreuja-data' // 지형 타일·Overpass 에 보내는 User-Agent
+const ZOOM = 13 // Terrain Tiles 확대 단계. 13 이면 한 픽셀이 약 15m 다
 
 // 산 목록. 산마다 지형 한 장과 그 위의 코스들을 만든다
 //  - bbox: 지형으로 만들 영역 (남, 서, 북, 동). 모든 코스가 들어가게 잡는다
@@ -57,8 +57,8 @@ const BUKHANSAN_COURSES = [
       { name: '백운봉암문(위문)', lat: 37.65765, lon: 126.97955, note: '우이동에서 오는 백운대 코스와 여기서 만난다. 정상까지 바위 구간이다' },
     ],
   },
-  // 우이동 쪽 들머리에서 진달래능선(OSM 「진달래길」)을 따라 대동문까지 오른다. 예전에는 아카데미탐방지원센터에서 가장 짧은 계곡 길로 가서
-  // 능선과는 마지막 15m 만 겹쳤다. 가장 짧은 길이 능선을 벗어나지 않게 능선 위 두 지점을 거쳐 가게 한다
+  // 우이동 쪽 들머리에서 진달래능선(OSM 「진달래길」)을 따라 대동문까지 오른다. 가장 짧은 길은 계곡으로 가서
+  // 능선과는 마지막 15m 만 겹친다. 그래서 능선 위 두 지점을 거쳐 가게 한다
   {
     id: 'bukhansan-jindallae',
     mountain: '북한산',
@@ -126,8 +126,8 @@ const DOBONGSAN_COURSES = [
     mountain: '도봉산',
     name: '우이암 코스',
     level: '쉬움',
-    // 무수골 매표소에서 정식 등산로(OSM 「무수골 매표소-원통사」)로 자현암과 원통사를 지나 오른다. 예전 출발점(우이탐방지원센터)은
-    // 우이령길 입구라 우이암 등산로와 바로 이어지지 않아, 마을 관리 도로로 450m 를 내려갔다 돌아 올라갔다
+    // 무수골 매표소에서 정식 등산로(OSM 「무수골 매표소-원통사」)로 자현암과 원통사를 지나 오른다. 우이탐방지원센터는
+    // 우이령길 입구라 우이암 등산로와 바로 이어지지 않아, 거기서 출발하면 마을 관리 도로로 450m 를 내려갔다 돌아 오른다
     start: { name: '무수골 매표소', lat: 37.67545, lon: 127.02436 },
     summit: { name: '우이암', lat: 37.68372, lon: 127.00908 },
     checkpoints: [
@@ -286,6 +286,7 @@ const haversine = (a, b) => {
   const h = Math.sin(dLat / 2) ** 2 + Math.cos((a.lat * Math.PI) / 180) * Math.cos((b.lat * Math.PI) / 180) * Math.sin(dLon / 2) ** 2
   return 2 * R * Math.asin(Math.sqrt(h))
 }
+// 웹 메르카토르 타일 픽셀 좌표 (타일 한 장은 256px)
 const lon2px = (lon) => ((lon + 180) / 360) * 2 ** ZOOM * 256
 const lat2px = (lat) => {
   const r = (lat * Math.PI) / 180
@@ -372,7 +373,7 @@ async function buildTerrain(sheetIds) {
   await fs.writeFile(path.join(OUT, 'terrain.json'), JSON.stringify(meta, null, 2))
   console.log(`지형 ${grid.width}x${grid.height}, 높이 ${min.toFixed(0)}~${max.toFixed(0)}m, 크기 ${(se.x - nw.x).toFixed(0)}x${(se.z - nw.z).toFixed(0)}m`)
 
-  // 등산로 높이 샘플링용
+  // 등산로 점의 높이는 이 격자에서 읽는다
   return makeSampler(grid.heights, grid.width, grid.height, ext)
 }
 
@@ -418,9 +419,9 @@ async function loadOsm() {
   }
 }
 
-/** 등산로 그래프 (노드와 이웃 목록). 출입금지·비법정·암벽 구간은 뺀다 */
 /** 코스에 allowAlpine 을 주면 암벽 구간도 길로 쓰되 이만큼 비싸게 매겨, 돌아가는 길보다 훨씬 짧을 때만 지나게 한다 */
 const ALPINE_PENALTY = 3
+/** 등산로 그래프 (노드와 이웃 목록). 출입금지·비법정·암벽 구간은 뺀다 */
 function buildGraph(osm, { allowAlpine = false } = {}) {
   const nodes = new Map()
   const adj = new Map()
@@ -473,9 +474,10 @@ function shortestPath(graph, startCoord, goalCoord) {
   while (queue.length) for (const [nb] of adj.get(queue.pop()) ?? []) if (!linked.has(nb)) { linked.add(nb); queue.push(nb) }
   const startId = nearestNode(graph, startCoord, linked)
   const startGap = haversine(nodes.get(startId), startCoord)
+  // 80m 넘게 떨어졌으면 출발점이 엉뚱한 길에 붙었을 수 있어 알린다
   if (startGap > 80) console.warn(`  ! 출발점이 이어진 길에서 ${startGap.toFixed(0)}m 떨어져 있다`)
 
-  // 노드 수가 적어 단순 구현
+  // 산 하나의 길 노드는 많지 않아서 우선순위 큐 없이 매번 열린 노드를 모두 훑어 가장 가까운 것을 고른다
   const dist = new Map([[startId, 0]])
   const prev = new Map()
   const open = new Set([startId])
@@ -613,11 +615,10 @@ function buildTrail(course, graph, sampleHeight) {
   }
 
   // 2m 간격으로 다시 나눠 부드럽게 만든다
-  const raw = route
   const STEP = 2
-  const pts = [raw[0]]
-  for (let k = 1; k < raw.length; k++) {
-    const a = raw[k - 1], b = raw[k]
+  const pts = [route[0]]
+  for (let k = 1; k < route.length; k++) {
+    const a = route[k - 1], b = route[k]
     const len = Math.hypot(b.x - a.x, b.z - a.z)
     const n = Math.max(1, Math.round(len / STEP))
     for (let s = 1; s <= n; s++) pts.push({ x: a.x + ((b.x - a.x) * s) / n, z: a.z + ((b.z - a.z) * s) / n })

@@ -8,13 +8,18 @@ import { AvatarChips } from './AvatarChips'
 import { playHudEnter } from '../lib/splash'
 import { SKY_PRESETS, currentPhase, useSky, type Phase } from '../lib/daylight'
 
+type LobbyProps = { trail: Trail; trails: Trail[]; mountains: Mountain[]; mountain: Mountain }
+/** 코스 카드에 보여 줄 코스들. 다른 산은 받는 동안 'loading', 못 받으면 'failed' */
+type CourseList = TrailData[] | 'loading' | 'failed'
+
+/** 「지금」 하늘이 어떤 시간대인지 다시 보는 간격(ms). 베이스캠프를 오래 열어 두면 시간대가 바뀔 수 있다 */
+const PHASE_CHECK_MS = 30000
+
 /**
- * 베이스캠프: 출발 전에 산·코스·하늘·캐릭터를 고르는 창. 혼자/같이 고르기는 같이하기를 열 때 다시 넣는다.
+ * 베이스캠프: 출발 전에 산·코스·캐릭터·조작·하늘을 고르는 창.
  * 게임 로비처럼 출발점 3D 장면(내 캐릭터) 위에 띄운다. 다시 온 사람은 지난번 고른 것이 그대로라 「출발」만 누르면 된다.
  * 걷는 중에도 Esc(또는 코스 패널 버튼)로 다시 연다.
  */
-type LobbyProps = { trail: Trail; trails: Trail[]; mountains: Mountain[]; mountain: Mountain }
-
 export function Lobby(props: LobbyProps) {
   const mode = useGame((s) => s.mode)
   const open = mode === 'lobby'
@@ -43,37 +48,39 @@ export function Lobby(props: LobbyProps) {
 }
 
 function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
+  // 탭에서 보고 있는 산. 지금 지형이 열린 산(mountain)과 다를 수 있다
   const [shownMountain, setShownMountain] = useState(mountain)
   const [courseId, setCourseId] = useState(trail.data.id)
-  const [others, setOthers] = useState<{ id: string; courses: TrailData[] | 'loading' | 'failed' }>()
+  const [otherCourses, setOtherCourses] = useState<{ mountainId: string; courses: CourseList }>()
   const distance = useGame((s) => s.distance)
   const records = useGame((s) => s.records)
-  const here = shownMountain.id === mountain.id
+  const onOpenMountain = shownMountain.id === mountain.id
 
   // 다른 산 탭을 누르면 그 산의 코스 목록만 받아 카드로 보여 준다 (지형은 출발할 때 받는다)
   useEffect(() => {
-    if (here) return
+    if (onOpenMountain) return
     let alive = true
     loadCourses(shownMountain.id)
       .then((courses) => {
         if (!alive) return
-        setOthers({ id: shownMountain.id, courses })
+        setOtherCourses({ mountainId: shownMountain.id, courses })
         setCourseId((id) => (courses.some((c) => c.id === id) ? id : courses[0]?.id ?? id))
       })
-      .catch(() => alive && setOthers({ id: shownMountain.id, courses: 'failed' }))
+      .catch(() => alive && setOtherCourses({ mountainId: shownMountain.id, courses: 'failed' }))
     return () => {
       alive = false
     }
-  }, [here, shownMountain.id])
+  }, [onOpenMountain, shownMountain.id])
 
-  const courses: TrailData[] | 'loading' | 'failed' = here
+  const courses: CourseList = onOpenMountain
     ? trails.map((t) => t.data)
-    : others?.id === shownMountain.id
-      ? others.courses
+    : otherCourses?.mountainId === shownMountain.id
+      ? otherCourses.courses
       : 'loading'
   const picked = Array.isArray(courses) ? courses.find((c) => c.id === courseId) : undefined
-  // 지금 오르던 코스로 돌아왔으면 이어서 오를 수 있다
-  const midway = here && courseId === trail.data.id && distance > 0
+  // 오르다 만 코스. 그 코스를 고르면 이어서 오를 수 있다
+  const unfinishedId = onOpenMountain && distance > 0 ? trail.data.id : null
+  const midway = courseId === unfinishedId
 
   const pickMountain = (m: Mountain) => {
     setShownMountain(m)
@@ -83,7 +90,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
   const start = (fromScratch = false) => {
     if (!picked) return
     const g = useGame.getState()
-    if (!here) switchMountain(shownMountain, picked.id)
+    if (!onOpenMountain) switchMountain(shownMountain, picked.id)
     else if (picked.id !== trail.data.id) g.setCourse(picked.id)
     else if (fromScratch) g.restart()
     else g.resume()
@@ -93,8 +100,11 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
       if (e.key !== 'Enter' || e.repeat || e.target instanceof HTMLInputElement) return
-      // 「처음부터」 같은 일반 버튼에 포커스가 있으면 그 버튼이 눌리게 둔다. 코스 카드·캐릭터처럼 고르는 버튼이면 출발한다
-      if (e.target instanceof HTMLButtonElement && e.target.getAttribute('role') !== 'radio' && e.target.getAttribute('role') !== 'tab') return
+      // 「처음부터」 같은 일반 버튼에 포커스가 있으면 그 버튼이 눌리게 둔다. 코스 카드·산 탭·캐릭터처럼 고르는 버튼이면 출발한다
+      if (e.target instanceof HTMLButtonElement) {
+        const role = e.target.getAttribute('role')
+        if (role !== 'radio' && role !== 'tab') return
+      }
       e.preventDefault()
       start()
     }
@@ -113,18 +123,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
         {mountains.length > 1 && (
           <div className="mountain-tabs" role="tablist" aria-label="산">
             {mountains.map((m) => (
-              <button
-                key={m.id}
-                role="tab"
-                aria-selected={m.id === shownMountain.id}
-                className={m.id === shownMountain.id ? 'mountain-tab selected' : 'mountain-tab'}
-                onClick={() => pickMountain(m)}
-              >
-                <span className="mountain-tab-name">{m.name}</span>
-                <span className="mountain-tab-meta">
-                  {m.elevation}m · {doneIn(records, m) > 0 ? `${doneIn(records, m)}/${m.courses} 완등` : `코스 ${m.courses}개`}
-                </span>
-              </button>
+              <MountainTab key={m.id} mountain={m} selected={m.id === shownMountain.id} done={doneIn(records, m)} onPick={() => pickMountain(m)} />
             ))}
           </div>
         )}
@@ -138,7 +137,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
                 key={c.id}
                 course={c}
                 selected={c.id === courseId}
-                current={here && c.id === trail.data.id && distance > 0}
+                unfinished={c.id === unfinishedId}
                 climbs={records.filter((r) => r.trailId === c.id).length}
                 best={bestOf(records, c.id)}
                 onPick={() => setCourseId(c.id)}
@@ -159,7 +158,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
             </button>
           )}
           <button className="btn primary lobby-start" disabled={!picked} onClick={() => start()}>
-            {midway ? '이어서 오르기' : here ? '출발' : `${shownMountain.name}으로 출발`}
+            {midway ? '이어서 오르기' : onOpenMountain ? '출발' : `${shownMountain.name}으로 출발`}
             <span className="lobby-key" aria-hidden>
               Enter
             </span>
@@ -182,18 +181,31 @@ function doneIn(records: ClimbRecord[], m: Mountain) {
   return Math.min(ids.size, m.courses)
 }
 
+/** 산 탭: 이름과 높이, 오른 코스가 있으면 「2/5 완등」, 없으면 코스 수 */
+function MountainTab({ mountain, selected, done, onPick }: { mountain: Mountain; selected: boolean; done: number; onPick: () => void }) {
+  return (
+    <button role="tab" aria-selected={selected} className={selected ? 'mountain-tab selected' : 'mountain-tab'} onClick={onPick}>
+      <span className="mountain-tab-name">{mountain.name}</span>
+      <span className="mountain-tab-meta">
+        {mountain.elevation}m · {done > 0 ? `${done}/${mountain.courses} 완등` : `코스 ${mountain.courses}개`}
+      </span>
+    </button>
+  )
+}
+
 /** 코스 카드: 이름·난이도, 출발→도착, 거리·오르막·실제 예상 시간, 고도 그래프, 완등 횟수와 지금 오르는 사람 수 */
 function CourseCard({
   course,
   selected,
-  current,
+  unfinished,
   climbs,
   best,
   onPick,
 }: {
   course: TrailData
   selected: boolean
-  current: boolean
+  /** 오르다 만 코스인지 */
+  unfinished: boolean
   climbs: number
   /** 가장 빠른 완등 시간(초). 오른 적이 없으면 null */
   best: number | null
@@ -206,7 +218,7 @@ function CourseCard({
       <span className="course-card-top">
         <span className="course-card-name">{course.name}</span>
         <span className={`level level-${course.level}`}>{course.level}</span>
-        {current && <span className="course-card-tag">오르던 코스</span>}
+        {unfinished && <span className="course-card-tag">오르던 코스</span>}
       </span>
       <span className="course-card-route">
         {course.start} → {course.summit}
@@ -227,37 +239,41 @@ function CourseCard({
   )
 }
 
+/** 고도 그래프 그림판 크기. CSS 가 카드 너비에 맞춰 늘린다 */
 const PROFILE_W = 300
 const PROFILE_H = 34
+/** 그래프에 찍는 점 수. 이 정도면 굴곡이 보이고 SVG 가 가볍다 */
 const PROFILE_SAMPLES = 60
 
-/** 고도 단면 그래프 (등산 앱 코스 카드처럼). 가로는 등산로 거리, 세로는 해발 */
+/** 고도 단면 그래프 (등산 앱 코스 카드처럼). 가로는 등산로 거리, 세로는 해발. points 는 [x, 해발, z] */
 function Profile({ points }: { points: [number, number, number][] }) {
-  const d = useMemo(() => {
-    const along = [0]
+  const path = useMemo(() => {
+    // 출발점부터 각 점까지 걸은 거리
+    const walked = [0]
     for (let i = 1; i < points.length; i++)
-      along.push(along[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][2] - points[i - 1][2]))
-    const total = along[along.length - 1] || 1
-    let lo = Infinity
-    let hi = -Infinity
+      walked.push(walked[i - 1] + Math.hypot(points[i][0] - points[i - 1][0], points[i][2] - points[i - 1][2]))
+    const total = walked[walked.length - 1] || 1
+    let lowest = Infinity
+    let highest = -Infinity
     for (const p of points) {
-      lo = Math.min(lo, p[1])
-      hi = Math.max(hi, p[1])
+      lowest = Math.min(lowest, p[1])
+      highest = Math.max(highest, p[1])
     }
-    const span = Math.max(hi - lo, 1)
-    const pts: string[] = []
+    const span = Math.max(highest - lowest, 1)
+    const coords: string[] = []
     let k = 0
     for (let s = 0; s <= PROFILE_SAMPLES; s++) {
       const at = (total * s) / PROFILE_SAMPLES
-      while (k < along.length - 2 && along[k + 1] < at) k++
-      const y = points[k][1]
-      pts.push(`${((at / total) * PROFILE_W).toFixed(1)},${(PROFILE_H - 2 - ((y - lo) / span) * (PROFILE_H - 6)).toFixed(1)}`)
+      while (k < walked.length - 2 && walked[k + 1] < at) k++
+      const height = (points[k][1] - lowest) / span
+      // 아래 2px, 위 4px 여백을 남기고 그린다
+      coords.push(`${((at / total) * PROFILE_W).toFixed(1)},${(PROFILE_H - 2 - height * (PROFILE_H - 6)).toFixed(1)}`)
     }
-    return `M0,${PROFILE_H} L${pts.join(' L')} L${PROFILE_W},${PROFILE_H} Z`
+    return `M0,${PROFILE_H} L${coords.join(' L')} L${PROFILE_W},${PROFILE_H} Z`
   }, [points])
   return (
     <svg className="course-card-profile" viewBox={`0 0 ${PROFILE_W} ${PROFILE_H}`} preserveAspectRatio="none" aria-hidden>
-      <path d={d} />
+      <path d={path} />
     </svg>
   )
 }
@@ -269,10 +285,10 @@ const PHASE_SWATCH: Record<Phase, string> = { 새벽: 'dawn', 아침: 'morning',
 function SkySwitch() {
   const preset = useSky((s) => s.preset)
   const setPreset = useSky((s) => s.setPreset)
-  // 「지금」이 어떤 시간대인지 보여 준다. 베이스캠프를 오래 열어 두면 바뀔 수 있어 가끔 다시 본다
+  // 「지금」이 어떤 시간대인지 보여 준다
   const [phase, setPhase] = useState(currentPhase)
   useEffect(() => {
-    const t = window.setInterval(() => setPhase(currentPhase()), 30000)
+    const t = window.setInterval(() => setPhase(currentPhase()), PHASE_CHECK_MS)
     return () => window.clearInterval(t)
   }, [])
   return (

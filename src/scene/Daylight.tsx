@@ -8,7 +8,17 @@ import { occlusionUniforms } from '../lib/occlusion'
 import { IS_TOUCH } from '../lib/device'
 
 const STAR_COUNT = 1500
+/** 별을 흩뿌리는 구 반지름(m). 하늘 상자(5000) 안쪽이어야 보인다 */
 const STAR_RADIUS = 4000
+/** 해·달 조명을 캐릭터에서 이만큼 떨어진 곳에 둔다(m). 그림자 카메라 far(800) 안이어야 한다 */
+const LIGHT_DISTANCE = 300
+
+/** 조명을 target 에서 direction 쪽 LIGHT_DISTANCE 에 두고 target 을 비추게 한다 */
+function aimAt(light: THREE.DirectionalLight, target: THREE.Vector3, direction: THREE.Vector3) {
+  light.position.copy(target).addScaledVector(direction, LIGHT_DISTANCE)
+  light.target.position.copy(target)
+  light.target.updateMatrixWorld()
+}
 
 /**
  * 실제 한국 시각 또는 베이스캠프에서 고른 시간대에 맞춘 하늘과 빛 (src/lib/daylight.ts). 하늘 상자와 별은 카메라를 따라다녀 높은 곳에서도 보인다.
@@ -16,8 +26,8 @@ const STAR_RADIUS = 4000
  */
 export function Daylight() {
   const group = useRef<THREE.Group>(null!)
-  const sun = useRef<THREE.DirectionalLight>(null!)
-  const moon = useRef<THREE.DirectionalLight>(null!)
+  const sunLight = useRef<THREE.DirectionalLight>(null!)
+  const moonLight = useRef<THREE.DirectionalLight>(null!)
   const sky = useRef<SkyImpl>(null!)
   const hemi = useRef<THREE.HemisphereLight>(null!)
   const stars = useRef<THREE.PointsMaterial>(null!)
@@ -28,14 +38,15 @@ export function Daylight() {
   // 별: 하늘 위쪽 반구에 흩뿌린 점. 지평선 가까이는 성기게
   const starGeometry = useMemo(() => {
     const pos = new Float32Array(STAR_COUNT * 3)
+    // 늘 같은 별자리가 나오게 씨앗을 고정한 난수 (Park–Miller)
     let seed = 7
     const rand = () => ((seed = (seed * 16807) % 2147483647) - 1) / 2147483646
     for (let i = 0; i < STAR_COUNT; i++) {
-      const a = rand() * Math.PI * 2
-      const e = Math.asin(0.05 + rand() * 0.95)
-      pos[i * 3] = Math.cos(e) * Math.cos(a) * STAR_RADIUS
-      pos[i * 3 + 1] = Math.sin(e) * STAR_RADIUS
-      pos[i * 3 + 2] = Math.cos(e) * Math.sin(a) * STAR_RADIUS
+      const azimuth = rand() * Math.PI * 2
+      const elevation = Math.asin(0.05 + rand() * 0.95)
+      pos[i * 3] = Math.cos(elevation) * Math.cos(azimuth) * STAR_RADIUS
+      pos[i * 3 + 1] = Math.sin(elevation) * STAR_RADIUS
+      pos[i * 3 + 2] = Math.cos(elevation) * Math.sin(azimuth) * STAR_RADIUS
     }
     const g = new THREE.BufferGeometry()
     g.setAttribute('position', new THREE.BufferAttribute(pos, 3))
@@ -58,18 +69,12 @@ export function Daylight() {
     hemi.current.groundColor.copy(daylight.groundColor)
     hemi.current.intensity = daylight.hemiIntensity
 
-    const pos = occlusionUniforms.uOccTarget.value
-    const light = sun.current
-    light.color.copy(daylight.sunColor)
-    light.intensity = daylight.sunIntensity
-    light.position.copy(pos).addScaledVector(SUN, 300)
-    light.target.position.copy(pos)
-    light.target.updateMatrixWorld()
-    const night = moon.current
-    night.intensity = daylight.moonIntensity
-    night.position.copy(pos).addScaledVector(MOON, 300)
-    night.target.position.copy(pos)
-    night.target.updateMatrixWorld()
+    const avatar = occlusionUniforms.uOccTarget.value
+    sunLight.current.color.copy(daylight.sunColor)
+    sunLight.current.intensity = daylight.sunIntensity
+    aimAt(sunLight.current, avatar, SUN)
+    moonLight.current.intensity = daylight.moonIntensity
+    aimAt(moonLight.current, avatar, MOON)
     if (scene.fog) scene.fog.color.copy(daylight.fogColor)
   })
 
@@ -83,7 +88,7 @@ export function Daylight() {
       </group>
       <hemisphereLight ref={hemi} args={[daylight.skyColor, daylight.groundColor, daylight.hemiIntensity]} />
       <directionalLight
-        ref={sun}
+        ref={sunLight}
         intensity={daylight.sunIntensity}
         castShadow
         // 폰·태블릿은 그림자 지도를 절반 크기로 (GPU 를 아낀다)
@@ -96,7 +101,7 @@ export function Daylight() {
         shadow-bias={-0.0005}
       />
       {/* 달빛: 그림자 없이 은은하게. 밤에도 길이 보이게 한다 */}
-      <directionalLight ref={moon} color={MOON_COLOR} intensity={daylight.moonIntensity} />
+      <directionalLight ref={moonLight} color={MOON_COLOR} intensity={daylight.moonIntensity} />
     </>
   )
 }

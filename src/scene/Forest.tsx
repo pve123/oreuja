@@ -13,17 +13,22 @@ import { DETAIL_VARIANTS, DetailTrees } from './DetailTrees'
 import { IS_TOUCH } from '../lib/device'
 import { PHOTO_CAMERA_BACK, distanceToSegmentXZ, summitVista } from '../lib/summit'
 
-const COUNT = 30000
+const TREE_COUNT = 30000
 const NEAR_TRAIL_SHARE = 0.45 // 절반 가까이는 등산로 250m 안에 심어 걸으며 보이게 한다
 const NEAR_TRAIL_RANGE = 250
+/** 이보다 가파른 곳(절벽)에는 심지 않는다. SLOPE_PROBE(m) 옆 두 점의 높이 차로 잰다 */
+const MAX_SLOPE = 1.3
+const SLOPE_PROBE = 6
 const TRAIL_CLEARANCE = 4 // 등산로 양옆 4m 는 비움
 const START_CLEARANCE = 30 // 출발점 둘레 30m 는 공터로 비워 첫 화면을 가리지 않게 함
 /** 정상에서 기념사진 카메라까지 선 둘레 이 거리(m)에는 나무를 심지 않는다. 사진 한가운데를 나무가 가리지 않게 (바위는 Rocks 가 6m 를 비운다) */
 const PHOTO_VIEW_CLEARANCE = 8
 const TREE_LINE = 760 // 사진이 없을 때: 이보다 높으면 바위 지대라 나무 없음
 const PINE_SHARE = 0.3 // 소나무 비율. 나머지는 참나무 같은 둥근 활엽수
-/** 줄기 반지름(m). 도형 줄기 아래 굵기(0.32)에 나무 크기를 곱한다 */
+/** 줄기 아래 반지름(m). 도형 줄기와 같고, 부딪힘 판정에는 나무 크기를 곱해 쓴다 */
 const TRUNK_RADIUS = 0.32
+/** 정밀 반경·카메라 가림 판정에 쓰는 수관 가운데 높이(모델 단위) */
+const CANOPY_CENTER = 4
 /** 위성사진의 숲 색은 그늘이 섞여 어두워서 나무 색으로 쓸 때 이만큼 밝힌다 */
 const PHOTO_BRIGHTEN = 1.7
 
@@ -67,13 +72,12 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     const q = new THREE.Quaternion()
     const up = new THREE.Vector3(0, 1, 0)
 
-    for (let tries = 0; out.length < COUNT && tries < COUNT * 8; tries++) {
+    for (let tries = 0; out.length < TREE_COUNT && tries < TREE_COUNT * 8; tries++) {
       const { x, z } = scatterPoint(rand, trail, terrain, NEAR_TRAIL_SHARE, NEAR_TRAIL_RANGE)
       if (x < terrain.minX || x > terrain.maxX || z < terrain.minZ || z > terrain.maxZ) continue
       const y = sampleHeight(terrain, x, z)
-      // 절벽 같은 급사면은 건너뜀
-      const slope = Math.hypot(sampleHeight(terrain, x + 6, z) - y, sampleHeight(terrain, x, z + 6) - y) / 6
-      if (slope > 1.3) continue
+      const slope = Math.hypot(sampleHeight(terrain, x + SLOPE_PROBE, z) - y, sampleHeight(terrain, x, z + SLOPE_PROBE) - y) / SLOPE_PROBE
+      if (slope > MAX_SLOPE) continue
       if (nearTrail(x, z, TRAIL_CLEARANCE)) continue
       if (nearLandmark(x, z)) continue
       if ((x - start.x) ** 2 + (z - start.z) ** 2 < START_CLEARANCE ** 2) continue
@@ -96,6 +100,7 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
       const variant = Math.floor(rand() * DETAIL_VARIANTS)
       // 기념사진 시야는 나무를 다 만든 뒤에 거른다. 앞에서 건너뛰면 난수 순서가 밀려 다른 산 숲의 나무 자리가 모두 바뀐다
       if (distanceToSegmentXZ(x, z, top, photoCamera) < PHOTO_VIEW_CLEARANCE) continue
+      // 밑동을 30cm 묻어 비탈에서 뿌리가 뜨지 않게 한다
       out.push({ matrix: new THREE.Matrix4().compose(new THREE.Vector3(x, y - 0.3, z), q, scale), color, pine, variant })
     }
     return out
@@ -119,34 +124,34 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     () => ({
       broadleaf: broadleafCanopy(),
       pine: pineCanopy(),
-      trunk: new THREE.CylinderGeometry(0.22, 0.32, 3.4, 5).translate(0, 1.7, 0),
+      trunk: new THREE.CylinderGeometry(0.22, TRUNK_RADIUS, 3.4, 5).translate(0, 1.7, 0),
     }),
     [],
   )
 
-  // 카메라와 아바타 사이에 들어온 나무는 통째로 줄여 아바타를 가리지 않게 한다 (판정 중심은 수관 가운데)
+  // 카메라와 아바타 사이에 들어온 나무는 점무늬로 비쳐 보여 아바타를 가리지 않게 한다 (lib/occlusion)
   // 아바타 가까이는 정밀 모델(DetailTrees)이 그리므로 도형 나무는 그 안에서 그림자까지 숨긴다
   const materials = useMemo(
     () => ({
-      canopy: withOcclusionFade(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), 4, { ring: 'far' }),
-      trunk: withOcclusionFade(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 }), 4, { ring: 'far' }),
-      depth: ringDepthMaterial(4, 'far'),
+      canopy: withOcclusionFade(new THREE.MeshStandardMaterial({ roughness: 1, flatShading: true }), CANOPY_CENTER, { ring: 'far' }),
+      trunk: withOcclusionFade(new THREE.MeshStandardMaterial({ color: '#4f3a2a', roughness: 1 }), CANOPY_CENTER, { ring: 'far' }),
+      depth: ringDepthMaterial(CANOPY_CENTER, 'far'),
     }),
     [],
   )
 
   useLayoutEffect(() => {
-    let nb = 0
-    let np = 0
+    let broadleafCount = 0
+    let pineCount = 0
     trees.forEach((t, i) => {
       const mesh = t.pine ? pines.current : broadleaf.current
-      const k = t.pine ? np++ : nb++
+      const k = t.pine ? pineCount++ : broadleafCount++
       mesh.setMatrixAt(k, t.matrix)
       mesh.setColorAt(k, t.color)
       trunks.current.setMatrixAt(i, t.matrix)
     })
-    broadleaf.current.count = nb
-    pines.current.count = np
+    broadleaf.current.count = broadleafCount
+    pines.current.count = pineCount
     trunks.current.count = trees.length
     for (const mesh of [broadleaf.current, pines.current, trunks.current]) {
       mesh.instanceMatrix.needsUpdate = true
@@ -160,9 +165,9 @@ export function Forest({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
     <group>
       {/* 그림자는 캐릭터 둘레 60m 에만 생기고 그 안은 정밀 나무가 그림자를 만든다. 폰에서는 도형 나무 2만여 그루를
           그림자용으로 한 번 더 그리지 않는다 (폰 화면 삼각형의 약 30%) */}
-      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, COUNT]} castShadow={!IS_TOUCH} customDepthMaterial={materials.depth} />
-      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, COUNT]} castShadow={!IS_TOUCH} customDepthMaterial={materials.depth} />
-      <instancedMesh ref={trunks} args={[shapes.trunk, materials.trunk, COUNT]} />
+      <instancedMesh ref={broadleaf} args={[shapes.broadleaf, materials.canopy, TREE_COUNT]} castShadow={!IS_TOUCH} customDepthMaterial={materials.depth} />
+      <instancedMesh ref={pines} args={[shapes.pine, materials.canopy, TREE_COUNT]} castShadow={!IS_TOUCH} customDepthMaterial={materials.depth} />
+      <instancedMesh ref={trunks} args={[shapes.trunk, materials.trunk, TREE_COUNT]} />
       {/* 정밀 모델은 받는 동안 도형 나무가 그대로 보인다 */}
       <Suspense fallback={null}>
         <DetailTrees trees={trees} />

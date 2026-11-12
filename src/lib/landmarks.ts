@@ -7,8 +7,8 @@ import type { Obstacle } from './obstacles'
  * - cairn: 고개·재(하루재)에 쌓은 돌탑
  * - pass: 깔딱고개. 돌탑 옆에 숨 고르는 나무 벤치
  * - temple: 절·암자(인수암, 보리사, 대동사). 붉은 기둥, 기와지붕, 연등
- * - hut: 산장(백운산장)·대피소(도봉산대피소, 1층 막돌에 연두색 2층을 얹은 건물). 막돌 벽에 처마가 넓은 낮은 지붕을 얹은 돌 산장
- * - gate: 성문(백운봉암문 위문). 이름에 암문·성문이 든 곳. 등산로가 위가 평평한 네모 문 사이로 지나간다
+ * - hut: 산장(백운산장)·대피소(도봉산대피소). 막돌 벽에 처마가 넓은 낮은 지붕을 얹은 돌 산장. 대피소는 연두색 2층을 더 얹는다
+ * - gate: 성문(백운봉암문). 이름에 암문·성문이 든 곳. 등산로가 위가 평평한 네모 문 사이로 지나간다
  * - ruins: 문터(수문터). 무너진 성벽 터
  * - waterfall: 폭포(개연폭포). 비스듬한 너럭바위를 타고 미끄러져 내리는 물줄기와 얕은 물웅덩이
  * - junction: 갈림길(소귀천계곡 갈림길). 화살표 판 세 장이 서로 다른 쪽을 가리키는 이정표 기둥
@@ -76,6 +76,7 @@ export const LANDMARK_ICON: Record<LandmarkKind, string> = {
   trailhead: '🥾',
 }
 
+/** 이정표 이름에 든 낱말로 랜드마크 종류를 고른다. 위에서부터 먼저 맞는 것을 쓴다 */
 export function landmarkKind(name: string): LandmarkKind {
   if (name.includes('폭포')) return 'waterfall'
   if (name.includes('산장') || name.includes('대피소')) return 'hut'
@@ -97,6 +98,7 @@ export function landmarkKind(name: string): LandmarkKind {
   return 'sign'
 }
 
+/** 랜드마크 종류마다 정한 크기와 자리 */
 type Spec = {
   /** 등산로 가운데에서 옆으로 비킨 거리(m). 0 이면 등산로 위에 걸쳐 선다 */
   side: number
@@ -110,7 +112,8 @@ type Spec = {
   colliders: Obstacle[]
 }
 
-const grid = (xs: number[], zs: number[], r: number, height: number) => xs.flatMap((x) => zs.map((z) => ({ x, z, r, height })))
+/** xs × zs 격자 자리마다 같은 크기의 충돌 원을 놓는다 */
+const circleGrid = (xs: number[], zs: number[], r: number, height: number) => xs.flatMap((x) => zs.map((z) => ({ x, z, r, height })))
 
 const SPECS: Record<LandmarkKind, Spec> = {
   cairn: { side: 3.4, clear: 3, label: 2.6, footprint: [1.6, 1.6], colliders: [{ x: 0, z: 0, r: 0.85, height: 1.7 }] },
@@ -124,8 +127,8 @@ const SPECS: Record<LandmarkKind, Spec> = {
       { x: 1.3, z: 0.2, r: 0.55, height: 0.5 },
     ],
   },
-  temple: { side: 7, clear: 6.5, label: 5.6, footprint: [4.6, 3.6], colliders: grid([-1.4, 0, 1.4], [-0.6, 0.6], 1.2, 5) },
-  hut: { side: 7.5, clear: 7, label: 5.4, footprint: [5.4, 4.4], colliders: grid([-1.7, 0, 1.7], [-0.8, 0.8], 1.4, 5) },
+  temple: { side: 7, clear: 6.5, label: 5.6, footprint: [4.6, 3.6], colliders: circleGrid([-1.4, 0, 1.4], [-0.6, 0.6], 1.2, 5) },
+  hut: { side: 7.5, clear: 7, label: 5.4, footprint: [5.4, 4.4], colliders: circleGrid([-1.7, 0, 1.7], [-0.8, 0.8], 1.4, 5) },
   gate: {
     side: 0,
     clear: 7,
@@ -133,21 +136,21 @@ const SPECS: Record<LandmarkKind, Spec> = {
     footprint: [7, 2.6],
     // 벽 양쪽과 벽이 기댄 바위 (src/scene/Landmarks.tsx 의 GATE_ROCKS)
     colliders: [
-      ...grid([-2.95, -1.9, 1.9, 2.95], [-0.6, 0.6], 0.7, 5.5),
+      ...circleGrid([-2.95, -1.9, 1.9, 2.95], [-0.6, 0.6], 0.7, 5.5),
       { x: -4.7, z: 0.2, r: 1.6, height: 4.5 },
       { x: -3.9, z: 2, r: 0.9, height: 1.5 },
       { x: 4.8, z: -0.1, r: 1.8, height: 5.3 },
       { x: 4, z: 2, r: 1, height: 2.2 },
     ],
   },
-  ruins: { side: 0, clear: 5, label: 2.4, footprint: [8, 1.4], colliders: grid([-3.7, -2.8, -1.9, 1.9, 2.8, 3.7], [0], 0.5, 1.1) },
+  ruins: { side: 0, clear: 5, label: 2.4, footprint: [8, 1.4], colliders: circleGrid([-3.7, -2.8, -1.9, 1.9, 2.8, 3.7], [0], 0.5, 1.1) },
   waterfall: {
     side: 11,
     clear: 9,
     label: 8.4,
     footprint: [3.6, 3.6],
     // 비스듬한 너럭바위와 둘레 바위(src/scene/Landmarks.tsx 의 FALL_ROCKS), 물웅덩이
-    colliders: [...grid([-2.8, -0.9, 0.9, 2.8], [-2.6, -5], 1.3, 5), { x: 0, z: 0.6, r: 2.2, height: 1 }],
+    colliders: [...circleGrid([-2.8, -0.9, 0.9, 2.8], [-2.6, -5], 1.3, 5), { x: 0, z: 0.6, r: 2.2, height: 1 }],
   },
   boulder: { side: 7.5, clear: 7, label: 5.4, footprint: [4, 3], colliders: [{ x: 0, z: 0, r: 2.6, height: 4 }] },
   peak: {
@@ -207,80 +210,91 @@ export type Landmark = Checkpoint & {
   colliders: Obstacle[]
 }
 
-const cache = new WeakMap<Trail, Landmark[]>()
+/** 길 위에 걸치는 랜드마크를 이정표에서 앞뒤로 옮겨 볼 수 있는 거리와 간격(m) */
+const SHIFT_RANGE = 12
+const SHIFT_STEP = 0.5
+/** 길 위에 걸치는 랜드마크 앞뒤 3m 에서 길이 꺾여도 되는 각도. 더 꺾이면 문에 들어갔다가 벽 끝을 돌아 나가게 된다 */
+const MAX_THROUGH_TURN = THREE.MathUtils.degToRad(20)
+/** 몸 반지름(m). World 의 BODY_RADIUS 와 같게 */
+const BODY = 0.35
+/** 랜드마크 앞뒤로 등산로가 걸리는지 살피는 거리(m) */
+const CHECK_RANGE = 30
+
+const landmarkCache = new WeakMap<Trail, Landmark[]>()
 
 /** 코스의 이정표마다 세울 랜드마크 */
 export function landmarks(terrain: Terrain, trail: Trail): Landmark[] {
-  const hit = cache.get(trail)
-  if (hit) return hit
+  const cached = landmarkCache.get(trail)
+  if (cached) return cached
   // 출발점(탐방지원센터)도 이정표처럼 세운다
   const start = { name: trail.data.start, note: '', distance: Math.min(TRAILHEAD_AT, trail.length / 2) }
-  const out = [start, ...trail.data.checkpoints].map((cp): Landmark => {
+  const list = [start, ...trail.data.checkpoints].map((cp): Landmark => {
     const kind = cp === start ? 'trailhead' : landmarkKind(cp.name)
     const spec = SPECS[kind]
-    const p = trail.positionAt(cp.distance)
-    const heading = trail.headingAt(cp.distance)
-    const right = new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
-
-    let position: THREE.Vector3
-    let rotation: number
-    if (spec.side === 0) {
-      // 길 위에 걸쳐 선다. 기준 좌표 +z 가 진행 방향. 등산로가 꺾이는 곳이면 길이 벽에 덜 걸리는 방향으로 돌린다.
-      // 이정표가 갈지자 길의 꺾이는 곳에 있으면 어느 쪽으로 돌려도 벽이 길에 걸리므로(북한산 위문),
-      // 앞뒤 SHIFT_RANGE 안에서 길이 문 사이로 곧게 지나는 가장 가까운 자리로 옮긴다. 출발점 입구는 처음 화면에 보이게,
-      // 충돌 원이 없는 것(지형 위에 까는 마당바위·기차바위)은 이정표 자리 그대로 둔다
-      let best = { hits: Infinity, at: cp.distance, rotation: heading }
-      const range = kind === 'trailhead' || spec.colliders.length === 0 ? 0 : SHIFT_RANGE
-      for (let k = 0; k <= range / SHIFT_STEP && best.hits > 0; k++) {
-        for (const sign of k === 0 ? [1] : [1, -1]) {
-          const at = THREE.MathUtils.clamp(cp.distance + sign * k * SHIFT_STEP, 0, trail.length)
-          // 문 앞뒤에서 길이 꺾이면 문으로 들어가 벽 끝을 돌아 나가게 되므로 곧은 곳만 고른다
-          if (range > 0 && turnAt(trail, at) > MAX_THROUGH_TURN) continue
-          const q = trail.positionAt(at)
-          const r = bestRotation(trail, at, q, trail.headingAt(at), spec.colliders)
-          const hits = trailHits(trail, at, place(spec.colliders, q, r))
-          if (hits < best.hits) best = { hits, at, rotation: r }
-        }
-      }
-      position = trail.positionAt(best.at)
-      rotation = best.rotation
-    } else {
-      // 등산로 양옆 가운데 땅이 등산로 높이와 덜 차이 나는(덜 가파른) 쪽에 세운다
-      const flatness = (s: number) => {
-        const q = p.clone().addScaledVector(right, s * spec.side)
-        return Math.abs(meshHeight(terrain, q.x, q.z) - p.y)
-      }
-      const s = flatness(1) <= flatness(-1) ? 1 : -1
-      position = p.clone().addScaledVector(right, s * spec.side)
-      // 정면(+z)이 등산로를 보게
-      rotation = Math.atan2(p.x - position.x, p.z - position.z)
-      const [w, d] = spec.footprint
-      const cos = Math.cos(rotation)
-      const sin = Math.sin(rotation)
-      let high = -Infinity
-      for (const [fx, fz] of [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
-        const lx = (fx * w) / 2
-        const lz = (fz * d) / 2
-        high = Math.max(high, meshHeight(terrain, position.x + lx * cos + lz * sin, position.z - lx * sin + lz * cos))
-      }
-      position.y = high
-    }
-
+    const { position, rotation } = spec.side === 0 ? placeAcrossTrail(trail, cp.distance, kind, spec) : placeBesideTrail(terrain, trail, cp.distance, spec)
     // 그래도 등산로 가운데 줄에 걸리는 원은 뺀다. 랜드마크 때문에 길이 막히는 일은 없게
     const colliders = place(spec.colliders, position, rotation).filter((c) => trailHits(trail, cp.distance, [c]) === 0)
     // 2층짜리 대피소는 이름표를 한 층 더 높이 띄운다
     const label = spec.label + (kind === 'hut' && cp.name.includes('대피소') ? 2.6 : 0)
     return { ...cp, kind, position, rotation, label, clear: spec.clear, colliders }
   })
-  cache.set(trail, out)
-  return out
+  landmarkCache.set(trail, list)
+  return list
 }
 
-/** 길 위에 걸치는 랜드마크를 이정표에서 앞뒤로 옮겨 볼 수 있는 거리와 간격(m) */
-const SHIFT_RANGE = 12
-const SHIFT_STEP = 0.5
-/** 길 위에 걸치는 랜드마크 앞뒤 3m 에서 길이 꺾여도 되는 각도 */
-const MAX_THROUGH_TURN = THREE.MathUtils.degToRad(20)
+/**
+ * 길 위에 걸쳐 세운다. 기준 좌표 +z 가 진행 방향이고, 등산로가 꺾이는 곳이면 길이 벽에 덜 걸리는 방향으로 돌린다.
+ * 갈지자 길의 꺾이는 곳이면 어느 쪽으로 돌려도 벽이 길에 걸리므로(북한산 위문),
+ * 앞뒤 SHIFT_RANGE 안에서 길이 문 사이로 곧게 지나는 가장 가까운 자리로 옮긴다.
+ * 출발점 입구는 처음 화면에 보이게, 충돌 원이 없는 것(지형 위에 까는 마당바위·기차바위)은 이정표 자리 그대로 둔다
+ */
+function placeAcrossTrail(trail: Trail, distance: number, kind: LandmarkKind, spec: Spec) {
+  const range = kind === 'trailhead' || spec.colliders.length === 0 ? 0 : SHIFT_RANGE
+  let best = { hits: Infinity, at: distance, rotation: trail.headingAt(distance) }
+  for (let k = 0; k <= range / SHIFT_STEP && best.hits > 0; k++) {
+    for (const sign of k === 0 ? [1] : [1, -1]) {
+      const at = THREE.MathUtils.clamp(distance + sign * k * SHIFT_STEP, 0, trail.length)
+      if (range > 0 && turnAt(trail, at) > MAX_THROUGH_TURN) continue
+      const q = trail.positionAt(at)
+      const rotation = bestRotation(trail, at, q, trail.headingAt(at), spec.colliders)
+      const hits = trailHits(trail, at, place(spec.colliders, q, rotation))
+      if (hits < best.hits) best = { hits, at, rotation }
+    }
+  }
+  return { position: trail.positionAt(best.at), rotation: best.rotation }
+}
+
+/**
+ * 등산로 옆에 비켜 세운다. 양옆 가운데 땅이 등산로 높이와 덜 차이 나는(덜 가파른) 쪽을 고르고, 정면(+z)이 등산로를 보게 돌린다.
+ * 높이는 비탈에서 묻히지 않게 바닥 가운데와 네 모서리 중 가장 높은 곳에 맞춘다
+ */
+function placeBesideTrail(terrain: Terrain, trail: Trail, distance: number, spec: Spec) {
+  const p = trail.positionAt(distance)
+  const heading = trail.headingAt(distance)
+  const right = new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
+  const heightGap = (side: number) => {
+    const q = p.clone().addScaledVector(right, side * spec.side)
+    return Math.abs(meshHeight(terrain, q.x, q.z) - p.y)
+  }
+  const side = heightGap(1) <= heightGap(-1) ? 1 : -1
+  const position = p.clone().addScaledVector(right, side * spec.side)
+  const rotation = Math.atan2(p.x - position.x, p.z - position.z)
+  position.y = highestCorner(terrain, position, rotation, spec.footprint)
+  return { position, rotation }
+}
+
+/** 바닥(가로 w, 세로 d)의 가운데와 네 모서리 중 가장 높은 지형 높이 */
+function highestCorner(terrain: Terrain, position: THREE.Vector3, rotation: number, [w, d]: [number, number]) {
+  const cos = Math.cos(rotation)
+  const sin = Math.sin(rotation)
+  let high = -Infinity
+  for (const [fx, fz] of [[0, 0], [-1, -1], [-1, 1], [1, -1], [1, 1]]) {
+    const lx = (fx * w) / 2
+    const lz = (fz * d) / 2
+    high = Math.max(high, meshHeight(terrain, position.x + lx * cos + lz * sin, position.z - lx * sin + lz * cos))
+  }
+  return high
+}
 
 /** at 앞 3m 와 뒤 3m 의 진행 방향 차이(라디안) */
 function turnAt(trail: Trail, at: number) {
@@ -288,11 +302,6 @@ function turnAt(trail: Trail, at: number) {
   const d = Math.atan2(c.x - b.x, c.z - b.z) - Math.atan2(b.x - a.x, b.z - a.z)
   return Math.abs(Math.atan2(Math.sin(d), Math.cos(d)))
 }
-
-/** 몸 반지름(m). World 의 BODY_RADIUS 와 같게 */
-const BODY = 0.35
-/** 랜드마크 앞뒤로 등산로가 걸리는지 살피는 거리(m) */
-const CHECK_RANGE = 30
 
 /** 랜드마크 기준 좌표의 원을 세계 좌표로 옮긴다 (+z 가 rotation 방향) */
 function place(local: Obstacle[], position: THREE.Vector3, rotation: number) {
@@ -317,10 +326,10 @@ function bestRotation(trail: Trail, at: number, position: THREE.Vector3, heading
   let bestHits = Infinity
   for (let k = 0; k <= 18; k++) {
     for (const sign of k === 0 ? [1] : [1, -1]) {
-      const r = heading + sign * THREE.MathUtils.degToRad(k * 5)
-      const hits = trailHits(trail, at, place(local, position, r))
+      const rotation = heading + sign * THREE.MathUtils.degToRad(k * 5)
+      const hits = trailHits(trail, at, place(local, position, rotation))
       if (hits < bestHits) {
-        best = r
+        best = rotation
         bestHits = hits
       }
     }
