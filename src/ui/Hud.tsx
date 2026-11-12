@@ -484,13 +484,13 @@ function PhotoModal({ trail, photo, photoName, shareFile }: { trail: Trail; phot
   const share = () => {
     if (!shareFile) return
     const { mountain, summit, summitElevation } = trail.data
-    shareQuietly({ files: [shareFile], title: '방구석 등반대', text: `${mountain} ${summit} ${summitElevation}m 완등! ⛰️🚩 방구석 등반대에서 올랐어요` })
+    shareQuietly({ files: [shareFile], title: '오르자', text: `${mountain} ${summit} ${summitElevation}m 완등! ⛰️🚩 오르자에서 올랐어요` })
   }
 
   return (
     <div className="overlay">
       <div className="panel modal photo-modal">
-        <div className="modal-brand">방구석 등반대 · 정상 기념사진</div>
+        <div className="modal-brand">오르자 · 정상 기념사진</div>
         <img src={photo} alt="정상 기념사진" />
         <div className="actions">
           {/* 폰에서는 카카오톡·인스타그램 등으로 바로 보내는 공유가 주 버튼이고, 공유를 못 하는 컴퓨터에서는 저장이 주 버튼이다 */}
@@ -544,7 +544,7 @@ function SummitResult({ trail }: { trail: Trail }) {
   return (
     <div className="overlay">
       <div className="panel modal summit-modal">
-        <div className="modal-brand">방구석 등반대</div>
+        <div className="modal-brand">오르자</div>
         <div className="badge-wrap">
           <Badge trail={trail} />
         </div>
