@@ -6,9 +6,10 @@ import { allObstacles, cameraBlockers, subscribeObstacles } from '../lib/obstacl
 import { makeNearTrail } from '../lib/placement'
 import { stairRampMesh } from '../lib/steps'
 
-/** 나무 줄기 충돌 원기둥 높이(m). 줄기 높이만큼이면 충분하다 */
-const TRUNK_HEIGHT = 6
-
+/** 장애물 원기둥 높이 상한(m). 캐릭터가 뛰어도(약 1m) 넘지 못할 만큼이면 충분하다 */
+const MAX_OBSTACLE_HEIGHT = 6
+/** 원기둥 바닥을 땅속에 묻는 깊이(m). 비탈에서도 바닥과 땅 사이에 틈이 생기지 않게 한다 */
+const BURY_DEPTH = 0.25
 
 /** 지형·돌계단 경사로·나무·바위·랜드마크 충돌체를 Rapier 세계에 만든다 (그림은 그리지 않는다) */
 export function Colliders({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
@@ -17,6 +18,7 @@ export function Colliders({ terrain, trail }: { terrain: Terrain; trail: Trail }
   // 지형과 계단 경사로
   useEffect(() => {
     const made: Collider[] = []
+    // 카메라 스프링 암도 지형과 경사로에 막힌다
     const ground = corridorMesh(terrain, trail)
     made.push(world.createCollider(rapier.ColliderDesc.trimesh(ground.vertices, ground.indices)))
     const ramp = stairRampMesh(terrain, trail)
@@ -44,14 +46,14 @@ export function Colliders({ terrain, trail }: { terrain: Terrain; trail: Trail }
     const sync = () => {
       clear()
       for (const [key, list] of allObstacles()) {
+        // 나무·바위는 가림 셰이더가 줄여 주므로 랜드마크만 카메라를 막는다
         const camera = key === 'landmarks'
         for (const o of list) {
-          // 갈 수 없는 먼 곳의 나무·바위는 만들지 않는다
+          // 갈 수 없는 먼 곳의 장애물은 만들지 않는다
           if (!nearTrail(o.x, o.z, CORRIDOR)) continue
-          const height = Math.min(o.height, TRUNK_HEIGHT)
+          const height = Math.min(o.height, MAX_OBSTACLE_HEIGHT)
           const base = meshHeight(terrain, o.x, o.z)
-          // 바닥을 조금 묻어 비탈에서도 틈이 없게
-          const desc = rapier.ColliderDesc.cylinder(height / 2 + 0.25, o.r).setTranslation(o.x, base + height / 2 - 0.25, o.z)
+          const desc = rapier.ColliderDesc.cylinder(height / 2 + BURY_DEPTH, o.r).setTranslation(o.x, base + height / 2 - BURY_DEPTH, o.z)
           const collider = world.createCollider(desc)
           if (camera) cameraBlockers.add(collider.handle)
           made.push({ collider, camera })

@@ -1,6 +1,6 @@
 import * as THREE from 'three'
-import { readStored, writeStored } from './storage'
 import { create } from 'zustand'
+import { readStored, writeStored } from './storage'
 
 /**
  * 하루 시간대. 기본은 대한민국 실제 시각(KST)의 해 위치로 하늘과 빛을 정한다.
@@ -16,6 +16,7 @@ const LAT = 37.6
 const LON = 127.0
 /** 한국 표준시 기준 경선(°). 시계 시각과 태양시의 차이를 보정한다 */
 const KST_MERIDIAN = 135
+/** 한국 표준시는 UTC 보다 9시간 빠르다 */
 const KST_OFFSET_MS = 9 * 3600 * 1000
 
 /** 조명(그림자) 방향에 쓰는 해 높이의 아래 한계(°). 지평선에 붙은 해로 비추면 비탈이 온통 제 그림자에 묻힌다 */
@@ -63,6 +64,7 @@ const target = { ...lightState(), sun: new THREE.Vector3() }
 
 /** 하늘이 바뀔 때 자리 잡는 시간 상수(초). 1초쯤 지나면 거의 다 옮겨 간다 */
 const BLEND_TAU = 0.35
+/** settle 이 목표값 쪽으로 옮기는 값들 (숫자와 색) */
 const BLEND_NUMBERS = ['elevation', 'azimuth', 'sunIntensity', 'moonIntensity', 'hemiIntensity', 'photoEmissive', 'stars', 'rayleigh', 'turbidity', 'mie'] as const
 const BLEND_COLORS = ['sunColor', 'skyColor', 'groundColor', 'fogColor'] as const
 
@@ -102,7 +104,7 @@ function solarPosition(kst: Date) {
   const equationOfTime = 9.87 * Math.sin(2 * B) - 7.53 * Math.cos(B) - 1.5 * Math.sin(B) // 분
   const clockMinutes = kst.getUTCHours() * 60 + kst.getUTCMinutes() + kst.getUTCSeconds() / 60
   const solarMinutes = clockMinutes + 4 * (LON - KST_MERIDIAN) + equationOfTime
-  const hourAngle = (solarMinutes / 4 - 180) // 정오가 0, 오후가 +
+  const hourAngle = solarMinutes / 4 - 180 // 정오가 0, 오후가 +
   const sinE = Math.sin(rad(LAT)) * Math.sin(rad(declination)) + Math.cos(rad(LAT)) * Math.cos(rad(declination)) * Math.cos(rad(hourAngle))
   const elevation = THREE.MathUtils.radToDeg(Math.asin(THREE.MathUtils.clamp(sinE, -1, 1)))
   const cosA = (Math.sin(rad(declination)) - sinE * Math.sin(rad(LAT))) / (Math.cos(rad(elevation)) * Math.cos(rad(LAT)))
@@ -111,14 +113,15 @@ function solarPosition(kst: Date) {
   return { elevation, azimuth }
 }
 
-/** 해 높이와 시각(오전·오후)으로 시간대 이름을 정한다 */
+/** 해 높이(°)와 오전·오후로 시간대 이름을 정한다. 해가 8° 아래로 지면 밤, 10° 위로 뜨면 낮이다 */
 function phaseOf(elevation: number, morning: boolean): Phase {
   if (elevation < -8) return '밤'
   if (elevation < 10) return morning ? (elevation < 0 ? '새벽' : '아침') : '저녁'
   return '낮'
 }
 
-const smooth = (a: number, b: number, x: number) => THREE.MathUtils.smoothstep(x, a, b)
+/** x 가 from 에서 to 로 갈 때 0 에서 1 로 부드럽게 오른다 */
+const smooth = (from: number, to: number, x: number) => THREE.MathUtils.smoothstep(x, from, to)
 
 // 밤은 달빛의 남색, 새벽·저녁은 실제 여명처럼 푸르스름하지만 게임답게 충분히 밝게, 낮은 환하게
 const NIGHT_SKY = new THREE.Color('#4a5a88')
@@ -139,10 +142,9 @@ export const MOON_COLOR = new THREE.Color('#8fa3d9')
 
 /** 해 높이(°)와 방위(°)로 조명·하늘·안개 목표값을 채운다 */
 function applyDaylight(elevation: number, azimuth: number, morning: boolean) {
-  const d = target
-  d.elevation = elevation
-  d.azimuth = azimuth
-  d.phase = phaseOf(elevation, morning)
+  target.elevation = elevation
+  target.azimuth = azimuth
+  target.phase = phaseOf(elevation, morning)
   // 여명 정도 0(밤)~1(새벽), 낮 정도 0(새벽)~1(아침)
   const dawn = smooth(-10, -3, elevation)
   const day = smooth(-4, 10, elevation)
@@ -155,28 +157,28 @@ function applyDaylight(elevation: number, azimuth: number, morning: boolean) {
   const hz = -Math.cos(rad(azimuth))
   // 하늘 셰이더는 해가 지평선 조금 아래까지만 밝고, 더 내려가면 서서히 캄캄해진다
   const skyElev = elevation >= -1 ? elevation : -1 - (-1 - elevation) * 0.4
-  d.skySun.set(Math.cos(rad(skyElev)) * hx, Math.sin(rad(skyElev)), Math.cos(rad(skyElev)) * hz)
+  target.skySun.set(Math.cos(rad(skyElev)) * hx, Math.sin(rad(skyElev)), Math.cos(rad(skyElev)) * hz)
   const lightElev = Math.max(elevation, LIGHT_MIN_ELEVATION)
-  d.sun.set(Math.cos(rad(lightElev)) * hx, Math.sin(rad(lightElev)), Math.cos(rad(lightElev)) * hz)
+  target.sun.set(Math.cos(rad(lightElev)) * hx, Math.sin(rad(lightElev)), Math.cos(rad(lightElev)) * hz)
 
   // 해가 뜨기 전에도 동쪽 하늘빛이 약하게 비춘다 (푸른 기). 지평선에서 주황으로, 떠오르면 따뜻한 흰색으로. 밤에는 꺼진다
-  d.sunIntensity = THREE.MathUtils.lerp(0.9, 2.2, smooth(-2, 6, elevation)) * dawn
-  d.sunColor.copy(DAWN_SUN).lerp(LOW_SUN, smooth(-2.5, 0.5, elevation)).lerp(HIGH_SUN, smooth(1, 12, elevation))
+  target.sunIntensity = THREE.MathUtils.lerp(0.9, 2.2, smooth(-2, 6, elevation)) * dawn
+  target.sunColor.copy(DAWN_SUN).lerp(LOW_SUN, smooth(-2.5, 0.5, elevation)).lerp(HIGH_SUN, smooth(1, 12, elevation))
   // 달빛은 실제보다 훨씬 밝게 둔다. 밤에도 길과 나무가 보여야 한다
-  d.moonIntensity = 1.3 * (1 - dawn)
-  d.skyColor.copy(NIGHT_SKY).lerp(DAWN_SKY, dawn).lerp(DAY_SKY, day)
-  d.groundColor.copy(NIGHT_GROUND).lerp(DAWN_GROUND, dawn).lerp(DAY_GROUND, day)
+  target.moonIntensity = 1.3 * (1 - dawn)
+  target.skyColor.copy(NIGHT_SKY).lerp(DAWN_SKY, dawn).lerp(DAY_SKY, day)
+  target.groundColor.copy(NIGHT_GROUND).lerp(DAWN_GROUND, dawn).lerp(DAY_GROUND, day)
   // 해가 없을 때는 하늘빛으로 더 많이 비춘다
-  d.hemiIntensity = THREE.MathUtils.lerp(THREE.MathUtils.lerp(1.1, 1.5, dawn), 0.6, day)
-  d.fogColor.copy(NIGHT_FOG).lerp(DAWN_FOG, dawn).lerp(DAY_FOG, day).lerp(GLOW_FOG, glow * 0.55)
-  d.photoEmissive = THREE.MathUtils.lerp(THREE.MathUtils.lerp(0.22, 0.3, dawn), 0.45, day)
-  d.stars = 1 - smooth(-9, -3, elevation)
-  d.rayleigh = THREE.MathUtils.lerp(2.6, 1.2, day)
-  d.turbidity = THREE.MathUtils.lerp(9, 6, day)
-  d.mie = THREE.MathUtils.lerp(0.004, 0.02, glow)
+  target.hemiIntensity = THREE.MathUtils.lerp(THREE.MathUtils.lerp(1.1, 1.5, dawn), 0.6, day)
+  target.fogColor.copy(NIGHT_FOG).lerp(DAWN_FOG, dawn).lerp(DAY_FOG, day).lerp(GLOW_FOG, glow * 0.55)
+  target.photoEmissive = THREE.MathUtils.lerp(THREE.MathUtils.lerp(0.22, 0.3, dawn), 0.45, day)
+  target.stars = 1 - smooth(-9, -3, elevation)
+  target.rayleigh = THREE.MathUtils.lerp(2.6, 1.2, day)
+  target.turbidity = THREE.MathUtils.lerp(9, 6, day)
+  target.mie = THREE.MathUtils.lerp(0.004, 0.02, glow)
 }
 
-/** 시각으로 바로 채운다 */
+/** KST 시각의 해 위치로 목표값을 채운다 */
 function applyTime(kst: Date) {
   const { elevation, azimuth } = solarPosition(kst)
   applyDaylight(elevation, azimuth, kst.getUTCHours() < 12)

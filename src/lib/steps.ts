@@ -16,8 +16,9 @@ const MERGE_GAP = 2
 /** 이보다 짧은 가파른 구간에는 계단을 놓지 않는다(m) */
 const MIN_RUN = 1.5
 /** 가파른 곳을 찾을 때 등산로를 따라 재는 간격(m) */
-const SAMPLE = 0.25
-const LIFT = 0.06 // 길 띠를 지면에서 띄운 높이와 같게(m)
+const SLOPE_SAMPLE = 0.25
+/** 흙길 띠를 지면에서 띄운 높이(m). TrailDetails 의 PATH_LIFT 와 같게 둔다 */
+const PATH_LIFT = 0.06
 /** 옆 경사를 다 따르지 못하는 곳에서 디딤판 오르막 쪽 모서리가 땅에 묻혀도 되는 깊이(m) */
 const STEP_BURY = 0.5
 /** 받침 아랫면을 가장 낮은 땅보다 이만큼 더 묻는다(m). 비탈 쪽 아래로 틈이 보이지 않게 */
@@ -35,31 +36,32 @@ const MAX_TILT = 0.3
  */
 type Step = { distance: number; depth: number; top: number; bottom: number; x: number; z: number; heading: number; tilt: number }
 
-const cache = new WeakMap<Trail, Step[]>()
+/** 코스마다 한 번만 계산한다 */
+const stepsCache = new WeakMap<Trail, Step[]>()
 
-/** 등산로 d 지점 앞뒤 2m 로 잰 경사 */
-const slopeAt = (trail: Trail, d: number) => Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
+/** 등산로 d 지점 앞뒤 2m 로 잰 경사 (오른 높이 ÷ 간 거리) */
+export const slopeAt = (trail: Trail, d: number) => Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
 
 /** 가파른 구간 [시작, 끝] 목록. 짧은 틈은 메우고 너무 짧은 구간은 버린다 */
 function steepRuns(trail: Trail): [number, number][] {
   const runs: [number, number][] = []
-  let open: number | null = null
-  for (let d = 2; d <= trail.length - 2; d += SAMPLE) {
+  let runStart: number | null = null
+  for (let d = 2; d <= trail.length - 2; d += SLOPE_SAMPLE) {
     const steep = slopeAt(trail, d) >= STEP_SLOPE
-    if (steep && open === null) open = d
-    if (!steep && open !== null) {
-      runs.push([open, d])
-      open = null
+    if (steep && runStart === null) runStart = d
+    if (!steep && runStart !== null) {
+      runs.push([runStart, d])
+      runStart = null
     }
   }
-  if (open !== null) runs.push([open, trail.length - 2])
+  if (runStart !== null) runs.push([runStart, trail.length - 2])
   const merged: [number, number][] = []
-  for (const r of runs) {
+  for (const [start, end] of runs) {
     const last = merged[merged.length - 1]
-    if (last && r[0] - last[1] < MERGE_GAP) last[1] = r[1]
-    else merged.push([r[0], r[1]])
+    if (last && start - last[1] < MERGE_GAP) last[1] = end
+    else merged.push([start, end])
   }
-  return merged.filter(([a, b]) => b - a >= MIN_RUN)
+  return merged.filter(([start, end]) => end - start >= MIN_RUN)
 }
 
 /**
@@ -68,48 +70,50 @@ function steepRuns(trail: Trail): [number, number][] {
  * 디딤판은 그 칸이 덮는 땅보다 위에 놓여 오르막 쪽이 땅에 묻히지 않고, 앞쪽에는 칸 높이만큼 돌 턱이 선다
  */
 export function stoneSteps(terrain: Terrain, trail: Trail): Step[] {
-  const hit = cache.get(trail)
-  if (hit) return hit
-  const out: Step[] = []
-  for (const [a, b] of steepRuns(trail)) {
-    let s = a
-    while (s < b - MIN_SPAN / 2) {
-      const span = THREE.MathUtils.clamp(TARGET_RISE / Math.max(slopeAt(trail, s), 0.05), MIN_SPAN, MAX_SPAN)
-      const e = Math.min(s + span, b)
-      out.push(makeStep(terrain, trail, s, e))
-      s = e
+  const cached = stepsCache.get(trail)
+  if (cached) return cached
+  const steps: Step[] = []
+  for (const [runStart, runEnd] of steepRuns(trail)) {
+    let start = runStart
+    // 남은 길이가 가장 얕은 칸의 절반도 안 되면 그만 놓는다
+    while (start < runEnd - MIN_SPAN / 2) {
+      // 칸 높이가 TARGET_RISE 가 되는 깊이. 경사가 거의 없어도 0 으로 나누지 않게 0.05 아래로는 내리지 않는다
+      const span = THREE.MathUtils.clamp(TARGET_RISE / Math.max(slopeAt(trail, start), 0.05), MIN_SPAN, MAX_SPAN)
+      const end = Math.min(start + span, runEnd)
+      steps.push(makeStep(terrain, trail, start, end))
+      start = end
     }
   }
-  cache.set(trail, out)
-  return out
+  stepsCache.set(trail, steps)
+  return steps
 }
 
-/** 등산로 [s, e] 를 덮는 한 칸 */
-function makeStep(terrain: Terrain, trail: Trail, s: number, e: number): Step {
-  const d = (s + e) / 2
-  const p = trail.positionAt(d)
-  const heading = trail.headingAt(d)
+/** 등산로 [start, end] 를 덮는 한 칸 */
+function makeStep(terrain: Terrain, trail: Trail, start: number, end: number): Step {
+  const middle = (start + end) / 2
+  const center = trail.positionAt(middle)
+  const heading = trail.headingAt(middle)
   const right = new THREE.Vector3(-Math.cos(heading), 0, Math.sin(heading))
   // 칸이 덮는 땅을 앞뒤·좌우로 재어 본다 (등산로를 따라 앞·가운데·뒤, 옆으로 왼쪽·가운데·오른쪽)
-  const samples: { side: number; h: number }[] = []
-  for (const along of [s, d, e]) {
+  const samples: { side: number; height: number }[] = []
+  for (const along of [start, middle, end]) {
     const q = trail.positionAt(along)
     for (const side of [-STEP_WIDTH / 2, 0, STEP_WIDTH / 2]) {
-      samples.push({ side, h: meshHeight(terrain, q.x + right.x * side, q.z + right.z * side) + LIFT })
+      samples.push({ side, height: meshHeight(terrain, q.x + right.x * side, q.z + right.z * side) + PATH_LIFT })
     }
   }
   // 옆 경사: 오른쪽과 왼쪽 땅 높이 차. 판을 이만큼 옆으로 기울여 땅을 따르게 한다
-  const avg = (side: number) => {
-    const hs = samples.filter((m) => m.side === side).map((m) => m.h)
-    return hs.reduce((x, y) => x + y, 0) / hs.length
+  const averageAt = (side: number) => {
+    const heights = samples.filter((m) => m.side === side).map((m) => m.height)
+    return heights.reduce((x, y) => x + y, 0) / heights.length
   }
-  const tilt = THREE.MathUtils.clamp((avg(STEP_WIDTH / 2) - avg(-STEP_WIDTH / 2)) / STEP_WIDTH, -MAX_TILT, MAX_TILT)
+  const tilt = THREE.MathUtils.clamp((averageAt(STEP_WIDTH / 2) - averageAt(-STEP_WIDTH / 2)) / STEP_WIDTH, -MAX_TILT, MAX_TILT)
   // 기울인 판을 기준으로 잰 높이 (옆 경사를 뺀 나머지만 남는다)
   let low = Infinity
   let high = -Infinity
   let centerHigh = -Infinity
   for (const m of samples) {
-    const h = m.h - tilt * m.side
+    const h = m.height - tilt * m.side
     low = Math.min(low, h)
     high = Math.max(high, h)
     if (m.side === 0) centerHigh = Math.max(centerHigh, h)
@@ -117,7 +121,7 @@ function makeStep(terrain: Terrain, trail: Trail, s: number, e: number): Step {
   // 디딤판은 칸이 덮는 등산로 가운데 땅보다 늘 위에 둔다. 옆 경사를 다 따르지 못한 모서리는 STEP_BURY 까지 묻힌다
   // (가장 높은 모서리에 맞추면 옆으로 기운 비탈에서 디딤판이 땅보다 1m 넘게 떠서 옆에서 오를 수 없는 벽이 된다)
   const top = Math.max(centerHigh, high - STEP_BURY)
-  return { distance: d, depth: e - s, top, bottom: low - BODY_SINK, x: p.x, z: p.z, heading, tilt }
+  return { distance: middle, depth: end - start, top, bottom: low - BODY_SINK, x: center.x, z: center.z, heading, tilt }
 }
 
 /** 디딤판 위를 평평하게 딛는 몫. 나머지 구간에서 다음 칸 높이로 올라선다 */
@@ -129,6 +133,18 @@ const RISE = 0.3
 const LINKED = MAX_SPAN * 2
 /** 계단 구간 첫 칸 앞·마지막 칸 뒤에서 땅과 디딤판 높이를 잇는 길이(m). 짧으면 들어서는 오르막이 가팔라 막힌다 */
 const LEAD = 2.6
+
+/** distance 바로 앞 칸(before, 번호 index)과 바로 뒤 칸(after). 칸이 거리 순이라 이분 탐색으로 찾는다. 첫 칸보다 앞이면 index 는 -1 */
+function neighborSteps(steps: Step[], distance: number) {
+  let lo = -1
+  let hi = steps.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    if (steps[mid].distance <= distance) lo = mid
+    else hi = mid - 1
+  }
+  return { index: lo, before: lo >= 0 ? steps[lo] : null, after: steps[lo + 1] ?? null }
+}
 
 /**
  * 등산로 distance 지점에서 발이 딛는 계단 높이. 계단 구간이 아니면 null.
@@ -145,16 +161,8 @@ export function stairAt(
   shape: 'tread' | 'ramp' = 'tread',
 ): { index: number; y: number } | null {
   if (!steps.length) return null
-  // 거리 순이므로 이분 탐색으로 distance 바로 앞 칸(lo)을 찾는다. 첫 칸보다 앞이면 lo = -1
-  let lo = -1
-  let hi = steps.length - 1
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1
-    if (steps[mid].distance <= distance) lo = mid
-    else hi = mid - 1
-  }
-  const a = lo >= 0 ? steps[lo] : null
-  const b = steps[lo + 1] ?? null
+  const { index: lo, before: a, after: b } = neighborSteps(steps, distance)
+  // t 는 0(앞 높이)~1(뒤 높이). tread 는 칸 앞쪽에서 평평하게 머물다 가장자리에서 올라선다
   const curve = (t: number) => (shape === 'ramp' ? THREE.MathUtils.clamp(t, 0, 1) : THREE.MathUtils.smoothstep(t, TREAD, TREAD + RISE))
   const ease = (from: number, to: number, t: number) => from + (to - from) * curve(t)
 
@@ -182,17 +190,9 @@ export function stairAt(
  * 등산로 distance 지점 디딤판의 옆 기울기 (stairAt 과 같은 구간에서 칸 사이를 곧게 잇고, 땅으로 내려서는 구간에서는 0 으로 줄인다).
  * 계단 구간이 아니면 0
  */
-export function tiltAt(steps: Step[], distance: number): number {
+function tiltAt(steps: Step[], distance: number): number {
   if (!steps.length) return 0
-  let lo = -1
-  let hi = steps.length - 1
-  while (lo < hi) {
-    const mid = (lo + hi + 1) >> 1
-    if (steps[mid].distance <= distance) lo = mid
-    else hi = mid - 1
-  }
-  const a = lo >= 0 ? steps[lo] : null
-  const b = steps[lo + 1] ?? null
+  const { before: a, after: b } = neighborSteps(steps, distance)
   if (a && b && b.distance - a.distance <= LINKED) return a.tilt + ((b.tilt - a.tilt) * (distance - a.distance)) / (b.distance - a.distance)
   const exit = a ? 1 - (distance - a.distance) / LEAD : 0
   const entry = b ? 1 - (b.distance - distance) / LEAD : 0

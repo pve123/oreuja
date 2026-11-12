@@ -11,11 +11,11 @@ export function EmoteDial() {
 
   useEffect(() => {
     if (!open) return
-    const outside = (e: PointerEvent) => {
+    const closeOnOutsidePress = (e: PointerEvent) => {
       if (!root.current.contains(e.target as Node)) setOpen(false)
     }
-    window.addEventListener('pointerdown', outside, true)
-    return () => window.removeEventListener('pointerdown', outside, true)
+    window.addEventListener('pointerdown', closeOnOutsidePress, true)
+    return () => window.removeEventListener('pointerdown', closeOnOutsidePress, true)
   }, [open])
 
   return (

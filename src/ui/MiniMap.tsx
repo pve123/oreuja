@@ -27,10 +27,15 @@ export function MiniMap({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 
   // 코스가 다 들어가는 정사각형 범위 (로컬 좌표 m)
   const view = useMemo(() => {
-    let x0 = Infinity, x1 = -Infinity, z0 = Infinity, z1 = -Infinity
+    let x0 = Infinity
+    let x1 = -Infinity
+    let z0 = Infinity
+    let z1 = -Infinity
     for (const p of trail.points) {
-      x0 = Math.min(x0, p.x); x1 = Math.max(x1, p.x)
-      z0 = Math.min(z0, p.z); z1 = Math.max(z1, p.z)
+      x0 = Math.min(x0, p.x)
+      x1 = Math.max(x1, p.x)
+      z0 = Math.min(z0, p.z)
+      z1 = Math.max(z1, p.z)
     }
     const size = Math.max(x1 - x0, z1 - z0) + MARGIN * 2
     return { minX: (x0 + x1) / 2 - size / 2, minZ: (z0 + z1) / 2 - size / 2, size }
@@ -38,6 +43,7 @@ export function MiniMap({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 
   // 바뀌지 않는 바탕(사진, 코스 선, 이정표)은 따로 그려 두고 위치가 바뀔 때마다 겹쳐 그린다
   const base = useMemo(() => {
+    // 화면이 촘촘해도 2배까지만. 더 그려도 168px 미니맵에서는 차이가 안 보인다
     const dpr = Math.min(2, window.devicePixelRatio || 1)
     const px = Math.round(SIZE * dpr)
     const c = document.createElement('canvas')
@@ -58,7 +64,7 @@ export function MiniMap({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       ctx.fillRect(0, 0, px, px)
     }
 
-    const line = (t: Trail, color: string, width: number) => {
+    const drawTrail = (t: Trail, color: string, width: number) => {
       ctx.strokeStyle = color
       ctx.lineWidth = width * dpr
       ctx.lineJoin = ctx.lineCap = 'round'
@@ -66,12 +72,15 @@ export function MiniMap({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       t.points.forEach((p, i) => (i ? ctx.lineTo(...toPx(p.x, p.z)) : ctx.moveTo(...toPx(p.x, p.z))))
       ctx.stroke()
     }
-    for (const t of trails) if (t !== trail) line(t, 'rgba(255, 255, 255, 0.45)', 1.5)
-    line(trail, 'rgba(0, 0, 0, 0.35)', 5)
-    line(trail, '#f2c14e', 3)
+    // 다른 코스는 흐린 흰 선, 지금 코스는 그림자 위에 금빛 선
+    for (const t of trails) if (t !== trail) drawTrail(t, 'rgba(255, 255, 255, 0.45)', 1.5)
+    drawTrail(trail, 'rgba(0, 0, 0, 0.35)', 5)
+    drawTrail(trail, '#f2c14e', 3)
 
+    // 이정표는 흰 동그라미
     for (const cp of trail.data.checkpoints) {
-      const [x, y] = toPx(trail.positionAt(cp.distance).x, trail.positionAt(cp.distance).z)
+      const at = trail.positionAt(cp.distance)
+      const [x, y] = toPx(at.x, at.z)
       ctx.fillStyle = '#fff'
       ctx.strokeStyle = '#1d3557'
       ctx.lineWidth = 1.5 * dpr
@@ -138,11 +147,11 @@ export function MiniMap({ trail, trails }: { trail: Trail; trails: Trail[] }) {
     }
     draw()
     // 걸을 때마다 다시 그리되 한 화면 갱신에 한 번만
-    const off = useGame.subscribe((s, prev) => {
+    const unsubscribe = useGame.subscribe((s, prev) => {
       if ((s.distance !== prev.distance || s.offset !== prev.offset) && !pending.frame) pending.frame = requestAnimationFrame(draw)
     })
     return () => {
-      off()
+      unsubscribe()
       if (pending.frame) cancelAnimationFrame(pending.frame)
     }
   }, [base, trail])

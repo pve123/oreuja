@@ -21,11 +21,10 @@ const GL = SOFTWARE ? ['--use-angle=swiftshader', '--enable-unsafe-swiftshader']
 const LOAD_MS = CI || SOFTWARE ? 240000 : 90000
 /** CPU 로 그리면 초당 몇 장만 그려져 걷는 데도 오래 걸린다. 걷고 기다리는 시간을 이만큼 늘린다 */
 const SLOW = SOFTWARE ? 3 : 1
-const courses = Object.fromEntries(
-  JSON.parse(fs.readFileSync(path.join(ROOT, 'public/data/mountains.json'), 'utf8')).flatMap((m) =>
-    JSON.parse(fs.readFileSync(path.join(ROOT, `public/data/${m.id}/courses.json`), 'utf8')).map((c) => [c.id, c]),
-  ),
-)
+const readJson = (file) => JSON.parse(fs.readFileSync(path.join(ROOT, 'public/data', file), 'utf8'))
+const mountains = readJson('mountains.json')
+/** 코스 id → 코스 데이터 */
+const courses = Object.fromEntries(mountains.flatMap((m) => readJson(`${m.id}/courses.json`).map((c) => [c.id, c])))
 
 const wait = (ms) => new Promise((r) => setTimeout(r, ms))
 const PHONE = { width: 390, height: 844, deviceScaleFactor: 2, isMobile: true, hasTouch: true }
@@ -76,7 +75,12 @@ async function open(b, url, viewport, store = {}) {
   return { ctx, page, errors }
 }
 
-const remaining = (page) => page.$eval('.progress-row', (e) => Number(e.textContent.match(/정상까지 ([\d.]+)(k?m)/).slice(1, 3).reduce((v, u) => (u === 'km' ? v * 1000 : +v))))
+/** 화면의 「정상까지 1.23km」·「정상까지 450m」를 미터로 읽는다 */
+const remaining = (page) =>
+  page.$eval('.progress-row', (e) => {
+    const [, value, unit] = e.textContent.match(/정상까지 ([\d.]+)(k?m)/)
+    return unit === 'km' ? value * 1000 : Number(value)
+  })
 function assert(ok, msg) {
   if (!ok) throw new Error(msg)
 }
@@ -88,8 +92,7 @@ test('컴퓨터: 베이스캠프에 산이 모두 뜨고 방향키로 걷는다'
   const { ctx, page, errors } = await open(browser, PREVIEW + '/', DESKTOP, { 'hiking-metaverse:control': 'free' })
   try {
     const tabs = await page.$$eval('.lobby button', (b) => b.filter((x) => /코스 \d+개/.test(x.textContent)).length)
-    const mountains = JSON.parse(fs.readFileSync(path.join(ROOT, 'public/data/mountains.json'), 'utf8')).length
-    assert(tabs === mountains, `산 탭이 ${tabs}개 (산은 ${mountains}개)`)
+    assert(tabs === mountains.length, `산 탭이 ${tabs}개 (산은 ${mountains.length}개)`)
     await page.click('.lobby-start')
     await wait(2000 * SLOW)
     const before = await remaining(page)

@@ -970,6 +970,7 @@ kbd {
   display: block;
 }
 
+/* 기념사진을 찍는 순간 화면이 하얗게 번쩍인다 */
 .flash {
   position: fixed;
   inset: 0;
@@ -1351,8 +1352,7 @@ kbd {
   width: 52px;
   height: 52px;
 }
-/* 좁은 화면: 캐릭터·도움말을 위에, 코스 패널을 그 아래 쌓는다. 오른쪽 위 모서리는 소리 버튼 자리 */
-/* 터치 기기 공통: 혼자 오르는 동안 닉네임·감정 표현 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다 (감정 표현은 💬 버튼으로 보낸다) */
+/* 터치 기기: 닉네임·감정 표현 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다 (감정 표현은 💬 버튼으로 보낸다) */
 @media (hover: none), (pointer: coarse), (pointer: none) {
   .together {
     display: none;
@@ -1427,7 +1427,7 @@ kbd {
   }
 }
 
-/* 등산로로 순간이동할 때 화면이 잠깐 하얗게 깜빡인다 */
+/* 등산로에서 멀어질수록 화면 가장자리가 어두워진다 (짙기는 Hud 의 RoamNotice 가 opacity 로 정한다) */
 .roam-vignette {
   position: fixed;
   inset: 0;

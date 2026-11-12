@@ -2,18 +2,18 @@ import { Suspense, useEffect, useLayoutEffect, useMemo, useRef } from 'react'
 import * as THREE from 'three'
 import { meshHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
-import { STEP_SLOPE, STEP_WIDTH, stoneSteps } from '../lib/steps'
+import { STEP_SLOPE, STEP_WIDTH, slopeAt, stoneSteps } from '../lib/steps'
 import { NearModels, type NearItem } from './NearModels'
 
 const PATH_WIDTH = 1.6 // 흙길 폭(m)
 /** 길 가장자리에서 풀밭으로 투명하게 녹아드는 폭(m). 줄마다 조금씩 달라 가장자리가 자연스럽게 들쭉날쭉하다 */
 const PATH_FADE = 0.45
-const PATH_LIFT = 0.06 // 지면과 겹쳐 깜빡이지 않게 살짝 띄운다(m)
+const PATH_LIFT = 0.06 // 지면과 겹쳐 깜빡이지 않게 살짝 띄운다(m). lib/steps 도 같은 값을 쓴다
 /** 길 질감 한 장이 덮는 길이(m) */
 const PATH_TILE = 2.4
 const POST_EVERY = 2.5 // 난간 기둥 간격(m)
 const RAIL_SIDE = 1.0 // 난간이 길 가운데서 떨어진 거리(m)
-const RAIL_HEIGHT = 0.95
+const RAIL_HEIGHT = 0.95 // 난간 높이(m). 어른 허리쯤
 
 /** Quaternius Stylized Nature MegaKit (CC0). scripts/prepare-nature.mjs 로 준비한다 */
 const NATURE = '/models/nature/'
@@ -23,7 +23,7 @@ const PEBBLES = ['Pebble_Round_1', 'Pebble_Round_3', 'Pebble_Round_5', 'Pebble_S
 const SLAB_THICK = 0.13
 /** 계단 몸통(흙과 돌 받침) 윗면을 판석 두께만큼 낮춘다 */
 const BODY_BELOW_TOP = 0.09
-/** 판석·자갈 색: 북한산 화강암 (모델 텍스처는 무늬만 쓰고 이 색으로 다시 칠한다) */
+/** 판석·자갈 색: 화강암 (모델 텍스처는 무늬만 쓰고 이 색으로 다시 칠한다) */
 const PATH_ROCK_TINT = '#aaa397'
 /** 길가 자갈: 길 1m 마다 개수 */
 const PEBBLES_PER_M = 1.4
@@ -192,13 +192,13 @@ function StoneSteps({ terrain, trail }: Props) {
   const { matrices, colors } = useMemo(() => {
     const rand = seededRandom(5)
     const colors: THREE.Color[] = []
-    const matrices = steps.map((st) => {
-      const q = stepRotation(st.heading, st.tilt)
-      const top = st.top - BODY_BELOW_TOP
-      const center = new THREE.Vector3(st.x, (top + st.bottom) / 2, st.z)
+    const matrices = steps.map((step) => {
+      const rotation = stepRotation(step.heading, step.tilt)
+      const top = step.top - BODY_BELOW_TOP
+      const center = new THREE.Vector3(step.x, (top + step.bottom) / 2, step.z)
       colors.push(new THREE.Color().setHSL(0.08, 0.1, 0.4 + rand() * 0.06))
       // 앞뒤로 조금 겹쳐 칸 사이에 틈이 보이지 않게 한다
-      return new THREE.Matrix4().compose(center, q, new THREE.Vector3(1, Math.max(0.05, top - st.bottom), st.depth + 0.02))
+      return new THREE.Matrix4().compose(center, rotation, new THREE.Vector3(1, Math.max(0.05, top - step.bottom), step.depth + 0.02))
     })
     return { matrices, colors }
   }, [steps])
@@ -208,20 +208,20 @@ function StoneSteps({ terrain, trail }: Props) {
     const rand = seededRandom(9)
     const out: NearItem[] = []
     const spin = new THREE.Quaternion()
-    const up = new THREE.Vector3(0, 1, 0)
-    for (const st of steps) {
-      const right = rightOf(st.heading)
-      const base = stepRotation(st.heading, st.tilt)
+    for (const step of steps) {
+      const right = rightOf(step.heading)
+      const base = stepRotation(step.heading, step.tilt)
       for (const side of [-1, 1]) {
         // 디딤판 기울기 안에서 돌린다: 앞뒤 뒤집기와 살짝 비뚤어짐
-        spin.setFromAxisAngle(up, (rand() < 0.5 ? 0 : Math.PI) + (rand() - 0.5) * 0.08)
-        const q = base.clone().multiply(spin)
+        spin.setFromAxisAngle(UP, (rand() < 0.5 ? 0 : Math.PI) + (rand() - 0.5) * 0.08)
+        const rotation = base.clone().multiply(spin)
         const lateral = side * (STEP_WIDTH / 4 + (rand() - 0.5) * 0.04)
-        const pos = new THREE.Vector3(st.x + right.x * lateral, st.top - SLAB_THICK + st.tilt * lateral, st.z + right.z * lateral)
-        const scale = new THREE.Vector3(STEP_WIDTH / 2 - 0.03, SLAB_THICK / 0.15, st.depth + 0.04)
+        const pos = new THREE.Vector3(step.x + right.x * lateral, step.top - SLAB_THICK + step.tilt * lateral, step.z + right.z * lateral)
+        // 모델 두께 0.15m 를 SLAB_THICK 으로 줄인다
+        const scale = new THREE.Vector3(STEP_WIDTH / 2 - 0.03, SLAB_THICK / 0.15, step.depth + 0.04)
         const shade = 0.88 + rand() * 0.24
         out.push({
-          matrix: new THREE.Matrix4().compose(pos, q, scale),
+          matrix: new THREE.Matrix4().compose(pos, rotation, scale),
           model: Math.floor(rand() * SLABS.length),
           color: new THREE.Color(shade, shade, shade),
         })
@@ -246,7 +246,7 @@ function StoneSteps({ terrain, trail }: Props) {
 
   return (
     <group>
-      {/* 받침은 그림자를 드리우지 않는다. 비탈에 긴 검은 쐐기가 생겨 계단이 땅에 박힌 판처럼 보였다 (판석은 그림자를 드리운다) */}
+      {/* 받침은 그림자를 드리우지 않는다. 드리우면 비탈에 긴 검은 쐐기가 생겨 계단이 땅에 박힌 판처럼 보인다 (판석은 그림자를 드리운다) */}
       <instancedMesh ref={ref} args={[shape, undefined, Math.max(1, matrices.length)]} receiveShadow>
         <meshStandardMaterial roughness={1} />
       </instancedMesh>
@@ -267,14 +267,13 @@ function Pebbles({ terrain, trail }: Props) {
     const count = Math.floor(trail.length * PEBBLES_PER_M)
     for (let i = 0; i < count; i++) {
       const d = rand() * trail.length
-      const slope = Math.abs(trail.positionAt(d + 2).y - trail.positionAt(d - 2).y) / 4
-      if (slope >= STEP_SLOPE) continue
+      if (slopeAt(trail, d) >= STEP_SLOPE) continue
       const c = trail.positionAt(d)
       const r = rightOf(trail.headingAt(d))
       // 가장자리 쪽에 몰리게: 0.45~1.25m, 가끔 길 가운데에도 하나
-      const o = (rand() < 0.5 ? -1 : 1) * (rand() < 0.15 ? rand() * 0.5 : 0.45 + rand() * 0.8)
-      const x = c.x + r.x * o
-      const z = c.z + r.z * o
+      const offset = (rand() < 0.5 ? -1 : 1) * (rand() < 0.15 ? rand() * 0.5 : 0.45 + rand() * 0.8)
+      const x = c.x + r.x * offset
+      const z = c.z + r.z * offset
       const s = 0.3 + rand() * rand() * 0.8
       q.setFromEuler(e.set((rand() - 0.5) * 0.3, rand() * Math.PI * 2, (rand() - 0.5) * 0.3))
       const shade = 0.8 + rand() * 0.35
@@ -301,7 +300,6 @@ function Railings({ terrain, trail }: Props) {
     const railMatrices: THREE.Matrix4[] = []
     const one = new THREE.Vector3(1, 1, 1)
     const noRotation = new THREE.Quaternion()
-    const yAxis = new THREE.Vector3(0, 1, 0)
 
     for (const side of [-1, 1]) {
       let prevTop: THREE.Vector3 | null = null
@@ -314,7 +312,7 @@ function Railings({ terrain, trail }: Props) {
           // 앞 기둥 꼭대기에서 이 기둥 꼭대기까지 가로대를 눕혀 잇는다
           const dir = top.clone().sub(prevTop)
           const len = dir.length()
-          const q = new THREE.Quaternion().setFromUnitVectors(yAxis, dir.normalize())
+          const q = new THREE.Quaternion().setFromUnitVectors(UP, dir.normalize())
           const mid = prevTop.clone().add(top).multiplyScalar(0.5)
           railMatrices.push(new THREE.Matrix4().compose(mid, q, new THREE.Vector3(1, len, 1)))
         }

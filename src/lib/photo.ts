@@ -18,11 +18,13 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
   const h = canvas.height
   // 글자 띠 높이. 화면 높이로만 정하면 폰 세로 사진에서 글자가 너비를 넘쳐 잘리므로 너비도 함께 본다 (가로 화면은 높이 기준 그대로)
   const bar = Math.round(Math.min(h, w * 0.75) * 0.16)
-  const grad = ctx.createLinearGradient(0, h - bar * 1.6, 0, h)
-  grad.addColorStop(0, 'rgba(12,18,34,0)')
-  grad.addColorStop(1, 'rgba(12,18,34,0.78)')
-  ctx.fillStyle = grad
-  ctx.fillRect(0, h - bar * 1.6, w, bar * 1.6)
+  // 글자가 잘 읽히게 아래쪽을 띠보다 조금 넓게 어둡게 깐다
+  const shadeH = bar * 1.6
+  const shade = ctx.createLinearGradient(0, h - shadeH, 0, h)
+  shade.addColorStop(0, 'rgba(12,18,34,0)')
+  shade.addColorStop(1, 'rgba(12,18,34,0.78)')
+  ctx.fillStyle = shade
+  ctx.fillRect(0, h - shadeH, w, shadeH)
 
   const pad = Math.round(w * 0.04)
   const font = '"Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif'
@@ -30,13 +32,15 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
   ctx.fillStyle = '#fff'
   ctx.font = `800 ${Math.round(bar * 0.38)}px ${font}`
   const title = `${trail.mountain} ${trail.summit} ${trail.summitElevation}m`
-  ctx.fillText(title, pad, h - bar * 0.55)
+  const titleY = h - bar * 0.55
+  ctx.fillText(title, pad, titleY)
   const titleW = ctx.measureText(title).width
   ctx.font = `500 ${Math.round(bar * 0.2)}px ${font}`
   const date = new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
-  const line = `${trail.name} 완등 · ${date}`
-  ctx.fillText(line, pad, h - bar * 0.2)
-  const lineW = ctx.measureText(line).width
+  const subtitle = `${trail.name} 완등 · ${date}`
+  const subtitleY = h - bar * 0.2
+  ctx.fillText(subtitle, pad, subtitleY)
+  const subtitleW = ctx.measureText(subtitle).width
 
   // 서비스 이름: 산 모양 표시와 「방구석 등반대」. 둘째 줄 오른쪽에 두고, 좁은 폰 세로 사진처럼 자리가 모자라면
   // 큰 제목 줄 오른쪽으로, 거기도 모자라면 사진 오른쪽 위로 옮겨 글자끼리 겹치지 않게 한다
@@ -47,26 +51,27 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
   const brandW = textW + size * 1.5 // 산 표시와 사이 간격까지
   const gap = size * 1.2
   const right = w - pad
-  const fits = (used: number) => pad + used + gap + brandW <= right
-  const base = fits(lineW) ? h - bar * 0.2 : fits(titleW) ? h - bar * 0.55 : pad + size
+  const fitsAfter = (usedW: number) => pad + usedW + gap + brandW <= right
+  const brandY = fitsAfter(subtitleW) ? subtitleY : fitsAfter(titleW) ? titleY : pad + size
   ctx.save()
   // 사진 위쪽은 밝은 하늘일 수 있어 그림자를 깔아 읽히게 한다
   ctx.shadowColor = 'rgba(0,0,0,0.45)'
   ctx.shadowBlur = size * 0.4
   ctx.fillStyle = '#fdf6ec'
   ctx.textAlign = 'right'
-  ctx.fillText(brand, right, base)
+  ctx.fillText(brand, right, brandY)
   ctx.textAlign = 'left'
-  const m = size * 1.1 // 산 표시 크기
-  const mx = right - textW - m - size * 0.4
-  const my = base - size * 0.85
+  // 산 표시: 봉우리 두 개짜리 금빛 삼각형
+  const icon = size * 1.1
+  const iconX = right - textW - icon - size * 0.4
+  const iconY = brandY - size * 0.85
   ctx.fillStyle = '#ffd58a'
   ctx.beginPath()
-  ctx.moveTo(mx, my + m)
-  ctx.lineTo(mx + m * 0.38, my + m * 0.3)
-  ctx.lineTo(mx + m * 0.55, my + m * 0.55)
-  ctx.lineTo(mx + m * 0.72, my)
-  ctx.lineTo(mx + m * 1.1, my + m)
+  ctx.moveTo(iconX, iconY + icon)
+  ctx.lineTo(iconX + icon * 0.38, iconY + icon * 0.3)
+  ctx.lineTo(iconX + icon * 0.55, iconY + icon * 0.55)
+  ctx.lineTo(iconX + icon * 0.72, iconY)
+  ctx.lineTo(iconX + icon * 1.1, iconY + icon)
   ctx.closePath()
   ctx.fill()
   ctx.restore()

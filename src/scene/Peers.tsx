@@ -9,13 +9,17 @@ import { occlusionUniforms } from '../lib/occlusion'
 import { Avatar } from './Avatar'
 import type { HikerHandle } from './Hiker'
 
-const FOLLOW = 15 // 채운 위치로 따라가는 빠르기 (클수록 바로 붙는다)
-// 위치는 1초에 5번 온다. 받은 위치로 바로 뛰지 않고 지난 위치에서 이 시간 동안 고르게 걸어가게 채운다(ms).
-// 서버 간격(200ms)보다 조금 길게 잡아 메시지가 늦게 와도 멈칫하지 않게 한다
+/** 채운 위치로 따라가는 빠르기 (클수록 바로 붙는다) */
+const FOLLOW = 15
+/**
+ * 위치는 1초에 5번 온다. 받은 위치로 바로 뛰지 않고 지난 위치에서 이 시간(ms) 동안 고르게 걸어가게 채운다.
+ * 서버 간격(200ms)보다 조금 길게 잡아 메시지가 늦게 와도 멈칫하지 않게 한다
+ */
 const BLEND_MS = 240
-const SNAP = 40 // 이보다 멀리 뛰면(순간이동·코스 재시작) 따라가지 않고 바로 옮긴다(m)
-const LABEL_RANGE = 120 // 이 거리 안의 사람만 이름표를 띄운다(m)
-
+/** 이보다 멀리 뛰면(순간이동·다시 오르기) 따라가지 않고 바로 옮긴다(m) */
+const SNAP = 40
+/** 이 거리(m) 안의 사람만 이름표를 띄운다. 멀리 있는 이름표가 화면을 덮지 않게 한다 */
+const LABEL_RANGE = 120
 
 /** 같은 코스를 오르는 다른 사람들 */
 export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
@@ -38,14 +42,18 @@ export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   )
 }
 
+/** 다른 사람 한 명. 받은 위치를 부드럽게 따라가며 아바타·이름표·말풍선을 그린다 */
 function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail: Trail }) {
   const hiker = useRef<HikerHandle>(null!)
   const label = useRef<THREE.Group>(null!)
+  /** 화면에 그리는 위치와 방향 (받은 값을 부드럽게 따라간다) */
   const shown = useRef<{ distance: number; offset: number; facing: number } | null>(null)
-  // 지난 위치(from)에서 받은 위치(to)로 채워 가는 구간
-  const seg = useRef<{ fromD: number; fromO: number; toD: number; toO: number; at: number } | null>(null)
+  /** 지난 위치(from)에서 받은 위치(to)로 채워 가는 구간. at 은 구간을 시작한 시각 */
+  const segment = useRef<{ fromD: number; fromO: number; toD: number; toO: number; at: number } | null>(null)
+  // 아바타 종류는 처음 값으로 고정한다 (바뀌면 Peers 가 key 를 바꿔 새로 만든다)
   const [peer] = useState(() => useNet.getState().peers.find((p) => p.id === id) as Peer)
   const [view, setView] = useState({ name: peer.name, emote: null as string | null, near: true })
+  /** 마지막으로 본 감정 표현의 at 과, 그것을 이 화면에서 처음 본 시각 */
   const emoteSeen = useRef<{ at: number; localAt: number } | null>(null)
 
   useFrame((_, rawDt) => {
@@ -55,43 +63,45 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
 
     // 받은 위치 사이를 고르게 채우고, 그 위치로 부드럽게 따라간다
     const now = performance.now()
-    const g = (seg.current ??= { fromD: p.distance, fromO: p.offset, toD: p.distance, toO: p.offset, at: now })
-    const t = Math.min(1, (now - g.at) / BLEND_MS)
-    const targetD = g.fromD + (g.toD - g.fromD) * t
-    const targetO = g.fromO + (g.toO - g.fromO) * t
-    if (p.distance !== g.toD || p.offset !== g.toO) {
-      Object.assign(g, { fromD: targetD, fromO: targetO, toD: p.distance, toO: p.offset, at: now })
+    const seg = (segment.current ??= { fromD: p.distance, fromO: p.offset, toD: p.distance, toO: p.offset, at: now })
+    const t = Math.min(1, (now - seg.at) / BLEND_MS)
+    const targetD = seg.fromD + (seg.toD - seg.fromD) * t
+    const targetO = seg.fromO + (seg.toO - seg.fromO) * t
+    // 새 위치가 오면 지금 채운 자리에서 새 구간을 시작한다
+    if (p.distance !== seg.toD || p.offset !== seg.toO) {
+      Object.assign(seg, { fromD: targetD, fromO: targetO, toD: p.distance, toO: p.offset, at: now })
     }
-    const s = (shown.current ??= { distance: p.distance, offset: p.offset, facing: p.facing })
-    const k = 1 - Math.exp(-FOLLOW * dt)
-    if (Math.abs(p.distance - s.distance) > SNAP) {
-      Object.assign(g, { fromD: p.distance, fromO: p.offset, toD: p.distance, toO: p.offset })
-      s.distance = p.distance
-      s.offset = p.offset
+    const pose = (shown.current ??= { distance: p.distance, offset: p.offset, facing: p.facing })
+    const follow = 1 - Math.exp(-FOLLOW * dt)
+    if (Math.abs(p.distance - pose.distance) > SNAP) {
+      Object.assign(seg, { fromD: p.distance, fromO: p.offset, toD: p.distance, toO: p.offset })
+      pose.distance = p.distance
+      pose.offset = p.offset
     }
-    const before = s.distance + s.offset
-    s.distance += (targetD - s.distance) * k
-    s.offset += (targetO - s.offset) * k
+    const before = pose.distance + pose.offset
+    pose.distance += (targetD - pose.distance) * follow
+    pose.offset += (targetO - pose.offset) * follow
     // 방향도 짧은 쪽으로 돌며 따라간다
-    s.facing += Math.atan2(Math.sin(p.facing - s.facing), Math.cos(p.facing - s.facing)) * k
-    const heading = trail.headingAt(s.distance)
-    const pos = trail.positionAt(s.distance)
-    pos.x += -Math.cos(heading) * s.offset
-    pos.z += Math.sin(heading) * s.offset
+    pose.facing += Math.atan2(Math.sin(p.facing - pose.facing), Math.cos(p.facing - pose.facing)) * follow
+    const heading = trail.headingAt(pose.distance)
+    const pos = trail.positionAt(pose.distance)
+    pos.x += -Math.cos(heading) * pose.offset
+    pos.z += Math.sin(heading) * pose.offset
     // 내 캐릭터와 같은 높이 규칙 (등산로·돌계단·지형)
-    pos.y = groundAt(terrain, trail, stoneSteps(terrain, trail), s.distance, s.offset, pos.x, pos.z).y
-    hiker.current.stride(s.distance + s.offset - before)
+    pos.y = groundAt(terrain, trail, stoneSteps(terrain, trail), pose.distance, pose.offset, pos.x, pos.z).y
+    hiker.current.stride(pose.distance + pose.offset - before)
     hiker.current.group.position.copy(pos).setY(pos.y + p.jump)
-    hiker.current.group.rotation.y = heading + s.facing
+    hiker.current.group.rotation.y = heading + pose.facing
     hiker.current.setAirborne(p.jump > 0)
     hiker.current.setCheering(p.mode !== 'hiking')
     label.current.position.copy(hiker.current.group.position)
 
-    // 이름표와 말풍선은 바뀔 때만 다시 그린다. 감정 표현 시각은 서버 시계라 받은 순간 기준으로 잰다
+    // 말풍선은 이 화면에서 감정 표현을 처음 본 때부터 EMOTE_MS 동안 띄운다
     if (p.emote && p.emote.at !== emoteSeen.current?.at) emoteSeen.current = { at: p.emote.at, localAt: Date.now() }
-    const emoting = emoteSeen.current && Date.now() - emoteSeen.current.localAt < EMOTE_MS ? emoteBubble(p.emote!.kind) : null
+    const bubble = emoteSeen.current && Date.now() - emoteSeen.current.localAt < EMOTE_MS ? emoteBubble(p.emote!.kind) : null
     const near = pos.distanceTo(occlusionUniforms.uOccTarget.value) < LABEL_RANGE
-    if (p.name !== view.name || emoting !== view.emote || near !== view.near) setView({ name: p.name, emote: emoting, near })
+    // 이름표와 말풍선은 바뀔 때만 다시 그린다
+    if (p.name !== view.name || bubble !== view.emote || near !== view.near) setView({ name: p.name, emote: bubble, near })
   })
 
   return (

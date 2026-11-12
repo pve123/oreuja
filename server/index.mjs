@@ -12,13 +12,13 @@
 //
 // 환경변수
 //   PORT              듣는 포트 (기본 5200). 호스팅 서비스가 정해 주면 그 값을 쓴다
-//   ALLOWED_ORIGINS   접속을 받을 페이지 주소, 쉼표로 여럿 (기본: 배포 주소). localhost 는 늘 받는다
+//   ALLOWED_ORIGINS   접속을 받을 페이지 주소, 쉼표로 여럿 (기본: 운영 주소 www.oreuja.com, oreuja.com). localhost 는 늘 받는다
 //   TRUST_PROXY       1 이면 X-Forwarded-For 첫 주소를 접속한 사람 IP 로 본다. 호스팅의 프록시 뒤에 둘 때만 켠다
 //                     (프록시 없이 켜면 누구나 머리글을 꾸며 IP 제한을 피한다)
 //   HEARTBEAT_MS      끊긴 연결을 찾는 간격 (기본 15000). 시험에서만 줄인다
 //
 // 브라우저 하나에 접속 하나: 클라이언트는 브라우저마다 정한 번호를 주소에 붙여 온다(?cid=…).
-// 같은 번호로 새 창이 붙으면 이전 창 연결을 4001(replaced) 로 닫는다. 한 사람이 창을 여러 개 열어도 마지막 창 하나만 센다
+// 같은 번호로 새 창이 붙으면 이전 창 연결을 4001(replaced) 로 닫는다. 한 사람이 창을 여러 개 열어도 마지막 창 하나만 센다.
 import { createServer } from 'node:http'
 import { WebSocketServer } from 'ws'
 
@@ -45,7 +45,7 @@ const climbing = (p) => p.mode !== 'lobby'
 const EMOTES = new Set(['wave', 'thanks', 'yaho', 'cheer', 'summit', 'cheerup', 'fighting'])
 
 const ALLOWED_ORIGINS = new Set(
-  (process.env.ALLOWED_ORIGINS ?? 'https://trailverse-seven.vercel.app')
+  (process.env.ALLOWED_ORIGINS ?? 'https://www.oreuja.com,https://oreuja.com')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean),
@@ -54,7 +54,8 @@ const TRUST_PROXY = process.env.TRUST_PROXY === '1'
 
 /**
  * 이 페이지에서 온 접속인지. 다른 사이트가 이 서버를 가져다 쓰지 못하게 브라우저가 붙이는 Origin 을 본다.
- * 배포 주소와 Vercel 미리보기 주소(trailverse-…-hsl-labs.vercel.app), 개발용 localhost 를 받는다
+ * 운영 주소(ALLOWED_ORIGINS)와 Vercel 미리보기 주소, 개발용 localhost 를 받는다.
+ * Vercel 프로젝트 이름이 아직 trailverse 라서 미리보기 주소는 trailverse-…-hsl-labs.vercel.app 꼴이다
  */
 function originAllowed(origin) {
   if (!origin) return false
@@ -83,6 +84,7 @@ function clientIp(req) {
 
 /** 주소에 붙어 온 브라우저 번호. 모양이 틀리면 없는 것으로 본다 */
 function clientId(req) {
+  // req.url 은 /?cid=… 처럼 뒷부분만 오니 아무 앞부분을 붙여 읽는다
   const cid = new URL(req.url ?? '/', 'http://x').searchParams.get('cid') ?? ''
   return /^[A-Za-z0-9-]{8,64}$/.test(cid) ? cid : ''
 }
@@ -136,6 +138,7 @@ const wss = new WebSocketServer({
   },
 })
 
+/** 연결 하나를 목록과 IP 별 접속 수에서 뺀다. 그 사람이 있던 코스에는 바뀌었다고 표시한다 */
 function drop(ws) {
   const me = players.get(ws)
   if (!me) return
@@ -203,7 +206,7 @@ wss.on('connection', (ws, req) => {
         me.avatar = avatar
         me.info++
       }
-      const course = str(msg.course, 40)
+      const course = str(msg.course, 40) // 코스 id 는 40자를 넘지 않는다
       if (course && course !== me.course) {
         dirty.add(me.course)
         me.course = course
@@ -246,7 +249,7 @@ setInterval(() => {
     if (ws.readyState !== ws.OPEN) continue
     if (!climbing(me)) {
       // 베이스캠프로 나가면 남은 사람을 지우라고 한 번 알린다
-      if (me.sentPeers) send(ws, me, me.sentCourse, [])
+      if (me.sentPeers) sendPeers(ws, me, me.sentCourse, [])
       continue
     }
     if (!dirty.has(me.course) && me.sentCourse === me.course) continue
@@ -257,13 +260,13 @@ setInterval(() => {
       for (const p of info) me.known.set(p.id, p.info)
       ws.send(JSON.stringify({ t: 'i', i: info.map((p) => [p.id, p.name, p.avatar]) }))
     }
-    send(ws, me, me.course, others)
+    sendPeers(ws, me, me.course, others)
   }
   dirty.clear()
 }, TICK_MS)
 
 /** 위치 메시지. 지난번과 똑같으면 보내지 않는다 */
-function send(ws, me, course, others) {
+function sendPeers(ws, me, course, others) {
   const peers = JSON.stringify(others.map((p) => [p.id, p.distance, p.offset, p.facing, p.jump, MODE_LIST.indexOf(p.mode)]))
   const key = others.length ? peers : ''
   if (course === me.sentCourse && key === me.sentPeers) return

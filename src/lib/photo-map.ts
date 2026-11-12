@@ -8,7 +8,9 @@ export type PhotoLayer = { rect: LocalRect; width: number; height: number; data:
 type PhotoStatus = 'none' | 'loading' | 'ready' | 'failed'
 
 type State = {
+  /** 지형 전체를 덮는 흐린 사진 */
   base: PhotoLayer | null
+  /** 등산로 둘레만 덮는 선명한 사진 */
   detail: PhotoLayer | null
   baseStatus: PhotoStatus
   detailStatus: PhotoStatus
@@ -32,7 +34,7 @@ export function layerFromCanvas(canvas: HTMLCanvasElement, rect: LocalRect): Pho
   return { rect, width: canvas.width, height: canvas.height, data }
 }
 
-/** 둘레 몇 픽셀을 평균 낸 색. 선명한 사진이 덮는 곳이면 그쪽을 쓴다 */
+/** (x, z) 자리의 사진 색 (0~255). 앞쪽 사진이 덮는 곳이면 그쪽을 쓰므로 선명한 사진을 먼저 넣는다. 어느 사진에도 없으면 null */
 export function samplePhoto(layers: (PhotoLayer | null)[], x: number, z: number): [number, number, number] | null {
   for (const layer of layers) {
     if (!layer) continue
@@ -40,13 +42,20 @@ export function samplePhoto(layers: (PhotoLayer | null)[], x: number, z: number)
     if (x < rect.minX || x > rect.maxX || z < rect.minZ || z > rect.maxZ) continue
     const px = Math.round(((x - rect.minX) / (rect.maxX - rect.minX)) * (width - 1))
     const py = Math.round(((z - rect.minZ) / (rect.maxZ - rect.minZ)) * (height - 1))
-    let r = 0, g = 0, b = 0, n = 0
+    // 둘레 3×3 픽셀 평균. 픽셀 하나만 보면 나무 사이 그늘이나 반짝이는 점에 휘둘린다
+    let r = 0
+    let g = 0
+    let b = 0
+    let n = 0
     for (let dy = -1; dy <= 1; dy++)
       for (let dx = -1; dx <= 1; dx++) {
         const qx = Math.min(width - 1, Math.max(0, px + dx))
         const qy = Math.min(height - 1, Math.max(0, py + dy))
         const k = (qy * width + qx) * 4
-        r += data[k]; g += data[k + 1]; b += data[k + 2]; n++
+        r += data[k]
+        g += data[k + 1]
+        b += data[k + 2]
+        n++
       }
     return [r / n, g / n, b / n]
   }
@@ -58,7 +67,7 @@ type Ground = 'forest' | 'rock' | 'other'
 /**
  * 사진 색으로 땅의 종류를 가른다.
  * - 숲: 초록이 빨강·파랑보다 뚜렷하게 강하다 (초과 녹색 지수 2G-R-B)
- * - 바위: 채도가 낮고 밝다 (북한산 화강암은 밝은 회색~누런 회색)
+ * - 바위: 채도가 낮고 밝다 (서울 둘레 산의 화강암은 밝은 회색~누런 회색)
  * - 그 밖: 길, 주차장, 건물, 그림자 등
  */
 export function classifyGround([r, g, b]: [number, number, number]): Ground {

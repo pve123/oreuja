@@ -11,6 +11,7 @@ import * as THREE from 'three'
 export const occlusionUniforms = {
   uOccCamera: { value: new THREE.Vector3() },
   uOccTarget: { value: new THREE.Vector3() },
+  /** 원기둥 반지름(m). 수관 하나를 넉넉히 덮는 크기 */
   uOccRadius: { value: 4.5 },
   uDetailRadius: { value: 0 },
 }
@@ -38,7 +39,7 @@ export function withOcclusionFade<T extends THREE.Material>(material: T, centerL
   const { ring, occlusion = true } = options
   material.onBeforeCompile = (shader) => {
     Object.assign(shader.uniforms, occlusionUniforms, { uOccLift: { value: centerLift } })
-    // 정밀 반경 판정은 밑동의 수평 거리로 한다. 'far' 는 반경 안, 'near' 는 반경 밖을 숨긴다
+    // 정밀 반경 판정은 밑동의 수평 거리로 한다. 'far' 는 반경 안, 'near' 는 반경 밖을 숨긴다 (크기를 0 으로 줄여 숨긴다)
     const ringCode =
       ring === undefined
         ? ''
@@ -47,6 +48,7 @@ export function withOcclusionFade<T extends THREE.Material>(material: T, centerL
             float inside = step( length( base.xz - uOccTarget.xz ), uDetailRadius );
             keep *= ${ring === 'far' ? '1.0 - inside' : 'inside'};
           }`
+    // 그루 중심에서 카메라~아바타 선분까지 거리 d. 가까울수록 fade 가 MIN_OPACITY 쪽으로 내려간다
     const occlusionCode = occlusion
       ? `vec3 center = ( modelMatrix * instanceMatrix * vec4( 0.0, uOccLift, 0.0, 1.0 ) ).xyz;
           vec3 ab = uOccTarget - uOccCamera;

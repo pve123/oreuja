@@ -5,14 +5,16 @@ import { meshHeight, type Terrain, type Trail } from '../lib/data'
 import { seededRandom } from '../lib/random'
 
 /**
- * 이름 붙은 바위·봉우리·정자 모형 (src/lib/landmarks.ts 의 boulder, peak, slab, ropes, pavilion).
+ * 이름 붙은 바위·봉우리·정자 모형 (src/lib/landmarks.ts 의 boulder, peak, rockgate, slab, ropes, ridge, pavilion).
  * 실제 사진을 보고 생김새를 저폴리로 옮겼다. 둥근 화강암은 모두 blob() 하나를 늘이고 눌러 만든다
  */
 
+/** 색을 따로 주지 않은 바위에 돌아가며 칠하는 화강암 색 */
 const ROCK = ['#b3ab9f', '#a9a195', '#bcb4a7', '#a0988c']
 /** 비탈에 묻힌 바닥이 떠 보이지 않게 모든 바위 밑에 까는 받침 */
 const FOOTING: Blob = { pos: [0, -0.4, 0], scale: [2.6, 0.9, 2.2], color: '#9d958a' }
 
+/** 둥근 바위 하나의 자리·크기·색 */
 export type Blob = {
   pos: [number, number, number]
   scale: [number, number, number]
@@ -50,6 +52,7 @@ function blob(seed: number, flatBottom = -2, flatTop = 2) {
   return geo
 }
 
+/** 둥근 바위 여러 개. 바위마다 seed + 순번으로 울퉁불퉁한 모양이 다르다 */
 export function Blobs({ blobs, seed }: { blobs: Blob[]; seed: number }) {
   return (
     <>
@@ -110,28 +113,40 @@ export function Boulder({ name, seed }: { name: string; seed: number }) {
   return <Blobs blobs={blobs} seed={Math.round(seed)} />
 }
 
-/** 세로로 쓴 정상석 글씨 */
-function markerTexture(name: string) {
+/** 캔버스에 그린 그림을 텍스처로 만든다 */
+function canvasTexture(width: number, height: number, draw: (g: CanvasRenderingContext2D) => void) {
   const c = document.createElement('canvas')
-  c.width = 64
-  c.height = 256
-  const g = c.getContext('2d')!
-  g.fillStyle = '#1d1d1f'
-  g.fillRect(0, 0, 64, 256)
-  g.fillStyle = '#f2f2f2'
-  g.textAlign = 'center'
-  g.textBaseline = 'middle'
-  const chars = [...name.replace(/\s.*$/, '')].slice(0, 4)
-  g.font = 'bold 44px sans-serif'
-  chars.forEach((ch, i) => g.fillText(ch, 32, 56 + i * 56))
+  c.width = width
+  c.height = height
+  draw(c.getContext('2d')!)
   const tex = new THREE.CanvasTexture(c)
   tex.colorSpace = THREE.SRGBColorSpace
   return tex
 }
 
+/** 폭 64px 판에 글자를 위에서 아래로 한 자씩 쓴 텍스처 (정상석, 마당바위 표지판) */
+function verticalTextTexture(
+  text: string,
+  { height, background, ink, fontPx, firstY, lineGap, maxChars }: { height: number; background: string; ink: string; fontPx: number; firstY: number; lineGap: number; maxChars: number },
+) {
+  return canvasTexture(64, height, (g) => {
+    g.fillStyle = background
+    g.fillRect(0, 0, 64, height)
+    g.fillStyle = ink
+    g.textAlign = 'center'
+    g.textBaseline = 'middle'
+    g.font = `bold ${fontPx}px sans-serif`
+    ;[...text].slice(0, maxChars).forEach((ch, i) => g.fillText(ch, 32, firstY + i * lineGap))
+  })
+}
+
 /** 봉우리 (수락산 도솔봉). 둥근 바위 무더기 앞에 검은 정상석을 세운다. 정상석 앞면에 봉우리 이름을 세로로 쓴다 */
 export function Peak({ name, seed }: { name: string; seed: number }) {
-  const label = useMemo(() => markerTexture(name.split(' ').pop() ?? name), [name])
+  const label = useMemo(() => {
+    // 마지막 낱말만 쓴다 ('관음사 국기봉' → '국기봉')
+    const word = (name.split(' ').pop() ?? name).replace(/\s.*$/, '')
+    return verticalTextTexture(word, { height: 256, background: '#1d1d1f', ink: '#f2f2f2', fontPx: 44, firstY: 56, lineGap: 56, maxChars: 4 })
+  }, [name])
   useEffect(() => () => label.dispose(), [label])
   return (
     <group>
@@ -179,43 +194,38 @@ function PeakMarker({ label }: { label: THREE.Texture }) {
 
 /** 태극기: 흰 바탕 가운데 빨강·파랑 태극, 네 귀에 검은 괘 */
 function taegeukTexture() {
-  const c = document.createElement('canvas')
-  c.width = 192
-  c.height = 128
-  const g = c.getContext('2d')!
-  g.fillStyle = '#ffffff'
-  g.fillRect(0, 0, 192, 128)
-  g.save()
-  g.translate(96, 64)
-  g.rotate(Math.atan2(2, 3))
-  g.fillStyle = '#cd2e3a'
-  g.beginPath()
-  g.arc(0, 0, 32, Math.PI, 0)
-  g.fill()
-  g.fillStyle = '#0047a0'
-  g.beginPath()
-  g.arc(0, 0, 32, 0, Math.PI)
-  g.fill()
-  g.beginPath()
-  g.arc(-16, 0, 16, 0, Math.PI * 2)
-  g.fillStyle = '#cd2e3a'
-  g.fill()
-  g.beginPath()
-  g.arc(16, 0, 16, 0, Math.PI * 2)
-  g.fillStyle = '#0047a0'
-  g.fill()
-  g.restore()
-  g.fillStyle = '#111111'
-  for (const [x, y, r] of [[34, 26, -0.6], [158, 26, 0.6], [34, 102, 0.6], [158, 102, -0.6]] as const) {
+  return canvasTexture(192, 128, (g) => {
+    g.fillStyle = '#ffffff'
+    g.fillRect(0, 0, 192, 128)
     g.save()
-    g.translate(x, y)
-    g.rotate(r)
-    for (let k = -1; k <= 1; k++) g.fillRect(-14, k * 8 - 2.5, 28, 5)
+    g.translate(96, 64)
+    g.rotate(Math.atan2(2, 3))
+    g.fillStyle = '#cd2e3a'
+    g.beginPath()
+    g.arc(0, 0, 32, Math.PI, 0)
+    g.fill()
+    g.fillStyle = '#0047a0'
+    g.beginPath()
+    g.arc(0, 0, 32, 0, Math.PI)
+    g.fill()
+    g.beginPath()
+    g.arc(-16, 0, 16, 0, Math.PI * 2)
+    g.fillStyle = '#cd2e3a'
+    g.fill()
+    g.beginPath()
+    g.arc(16, 0, 16, 0, Math.PI * 2)
+    g.fillStyle = '#0047a0'
+    g.fill()
     g.restore()
-  }
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
-  return tex
+    g.fillStyle = '#111111'
+    for (const [x, y, r] of [[34, 26, -0.6], [158, 26, 0.6], [34, 102, 0.6], [158, 102, -0.6]] as const) {
+      g.save()
+      g.translate(x, y)
+      g.rotate(r)
+      for (let k = -1; k <= 1; k++) g.fillRect(-14, k * 8 - 2.5, 28, 5)
+      g.restore()
+    }
+  })
 }
 
 /** 태극기를 단 게양대. 깃대 꼭대기에 금색 꼭지 */
@@ -262,35 +272,32 @@ export function RockGate({ seed }: { seed: number }) {
 
 /** 단청 띠: 초록 바탕에 붉은 꽃무늬와 흰·파랑 줄 */
 function dancheongTexture() {
-  const c = document.createElement('canvas')
-  c.width = 256
-  c.height = 32
-  const g = c.getContext('2d')!
-  g.fillStyle = '#2f8f6a'
-  g.fillRect(0, 0, 256, 32)
-  g.fillStyle = '#e9eef0'
-  g.fillRect(0, 3, 256, 2)
-  g.fillRect(0, 27, 256, 2)
-  g.fillStyle = '#3a6fb0'
-  g.fillRect(0, 7, 256, 2)
-  g.fillRect(0, 23, 256, 2)
-  for (let x = 16; x < 256; x += 32) {
-    g.fillStyle = '#d6453d'
-    g.beginPath()
-    g.arc(x, 16, 6, 0, Math.PI * 2)
-    g.fill()
-    g.fillStyle = '#f2c14e'
-    g.beginPath()
-    g.arc(x, 16, 2.5, 0, Math.PI * 2)
-    g.fill()
-  }
-  const tex = new THREE.CanvasTexture(c)
-  tex.colorSpace = THREE.SRGBColorSpace
+  const tex = canvasTexture(256, 32, (g) => {
+    g.fillStyle = '#2f8f6a'
+    g.fillRect(0, 0, 256, 32)
+    g.fillStyle = '#e9eef0'
+    g.fillRect(0, 3, 256, 2)
+    g.fillRect(0, 27, 256, 2)
+    g.fillStyle = '#3a6fb0'
+    g.fillRect(0, 7, 256, 2)
+    g.fillRect(0, 23, 256, 2)
+    for (let x = 16; x < 256; x += 32) {
+      g.fillStyle = '#d6453d'
+      g.beginPath()
+      g.arc(x, 16, 6, 0, Math.PI * 2)
+      g.fill()
+      g.fillStyle = '#f2c14e'
+      g.beginPath()
+      g.arc(x, 16, 2.5, 0, Math.PI * 2)
+      g.fill()
+    }
+  })
   tex.wrapS = THREE.RepeatWrapping
   tex.repeat.set(3, 1)
   return tex
 }
 
+/** 정자 기둥이 선 육각형의 반지름(m) */
 const PAVILION_R = 1.85
 /** 육각형 꼭짓점 각도 (CylinderGeometry 6각과 같은 자리) */
 const HEX = Array.from({ length: 6 }, (_, i) => (i / 6) * Math.PI * 2)
@@ -312,8 +319,11 @@ export function Pavilion() {
         const next = a + Math.PI / 3
         const [nx, nz] = [Math.sin(next) * PAVILION_R, Math.cos(next) * PAVILION_R]
         const len = Math.hypot(nx - x, nz - z)
-        const mid: [number, number, number] = [(x + nx) / 2, 0.85, (z + nz) / 2]
+        const railCenter: [number, number, number] = [(x + nx) / 2, 0.85, (z + nz) / 2]
         const yaw = Math.atan2(nx - x, nz - z) + Math.PI / 2
+        // 가운데 각도가 0(+z, 등산로 쪽)인 칸이 정면이다
+        const middle = a + Math.PI / 6
+        const isFront = Math.abs(Math.sin(middle)) <= 0.01 && Math.cos(middle) >= 0
         return (
           <group key={a}>
             <mesh position={[x, 0.32, z]}>
@@ -324,13 +334,13 @@ export function Pavilion() {
               <cylinderGeometry args={[0.12, 0.13, 2.3, 10]} />
               <meshStandardMaterial color={red} roughness={0.7} />
             </mesh>
-            {/* 앞쪽 한 칸은 드나들게 비운다 */}
-            {Math.abs(Math.sin(a + Math.PI / 6)) > 0.01 || Math.cos(a + Math.PI / 6) < 0 ? (
-              <mesh position={mid} rotation={[0, yaw, 0]}>
+            {/* 정면 한 칸은 드나들게 난간을 비운다 */}
+            {!isFront && (
+              <mesh position={railCenter} rotation={[0, yaw, 0]}>
                 <boxGeometry args={[len - 0.2, 0.08, 0.08]} />
                 <meshStandardMaterial color="#2f8f6a" />
               </mesh>
-            ) : null}
+            )}
           </group>
         )
       })}
@@ -364,9 +374,13 @@ export function Pavilion() {
 
 /** 지형 위로 띄우는 높이(m). 볼록한 비탈에서도 지형에 묻히지 않을 만큼 */
 const SLAB_LIFT = 0.2
+/** 판을 등산로 방향으로 나누는 간격(m) */
 const SLAB_STEP = 0.6
 
-/** 등산로를 따라 지형 위에 덮는 판. along 은 이정표 앞뒤 거리, width(s) 는 그 자리의 반폭 */
+/**
+ * 등산로를 따라 지형 위에 덮는 판. at 앞뒤 along 미터를 덮는다.
+ * width(s) 는 at 에서 s 만큼 떨어진 자리의 반폭이고, offset 만큼 오른쪽으로 비킨다
+ */
 function drapeAlong(terrain: Terrain, trail: Trail, at: number, along: number, width: (s: number) => number, offset = 0, lift = SLAB_LIFT) {
   const rows = Math.round((along * 2) / SLAB_STEP)
   const cols = 8
@@ -409,60 +423,67 @@ function lowerSide(terrain: Terrain, trail: Trail, at: number) {
   return drop(1) < drop(-1) ? 1 : -1
 }
 
-/** 등산로 위 at 에서 옆으로 t 만큼 비킨 곳 (지형 높이) */
-function beside(terrain: Terrain, trail: Trail, d: number, t: number) {
-  const p = trail.positionAt(d)
-  const h = trail.headingAt(d)
-  const x = p.x - Math.cos(h) * t
-  const z = p.z + Math.sin(h) * t
-  return { pos: new THREE.Vector3(x, meshHeight(terrain, x, z), z), heading: h }
+/** 등산로 위 at 에서 오른쪽으로 offset 만큼(음수면 왼쪽) 비킨 땅 위 자리와 그곳 진행 방향 */
+function beside(terrain: Terrain, trail: Trail, at: number, offset: number) {
+  const p = trail.positionAt(at)
+  const heading = trail.headingAt(at)
+  const x = p.x - Math.cos(heading) * offset
+  const z = p.z + Math.sin(heading) * offset
+  return { pos: new THREE.Vector3(x, meshHeight(terrain, x, z), z), heading }
+}
+
+type SlabMode = 'yard' | 'ropes' | 'ridge'
+
+/** 맨바위 모양마다: 이정표 앞뒤로 덮는 거리(m), 기본 반폭(m), 바위 색 */
+const SLAB_STYLE: Record<SlabMode, { along: number; halfWidth: number; color: string }> = {
+  yard: { along: 14, halfWidth: 5, color: '#b4ada0' },
+  ropes: { along: 18, halfWidth: 2.6, color: '#bab3a6' },
+  ridge: { along: 20, halfWidth: 2.2, color: '#aaa397' },
 }
 
 /**
- * 등산로를 따라 까는 맨바위.
- * - 마당바위: 앞뒤 14m 를 너른 화강암 판으로 덮고, 길옆에 이름 표지판과 낮은 바위를 둔다
- * - 기차바위: 앞뒤 18m 를 좁고 밝은 바위 비탈로 덮고, 길 오른쪽에 바위 틈, 양쪽에 쇠기둥과 밧줄을 놓는다
+ * 등산로를 따라 지형 위에 까는 맨바위.
+ * - yard(마당바위): 너른 화강암 판을 덮고, 길옆에 이름 표지판과 낮은 바위를 둔다
+ * - ropes(기차바위): 좁고 밝은 바위 비탈을 덮고, 길 오른쪽에 바위 틈, 양쪽에 쇠기둥과 밧줄을 놓는다
+ * - ridge(능선): 좁은 바위 능선을 덮고, 낭떠러지 쪽(더 낮은 쪽)에 쇠줄 난간을 놓는다
  */
-type SlabMode = 'yard' | 'ropes' | 'ridge'
-
 export function TrailSlab({ terrain, trail, at, name, mode }: { terrain: Terrain; trail: Trail; at: number; name: string; mode: SlabMode }) {
-  const ropes = mode === 'ropes'
-  const ridge = mode === 'ridge'
   const built = useMemo(() => {
     const rand = seededRandom(Math.round(at))
-    const along = ropes ? 18 : ridge ? 20 : 14
+    const { along, halfWidth } = SLAB_STYLE[mode]
+    // 판을 앞뒤 8토막으로 나눠 토막마다 폭을 조금씩 달리한다
     const wobble = Array.from({ length: 8 }, () => rand())
     const width = (s: number) => {
       const k = Math.min(7, Math.max(0, Math.floor(((s + along) / (along * 2)) * 8)))
       const edge = 1 - Math.max(0, Math.abs(s) / along - 0.75) * 2 // 양 끝으로 좁아진다
-      return (ropes ? 2.6 : ridge ? 2.2 : 5) * (0.8 + wobble[k] * 0.35) * edge
+      return halfWidth * (0.8 + wobble[k] * 0.35) * edge
     }
     const slab = drapeAlong(terrain, trail, at, along, width)
-    const crack = ropes ? drapeAlong(terrain, trail, at, along - 2, () => 0.07, 0.8, SLAB_LIFT + 0.02) : null
-    const posts: { pos: THREE.Vector3 }[] = []
+    const crack = mode === 'ropes' ? drapeAlong(terrain, trail, at, along - 2, () => 0.07, 0.8, SLAB_LIFT + 0.02) : null
+
+    const posts: THREE.Vector3[] = []
     const lines: { a: THREE.Vector3; b: THREE.Vector3 }[] = []
-    // 기차바위는 양쪽 밧줄, 능선은 낭떠러지 쪽(더 낮은 쪽) 한쪽에 쇠줄 난간
-    const ropeSides = ropes ? [-1.5, 1.5] : ridge ? [lowerSide(terrain, trail, at) * 1.4] : []
-    {
-      for (const side of ropeSides) {
-        let prev: THREE.Vector3 | null = null
-        for (let s = -along + 2; s <= along - 2; s += 3) {
-          const top = beside(terrain, trail, at + s, side).pos.add(new THREE.Vector3(0, SLAB_LIFT + 0.9, 0))
-          posts.push({ pos: top.clone().add(new THREE.Vector3(0, -0.45, 0)) })
-          if (prev) lines.push({ a: prev, b: top })
-          prev = top
-        }
+    const ropeSides = mode === 'ropes' ? [-1.5, 1.5] : mode === 'ridge' ? [lowerSide(terrain, trail, at) * 1.4] : []
+    for (const side of ropeSides) {
+      let prev: THREE.Vector3 | null = null
+      for (let s = -along + 2; s <= along - 2; s += 3) {
+        const postTop = beside(terrain, trail, at + s, side).pos.add(new THREE.Vector3(0, SLAB_LIFT + 0.9, 0))
+        posts.push(postTop.clone().add(new THREE.Vector3(0, -0.45, 0)))
+        if (prev) lines.push({ a: prev, b: postTop })
+        prev = postTop
       }
     }
-    const sign = mode !== 'yard' ? null : beside(terrain, trail, at, width(0) * 0.7 + 0.8)
-    const stones = mode !== 'yard'
-      ? []
-      : [-8, -3, 5, 9].map((s, i) => {
+
+    const isYard = mode === 'yard'
+    const sign = isYard ? beside(terrain, trail, at, width(0) * 0.7 + 0.8) : null
+    const stones = isYard
+      ? [-8, -3, 5, 9].map((s, i) => {
           const b = beside(terrain, trail, at + s, (i % 2 ? -1 : 1) * (width(s) - 0.4))
           return { pos: b.pos, size: 0.5 + rand() * 0.5, rot: rand() * 3 }
         })
+      : []
     return { slab, crack, posts, lines, sign, stones }
-  }, [terrain, trail, at, ropes, ridge, mode])
+  }, [terrain, trail, at, mode])
   useEffect(
     () => () => {
       built.slab.dispose()
@@ -474,7 +495,7 @@ export function TrailSlab({ terrain, trail, at, name, mode }: { terrain: Terrain
   return (
     <group>
       <mesh geometry={built.slab} receiveShadow>
-        <meshStandardMaterial color={ropes ? '#bab3a6' : ridge ? '#aaa397' : '#b4ada0'} roughness={0.85} flatShading polygonOffset polygonOffsetFactor={-2} />
+        <meshStandardMaterial color={SLAB_STYLE[mode].color} roughness={0.85} flatShading polygonOffset polygonOffsetFactor={-2} />
       </mesh>
       {built.crack && (
         <mesh geometry={built.crack}>
@@ -482,7 +503,7 @@ export function TrailSlab({ terrain, trail, at, name, mode }: { terrain: Terrain
         </mesh>
       )}
       {built.posts.map((p, i) => (
-        <mesh key={i} position={p.pos} castShadow>
+        <mesh key={i} position={p} castShadow>
           <cylinderGeometry args={[0.035, 0.035, 0.9, 6]} />
           <meshStandardMaterial color="#8a8f94" metalness={0.4} roughness={0.5} />
         </mesh>
@@ -524,22 +545,10 @@ export function Rope({ a, b, color = '#e8e4da' }: { a: THREE.Vector3; b: THREE.V
 
 /** 마당바위 길옆 이름 표지판: 기둥에 짙은 판, 흰 글씨 */
 function SlabSign({ name }: { name: string }) {
-  const tex = useMemo(() => {
-    const c = document.createElement('canvas')
-    c.width = 64
-    c.height = 192
-    const g = c.getContext('2d')!
-    g.fillStyle = '#3b2f26'
-    g.fillRect(0, 0, 64, 192)
-    g.fillStyle = '#f4efe6'
-    g.textAlign = 'center'
-    g.textBaseline = 'middle'
-    g.font = 'bold 38px sans-serif'
-    ;[...name].slice(0, 4).forEach((ch, i) => g.fillText(ch, 32, 30 + i * 44))
-    const t = new THREE.CanvasTexture(c)
-    t.colorSpace = THREE.SRGBColorSpace
-    return t
-  }, [name])
+  const tex = useMemo(
+    () => verticalTextTexture(name, { height: 192, background: '#3b2f26', ink: '#f4efe6', fontPx: 38, firstY: 30, lineGap: 44, maxChars: 4 }),
+    [name],
+  )
   useEffect(() => () => tex.dispose(), [tex])
   return (
     <group>

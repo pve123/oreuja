@@ -6,6 +6,7 @@ const A = 6378137
 const F = 1 / 298.257222101 // GRS80
 const E2 = 2 * F - F * F
 const EP2 = E2 / (1 - E2)
+// 중부원점: 북위 38°, 동경 127° 를 (200000, 600000) m 로 둔다. 축척 계수는 1
 const K0 = 1
 const LAT0 = (38 * Math.PI) / 180
 const LON0 = (127 * Math.PI) / 180
@@ -21,7 +22,7 @@ const meridianArc = (phi) =>
 const M0 = meridianArc(LAT0)
 
 /** 횡메르카토르 역변환 (Snyder 식 8-18~8-25). 반환: { lat, lon } (도) */
-export function tm5186ToLatLon(x, y) {
+function tm5186ToLatLon(x, y) {
   const M = M0 + (y - FN) / K0
   const mu = M / (A * (1 - E2 / 4 - (3 * E2 ** 2) / 64 - (5 * E2 ** 3) / 256))
   const e1 = (1 - Math.sqrt(1 - E2)) / (1 + Math.sqrt(1 - E2))
@@ -182,6 +183,7 @@ export function buildContourDem({ sheets, toLocal, extent, spacing, baseSample }
       for (let n = 1; n < pts.length; n++) {
         const a = pts[n - 1]
         const b = pts[n]
+        // 칸 크기의 0.4 배 간격으로 찍어 선분이 지나는 칸을 하나도 빠뜨리지 않는다
         const steps = Math.max(1, Math.ceil(Math.hypot(b.x - a.x, b.z - a.z) / (spacing * 0.4)))
         for (let t = 0; t <= steps; t++) stamp(a.x + ((b.x - a.x) * t) / steps, a.z + ((b.z - a.z) * t) / steps, c.z)
       }
@@ -200,6 +202,7 @@ export function buildContourDem({ sheets, toLocal, extent, spacing, baseSample }
     }
 
   // 4) 나머지 칸은 라플라스 방정식(주변 평균)으로 채운다. SOR 로 빨리 수렴시킨다
+  // OMEGA 는 2 에 가까울수록 빨리 수렴한다(2 이상이면 발산). 한 번 돌아 가장 크게 바뀐 칸이 5mm 아래면 멈추고, 4000 번에서는 그만둔다
   const OMEGA = 1.92
   let iterations = 0
   let change = Infinity

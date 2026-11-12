@@ -30,7 +30,7 @@ export const AVATARS: { kind: AvatarKind; name: string; desc: string }[] = [
 ]
 
 /**
- * GLB 모델로 그리는 캐릭터 (public/models/avatars, 둘 다 CC0).
+ * GLB 모델로 그리는 캐릭터 (public/models/avatars, Kenney·KayKit 둘 다 CC0).
  * 파일은 scripts/prepare-avatars.mjs 로 준비한다. 여기 없는 캐릭터는 Hiker.tsx 가 도형으로 그린다.
  * clips 는 쉬기·걷기·공중·만세 때 틀 동작 이름이다.
  */
@@ -61,6 +61,7 @@ export const AVATAR_MODELS: Partial<Record<AvatarKind, AvatarModel>> = {
 
 const AVATAR_KEY = 'hiking-metaverse:avatar'
 
+/** 지난번 고른 캐릭터. 없거나 지금은 없는 캐릭터면 기본 등산객 */
 export function loadAvatar(): AvatarKind {
   const saved = readStored(AVATAR_KEY)
   return AVATARS.some((a) => a.kind === saved) ? (saved as AvatarKind) : 'hiker'

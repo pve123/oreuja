@@ -10,14 +10,16 @@ const FRAME_HEIGHT = 2.6 // 그림 한 장에 담을 높이(m)
 // 캐릭터 사이 간격(m). 한 칸이 그림 한 장이 되므로 높이와 같아야 정사각형으로 찌그러짐 없이 잘린다
 const SPACING = FRAME_HEIGHT
 /**
- * 몇 프레임 그린 뒤 찍는다. 모두 쉬는 자세로 찍는다: 만세는 GLB 캐릭터가 동작을 섞는 동안
- * 팔을 옆으로 벌린 어중간한 자세로 찍혀 도형 캐릭터와 자세가 달라 보였다
+ * 자세가 자리 잡도록 몇 프레임 그린 뒤 찍는다. 모두 쉬는 자세로 찍는다:
+ * 만세로 찍으면 GLB 캐릭터는 동작을 섞는 동안 팔을 어중간하게 벌려서 도형 캐릭터와 자세가 달라 보인다
  */
 const SETTLE_FRAMES = 4
 /** 첫 화면(지형·내 캐릭터)을 먼저 받도록 이만큼 기다렸다가 나머지 캐릭터 파일을 받아 찍는다 (ms) */
 const START_DELAY = 2000
+/** 시작하고 이만큼(ms) 지나도 못 찍으면 그만둔다. 그림이 없어도 고르기 목록은 이름으로 보인다 */
+const GIVE_UP_MS = 10000
 
-/** 다섯 캐릭터를 나란히 세워 한 번에 찍고, 한 칸씩 잘라 그림으로 만든다 */
+/** 모든 캐릭터를 나란히 세워 한 번에 찍고, 한 칸씩 잘라 그림으로 만든다 */
 function Studio() {
   const handles = useRef<(HikerHandle | null)[]>([])
   const frames = useRef(0)
@@ -70,15 +72,16 @@ export function AvatarThumbnails() {
     const t = setTimeout(() => setStarted(true), START_DELAY)
     return () => clearTimeout(t)
   }, [])
-  // 끝내 못 찍어도 목록은 이름으로 보이니, 시작하고 10초 뒤에는 숨은 화면을 치운다
+  // 끝내 못 찍으면 숨은 화면을 치운다
   useEffect(() => {
     if (!started) return
-    const t = setTimeout(() => useAvatarThumbs.setState({ done: true }), 10000)
+    const t = setTimeout(() => useAvatarThumbs.setState({ done: true }), GIVE_UP_MS)
     return () => clearTimeout(t)
   }, [started])
   if (done || !started) return null
 
   const width = AVATARS.length * SPACING
+  // 화면 밖에 숨겨 둔 3D 화면
   return (
     <div style={{ position: 'fixed', left: -10000, top: 0, width: SIZE * AVATARS.length, height: SIZE }} aria-hidden>
       <Canvas gl={{ preserveDrawingBuffer: true, alpha: true }} dpr={1}>

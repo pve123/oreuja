@@ -31,7 +31,6 @@ function socialMeta(): Plugin {
   }
 }
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), socialMeta()],
   build: {

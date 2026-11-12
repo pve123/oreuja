@@ -20,6 +20,7 @@ import { Blobs, Flagpole, Rope, type Blob } from './NamedRocks'
  * - fortress: 도착 10m 앞 등산로에 걸친 산성 대문과 문루 (대동문). 정상에 서면 성문을 막 지나온 자리다
  */
 type Decor = { rock?: boolean; flag?: boolean; railing?: boolean; marker?: string; spire?: boolean; hermitage?: boolean; fortress?: boolean }
+/** 정상 이름 → 꾸밈 */
 const SUMMITS: Record<string, Decor> = {
   영봉: { rock: true },
   백운대: { rock: true, flag: true, railing: true },
@@ -29,8 +30,9 @@ const SUMMITS: Record<string, Decor> = {
   대동문: { fortress: true },
 }
 
-/** 맨바위 판 반지름(m)과 둘레를 나누는 수 */
+/** 맨바위 판 반지름(m) */
 const RADIUS = 7
+/** 맨바위 판을 가운데에서 바깥으로 나누는 고리 수와, 둘레를 나누는 수 */
 const RINGS = 24
 const SEGMENTS = 96
 /** 지형 위로 띄우는 높이(m). 캐릭터 발이 묻혀 보이지 않을 만큼만 */
@@ -38,6 +40,7 @@ const LIFT = 0.2
 /** 기념사진 카메라가 서는 쪽(풍경 반대쪽) 이 각도 안에는 바위를 두지 않는다 */
 const CAMERA_CLEAR = THREE.MathUtils.degToRad(60)
 
+/** 맨바위 판과 가장자리 바위 색 */
 const SHADES = ['#b4ada0', '#a59e92', '#bab3a6', '#9c958a']
 
 /** 정상 둘레 꾸밈. 이름이 SUMMITS 에 없는 정상은 깃발만 둔다 (src/scene/SummitFlag.tsx) */
@@ -50,7 +53,7 @@ export function SummitRock({ terrain, trail }: { terrain: Terrain; trail: Trail 
     const ground = (p: THREE.Vector3) => p.setY(meshHeight(terrain, p.x, p.z))
     return { top, vista, side, ground }
   }, [terrain, trail])
-  const built = useMemo(() => (decor?.rock ? build(terrain, trail) : null), [decor, terrain, trail])
+  const built = useMemo(() => (decor?.rock ? buildRockSlab(terrain, trail) : null), [decor, terrain, trail])
   useEffect(() => () => built?.slab.dispose(), [built])
   const { top, vista, side, ground } = frame
 
@@ -74,11 +77,14 @@ export function SummitRock({ terrain, trail }: { terrain: Terrain; trail: Trail 
   }, [obstacles])
 
   // 정상에서 멀면 꾸밈을 그리지 않는다 (충돌은 그대로). 50m 단위로만 다시 그린다
-  const near = useGame((s) => Math.floor(s.distance / 50)) * 50
-  const far = useMemo(() => trail.positionAt(near).distanceTo(top) > DRAW_RANGE + 50, [trail, near, top])
+  const walked = useGame((s) => Math.floor(s.distance / 50)) * 50
+  const far = useMemo(() => trail.positionAt(walked).distanceTo(top) > DRAW_RANGE + 50, [trail, walked, top])
   if (!decor || far) return null
-  const at = (v: number, s: number) => ground(top.clone().addScaledVector(vista, v).addScaledVector(side, s))
-  const facing = Math.atan2(-vista.x, -vista.z) // 카메라 쪽을 본다
+  /** 정상에서 풍경 쪽으로 forward, 옆으로 sideways 미터 떨어진 땅 위 자리 */
+  const at = (forward: number, sideways: number) => ground(top.clone().addScaledVector(vista, forward).addScaledVector(side, sideways))
+  // 카메라 쪽을 본다
+  const facing = Math.atan2(-vista.x, -vista.z)
+  const gate = decor.fortress ? gateFrame(trail) : null
 
   return (
     <group>
@@ -117,8 +123,8 @@ export function SummitRock({ terrain, trail }: { terrain: Terrain; trail: Trail 
         </group>
       )}
       {decor.hermitage && <Hermitage base={at(16, -3)} top={top} facing={facing} />}
-      {decor.fortress && (
-        <group position={gateFrame(trail).pos} rotation={[0, gateFrame(trail).heading, 0]}>
+      {gate && (
+        <group position={gate.pos} rotation={[0, gate.heading, 0]}>
           <FortressGate />
         </group>
       )}
@@ -126,8 +132,10 @@ export function SummitRock({ terrain, trail }: { terrain: Terrain; trail: Trail 
   )
 }
 
-/** 산성 대문을 세울 자리: 도착 10m 앞 등산로와 그곳 진행 방향 */
+/** 산성 대문을 세울 거리: 도착 10m 앞 */
 const GATE_BEFORE = 10
+
+/** 산성 대문을 세울 자리와 그곳 진행 방향 */
 function gateFrame(trail: Trail) {
   const d = Math.max(0, trail.length - GATE_BEFORE)
   return { pos: trail.positionAt(d), heading: trail.headingAt(d) }
@@ -225,6 +233,7 @@ function Hermitage({ base, top, facing }: { base: THREE.Vector3; top: THREE.Vect
   // 정상보다 몇 m 낮은 절벽 끝에 앉혀, 정상에서 내려다보이게 한다
   const floor = Math.max(base.y + 0.3, top.y - 7)
   const drop = floor - base.y + 3
+  // 단면이 삼각형인 기둥을 눕혀 만든 박공지붕
   const roof = useMemo(() => new THREE.CylinderGeometry(1, 1, 1, 3, 1, false, Math.PI / 2).rotateZ(Math.PI / 2), [])
   const columns: Blob[] = [
     { pos: [-1, -drop / 2, 0], scale: [1.4, drop / 2 + 0.3, 1.3], color: '#a79e8f' },
@@ -258,7 +267,8 @@ function Hermitage({ base, top, facing }: { base: THREE.Vector3; top: THREE.Vect
   )
 }
 
-function build(terrain: Terrain, trail: Trail) {
+/** 정상 둘레에 까는 들쭉날쭉한 맨바위 판과 가장자리 바위 */
+function buildRockSlab(terrain: Terrain, trail: Trail) {
   const top = trail.positionAt(trail.length)
   const rand = seededRandom(Math.round(top.x * 7 + top.z * 13))
   // 둘레를 들쭉날쭉하게: 각도마다 반지름을 달리하고 이웃끼리 부드럽게 잇는다
@@ -277,10 +287,11 @@ function build(terrain: Terrain, trail: Trail) {
       push(top.x + Math.cos(a) * r, top.z + Math.sin(a) * r)
     }
   const index: number[] = []
-  const at = (k: number, s: number) => (k === 0 ? 0 : 1 + (k - 1) * SEGMENTS + (s % SEGMENTS))
-  for (let s = 0; s < SEGMENTS; s++) index.push(0, at(1, s + 1), at(1, s))
+  // k 번째 고리의 s 번째 꼭짓점 번호. 0 번은 가운데 점이다
+  const vertex = (k: number, s: number) => (k === 0 ? 0 : 1 + (k - 1) * SEGMENTS + (s % SEGMENTS))
+  for (let s = 0; s < SEGMENTS; s++) index.push(0, vertex(1, s + 1), vertex(1, s))
   for (let k = 1; k < RINGS; k++)
-    for (let s = 0; s < SEGMENTS; s++) index.push(at(k, s), at(k, s + 1), at(k + 1, s + 1), at(k, s), at(k + 1, s + 1), at(k + 1, s))
+    for (let s = 0; s < SEGMENTS; s++) index.push(vertex(k, s), vertex(k, s + 1), vertex(k + 1, s + 1), vertex(k, s), vertex(k + 1, s + 1), vertex(k + 1, s))
   const slab = new THREE.BufferGeometry()
   slab.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3))
   slab.setIndex(index)

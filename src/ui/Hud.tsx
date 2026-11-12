@@ -12,14 +12,22 @@ import { useWakeLock } from '../lib/wakeLock'
 import { IS_IOS, IS_TOUCH } from '../lib/device'
 import { readStored, writeStored } from '../lib/storage'
 
+/** 거리(m)를 1km 넘으면 「1.23km」, 아니면 「850m」로 */
 function formatDistance(m: number) {
   return m >= 1000 ? `${(m / 1000).toFixed(2)}km` : `${Math.round(m)}m`
 }
 
+/** 패널마다 접었는지 기억하는 저장소 키 앞부분. 3 은 기본값을 바꿀 때 옛 기억을 버리려고 올린 판 번호다 */
+const FOLD_KEY = 'hiking-metaverse:folded3:'
+/** 코스·캐릭터 패널을 처음에 펼쳐 둘지. 폰·태블릿은 펼치면 3D 화면을 많이 가려 접어 둔다 */
+const OPEN_BY_DEFAULT = !IS_TOUCH
+/** 코스 패널을 접어 두는 작은 컴퓨터 창. 이보다 작으면 펼친 코스 패널이 산과 캐릭터를 가린다 */
+const SMALL_WINDOW = '(max-width: 1000px), (max-height: 700px)'
+
 /** 키보드 입력 연결 */
 function useKeyboard() {
   useEffect(() => {
-    const set = (e: KeyboardEvent, on: boolean) => {
+    const setKey = (e: KeyboardEvent, on: boolean) => {
       if (e.code === 'ArrowUp') input.forward = on
       else if (e.code === 'ArrowDown') input.backward = on
       else if (e.code === 'ArrowLeft') input.left = on
@@ -34,9 +42,9 @@ function useKeyboard() {
         if (!e.repeat) input.jump = true
         return
       }
-      set(e, true)
+      setKey(e, true)
     }
-    const up = (e: KeyboardEvent) => set(e, false)
+    const up = (e: KeyboardEvent) => setKey(e, false)
     window.addEventListener('keydown', down)
     window.addEventListener('keyup', up)
     window.addEventListener('blur', releaseInput)
@@ -48,149 +56,15 @@ function useKeyboard() {
   }, [])
 }
 
-export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
-  useKeyboard()
-  // 코스 정보는 컴퓨터에서는 펼쳐 두고, 폰에서는 3D 화면을 가리지 않게 접어 둔다 (이름만 보인다).
-  // 컴퓨터라도 창이 작으면 접어 둔다. 작은 창에서 직접 펴거나 접은 것은 이번에 여는 동안 작은 창일 때만 따른다
-  const [storedFold, toggleStoredFold] = useFolded('course', !OPEN_BY_DEFAULT)
-  const smallWindow = useMediaQuery(SMALL_WINDOW) && !IS_TOUCH
-  // 작은 창에서 직접 고른 값. 지금 창이 크면 쓰지 않고 저장해 둔 값(storedFold)을 따른다
-  const [smallFold, setSmallFold] = useState<{ small: boolean; folded: boolean } | null>(null)
-  const courseFolded = smallFold?.small === smallWindow ? smallFold.folded : smallWindow || storedFold
-  const toggleCourse = () => (smallWindow ? setSmallFold({ small: true, folded: !courseFolded }) : toggleStoredFold())
-  const distance = useGame((s) => s.distance)
-  const mode = useGame((s) => s.mode)
-  const controlMode = useGame((s) => s.controlMode)
-  const sections = useMemo(() => trail.sections(), [trail])
-  const progress = distance / trail.length
-  const elevation = Math.round(trail.positionAt(distance).y)
-  const remaining = Math.max(0, trail.length - distance)
-  const realMinutes = estimateMinutes(trail.data.length, trail.data.elevationGain)
-  const left = trail.statsBetween(distance, trail.length)
-  const leftMinutes = estimateMinutes(left.length, left.gain)
-  const current = sections.findIndex((s) => distance < s.end)
-  const next = sections[current === -1 ? sections.length - 1 : current]
-  // 폰에서 걷는 동안은 화면이 꺼지지 않게 한다
-  useWakeLock(IS_TOUCH && mode === 'hiking')
-
-  if (mode !== 'hiking') return null
-
-  return (
-    <>
-      {/* 위쪽 패널들: 왼쪽은 코스, 오른쪽은 캐릭터와 도움말. 좁은 화면에서는 위아래로 쌓인다 */}
-      <div className="hud-top">
-        <section className="panel course">
-          <div className="course-head">
-            <div className="eyebrow">
-              {trail.data.mountain} · {trail.data.level}
-            </div>
-            <button className="link-button" title="베이스캠프 열기 (Esc)" onClick={() => useGame.getState().openLobby()}>
-              산·코스 바꾸기
-            </button>
-            <FoldButton label="코스 정보" collapsed={courseFolded} onToggle={toggleCourse} />
-          </div>
-          <h1>{trail.data.name}</h1>
-          {!courseFolded && (
-            <>
-              <div className="course-meta">
-                {trail.data.start} → {trail.data.summit}
-              </div>
-              <dl className="stats">
-                <div>
-                  <dt>거리</dt>
-                  <dd>{(trail.data.length / 1000).toFixed(2)}km</dd>
-                </div>
-                <div>
-                  <dt>오르막</dt>
-                  <dd>{trail.data.elevationGain}m</dd>
-                </div>
-                <div>
-                  <dt>실제 예상</dt>
-                  <dd>{formatMinutes(realMinutes)}</dd>
-                </div>
-              </dl>
-              {/* 실제로 걸을 때 구간별 거리와 예상 시간 (코스 예습) */}
-              <ol className="sections">
-                {sections.map((sec, i) => (
-                  <li key={sec.to} className={i < current || current === -1 ? 'done' : i === current ? 'now' : ''}>
-                    <span className="sec-name">{sec.to}</span>
-                    <span className="sec-meta">
-                      {formatDistance(sec.length)} · 약 {formatMinutes(sec.minutes)}
-                    </span>
-                  </li>
-                ))}
-              </ol>
-            </>
-          )}
-        </section>
-        <div className="side-stack">
-          <AvatarPanel />
-          <HelpPanel />
-        </div>
-        {/* 걷는 동안 보는 패널: 해발 고도와 다음 이정표만 크게, 나머지는 작게 */}
-        <div className="panel progress">
-          <div className="progress-main">
-            <div>
-              <span className="progress-label">해발</span>
-              <span className="progress-alt">
-                {elevation}
-                <small>m</small>
-              </span>
-            </div>
-            <div className="progress-next">
-              <span className="progress-label">다음</span>
-              <span className="progress-next-name">{next.to}</span>
-              <span className="progress-next-dist">{formatDistance(Math.max(0, next.end - distance))}</span>
-            </div>
-          </div>
-          <div className="bar">
-            <div className="bar-fill" style={{ width: `${progress * 100}%` }} />
-            {trail.data.checkpoints.map((cp) => (
-              <i
-                key={cp.name}
-                className={distance >= cp.distance ? 'tick passed' : 'tick'}
-                style={{ left: `${(cp.distance / trail.length) * 100}%` }}
-                title={cp.name}
-              />
-            ))}
-          </div>
-          <div className="progress-row">
-            <span>정상까지 {formatDistance(remaining)}</span>
-            <span>실제로는 약 {formatMinutes(leftMinutes)}</span>
-          </div>
-        </div>
-      </div>
-
-      <ArrivalTitle trail={trail} />
-      <RoamNotice />
-      <MiniMap trail={trail} trails={trails} />
-      <TogetherPanel trail={trail} />
-      {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
-      {/* 쉬운 조작은 조이스틱 대신 큰 「걷기」 버튼 하나로 등산로를 따라 걷는다 */}
-      {controlMode === 'free' ? <TouchControls /> : <WalkButton />}
-      <TouchGuide />
-      <EmoteDial />
-      <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
-    </>
-  )
-}
-
-/** 코스와 캐릭터 패널을 기본으로 펼쳐 두는 것으로 바꿔, 예전에 접어 둔 기억(folded2:)은 쓰지 않는다 */
-const FOLD_KEY = 'hiking-metaverse:folded3:'
-/** 코스·캐릭터 패널을 처음에 펼쳐 둘지. 폰·태블릿은 펼치면 3D 화면을 많이 가려 접어 둔다 */
-const OPEN_BY_DEFAULT = !IS_TOUCH
-/** 코스 패널을 접어 두는 작은 컴퓨터 창. 이보다 작으면 펼친 코스 패널이 산과 캐릭터를 가린다 */
-const SMALL_WINDOW = '(max-width: 1000px), (max-height: 700px)'
-
 /** 미디어 쿼리가 맞는지. 창 크기가 바뀌면 다시 그린다 */
 function useMediaQuery(query: string) {
   const [match, setMatch] = useState(() => window.matchMedia(query).matches)
   useEffect(() => {
     const mq = window.matchMedia(query)
-    const on = () => setMatch(mq.matches)
-    on()
-    mq.addEventListener('change', on)
-    return () => mq.removeEventListener('change', on)
+    const update = () => setMatch(mq.matches)
+    update()
+    mq.addEventListener('change', update)
+    return () => mq.removeEventListener('change', update)
   }, [query])
   return match
 }
@@ -209,6 +83,176 @@ function useFolded(name: string, foldedByDefault = true): [boolean, () => void] 
   return [folded, toggle]
 }
 
+/**
+ * 코스 패널을 접었는지. 컴퓨터에서는 펼쳐 두고, 폰에서는 3D 화면을 가리지 않게 접어 둔다 (이름만 보인다).
+ * 컴퓨터라도 창이 작으면 접어 둔다. 작은 창에서 직접 펴거나 접은 것은 기억하지 않고, 앱을 연 동안 작은 창일 때만 따른다
+ */
+function useCourseFold(): [boolean, () => void] {
+  const [storedFold, toggleStoredFold] = useFolded('course', !OPEN_BY_DEFAULT)
+  const smallWindow = useMediaQuery(SMALL_WINDOW) && !IS_TOUCH
+  // 작은 창에서 직접 고른 값. 지금 창이 크면 쓰지 않고 저장해 둔 값(storedFold)을 따른다
+  const [smallFold, setSmallFold] = useState<{ small: boolean; folded: boolean } | null>(null)
+  const folded = smallFold?.small === smallWindow ? smallFold.folded : smallWindow || storedFold
+  const toggle = () => (smallWindow ? setSmallFold({ small: true, folded: !folded }) : toggleStoredFold())
+  return [folded, toggle]
+}
+
+type Section = ReturnType<Trail['sections']>[number]
+
+export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
+  useKeyboard()
+  // 베이스캠프에 다녀와도 작은 창에서 고른 접기 상태가 남도록 걷기 화면 밖(여기)에 둔다
+  const [courseFolded, toggleCourse] = useCourseFold()
+  const distance = useGame((s) => s.distance)
+  const mode = useGame((s) => s.mode)
+  const controlMode = useGame((s) => s.controlMode)
+  const sections = useMemo(() => trail.sections(), [trail])
+  // 폰에서 걷는 동안은 화면이 꺼지지 않게 한다
+  useWakeLock(IS_TOUCH && mode === 'hiking')
+
+  if (mode !== 'hiking') return null
+
+  // 지금 걷는 구간. 다 지나왔으면 -1
+  const current = sections.findIndex((s) => distance < s.end)
+  const next = sections[current === -1 ? sections.length - 1 : current]
+
+  return (
+    <>
+      {/* 위쪽 패널들: 왼쪽은 코스, 오른쪽은 캐릭터와 도움말. 좁은 화면에서는 위아래로 쌓인다 */}
+      <div className="hud-top">
+        <CoursePanel trail={trail} sections={sections} current={current} folded={courseFolded} onToggleFold={toggleCourse} />
+        <div className="side-stack">
+          <AvatarPanel />
+          <HelpPanel />
+        </div>
+        <ProgressPanel trail={trail} distance={distance} next={next} />
+      </div>
+
+      <ArrivalTitle trail={trail} />
+      <RoamNotice />
+      <MiniMap trail={trail} trails={trails} />
+      <TogetherPanel trail={trail} />
+      {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
+      {/* 쉬운 조작은 조이스틱 대신 큰 「걷기」 버튼 하나로 등산로를 따라 걷는다 */}
+      {controlMode === 'free' ? <TouchControls /> : <WalkButton />}
+      <TouchGuide />
+      <EmoteDial />
+      <HoldButton label="점프" className="jump" onHold={(on) => on && (input.jump = true)} />
+    </>
+  )
+}
+
+/** 구간 목록에서 i 번째 구간의 모습: 지나온 구간, 지금 구간, 앞으로 갈 구간 */
+function sectionClass(i: number, current: number) {
+  if (current === -1 || i < current) return 'done'
+  return i === current ? 'now' : ''
+}
+
+/** 왼쪽 위 코스 패널: 산·난이도, 코스 이름, 펼치면 거리·오르막·예상 시간과 구간 목록 */
+function CoursePanel({
+  trail,
+  sections,
+  current,
+  folded,
+  onToggleFold,
+}: {
+  trail: Trail
+  sections: Section[]
+  current: number
+  folded: boolean
+  onToggleFold: () => void
+}) {
+  const realMinutes = estimateMinutes(trail.data.length, trail.data.elevationGain)
+  return (
+    <section className="panel course">
+      <div className="course-head">
+        <div className="eyebrow">
+          {trail.data.mountain} · {trail.data.level}
+        </div>
+        <button className="link-button" title="베이스캠프 열기 (Esc)" onClick={() => useGame.getState().openLobby()}>
+          산·코스 바꾸기
+        </button>
+        <FoldButton label="코스 정보" collapsed={folded} onToggle={onToggleFold} />
+      </div>
+      <h1>{trail.data.name}</h1>
+      {!folded && (
+        <>
+          <div className="course-meta">
+            {trail.data.start} → {trail.data.summit}
+          </div>
+          <dl className="stats">
+            <div>
+              <dt>거리</dt>
+              <dd>{(trail.data.length / 1000).toFixed(2)}km</dd>
+            </div>
+            <div>
+              <dt>오르막</dt>
+              <dd>{trail.data.elevationGain}m</dd>
+            </div>
+            <div>
+              <dt>실제 예상</dt>
+              <dd>{formatMinutes(realMinutes)}</dd>
+            </div>
+          </dl>
+          {/* 실제로 걸을 때 구간별 거리와 예상 시간 (코스 예습) */}
+          <ol className="sections">
+            {sections.map((sec, i) => (
+              <li key={sec.to} className={sectionClass(i, current)}>
+                <span className="sec-name">{sec.to}</span>
+                <span className="sec-meta">
+                  {formatDistance(sec.length)} · 약 {formatMinutes(sec.minutes)}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </>
+      )}
+    </section>
+  )
+}
+
+/** 걷는 동안 보는 패널: 해발 고도와 다음 이정표만 크게, 진행 막대와 남은 거리·시간은 작게 */
+function ProgressPanel({ trail, distance, next }: { trail: Trail; distance: number; next: Section }) {
+  const elevation = Math.round(trail.positionAt(distance).y)
+  const remaining = Math.max(0, trail.length - distance)
+  const left = trail.statsBetween(distance, trail.length)
+  const leftMinutes = estimateMinutes(left.length, left.gain)
+  return (
+    <div className="panel progress">
+      <div className="progress-main">
+        <div>
+          <span className="progress-label">해발</span>
+          <span className="progress-alt">
+            {elevation}
+            <small>m</small>
+          </span>
+        </div>
+        <div className="progress-next">
+          <span className="progress-label">다음</span>
+          <span className="progress-next-name">{next.to}</span>
+          <span className="progress-next-dist">{formatDistance(Math.max(0, next.end - distance))}</span>
+        </div>
+      </div>
+      <div className="bar">
+        <div className="bar-fill" style={{ width: `${(distance / trail.length) * 100}%` }} />
+        {trail.data.checkpoints.map((cp) => (
+          <i
+            key={cp.name}
+            className={distance >= cp.distance ? 'tick passed' : 'tick'}
+            style={{ left: `${(cp.distance / trail.length) * 100}%` }}
+            title={cp.name}
+          />
+        ))}
+      </div>
+      <div className="progress-row">
+        <span>정상까지 {formatDistance(remaining)}</span>
+        <span>실제로는 약 {formatMinutes(leftMinutes)}</span>
+      </div>
+    </div>
+  )
+}
+
+/** 접기·펼치기 화살표. 펼치면 아래, 접으면 CSS 가 돌려 오른쪽을 본다 */
 function FoldIcon() {
   return (
     <svg className="fold-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
@@ -293,6 +337,7 @@ const HELP: [string[][], string, string?][] = [
   [[['길 밖']], '자유롭게 걷기', '등산로에서 20m까지 걸어 나갈 수 있어요. 나무와 바위는 돌아서 가요'],
 ]
 
+/** 오른쪽 위 도움말 패널: 키보드 조작을 한눈에 */
 function HelpPanel() {
   return (
     <SidePanel name="help" title="도움말" sub="키보드 조작" className="help-panel">
@@ -411,77 +456,86 @@ function HoldButton({ label, className, onHold }: { label: string; className?: s
   )
 }
 
+/** 공유 창을 연다. 공유 창을 닫은 것(AbortError)은 그냥 둔다 */
+function shareQuietly(data: ShareData) {
+  navigator.share(data).catch(() => {})
+}
+
+/** 정상에서 뜨는 창들: 완등 기록 창, 사진 찍는 순간의 번쩍임, 찍은 기념사진 창 */
 export function SummitModal({ trail }: { trail: Trail }) {
   const mode = useGame((s) => s.mode)
   const photo = useGame((s) => s.photo)
-  const startedAt = useGame((s) => s.startedAt)
-  const finishedAt = useGame((s) => s.finishedAt)
-  const records = useGame((s) => s.records)
-  const { takePhoto, closePhoto, restart } = useGame.getState()
+  // 사진 파일 이름에 넣을 날짜
   const [now] = useState(() => new Date())
   const photoName = `${trail.data.id}-${now.toISOString().slice(0, 10)}.png`
   const shareFile = useShareFile(mode === 'photoResult' ? photo : null, photoName)
-  const saveViaShare = IS_IOS && shareFile !== null
 
   if (mode === 'photo') return <div className="flash" />
+  if (mode === 'photoResult' && photo) return <PhotoModal trail={trail} photo={photo} photoName={photoName} shareFile={shareFile} />
+  if (mode === 'summit') return <SummitResult trail={trail} />
+  return null
+}
 
-  if (mode === 'photoResult' && photo) {
-    return (
-      <div className="overlay">
-        <div className="panel modal photo-modal">
-          <div className="modal-brand">방구석 등반대 · 정상 기념사진</div>
-          <img src={photo} alt="정상 기념사진" />
-          <div className="actions">
-            {/* 폰에서는 카카오톡·인스타그램 등으로 바로 보내는 공유가 주 버튼이고, 공유를 못 하는 컴퓨터에서는 저장이 주 버튼이다 */}
-            {shareFile && (
-              <button
-                className="btn primary"
-                onClick={() => {
-                  const { mountain, summit, summitElevation } = trail.data
-                  navigator
-                    .share({ files: [shareFile], title: '방구석 등반대', text: `${mountain} ${summit} ${summitElevation}m 완등! ⛰️🚩 방구석 등반대에서 올랐어요` })
-                    .catch(() => {
-                      // 공유 창을 닫은 것(AbortError)은 그냥 둔다
-                    })
-                }}
-              >
-                사진 공유
-              </button>
-            )}
-            {saveViaShare ? (
-              // 아이폰: 내려받으면 파일 앱에 들어가므로 공유 창을 열어 「이미지 저장」으로 사진 앱에 넣게 한다.
-              // 글을 같이 넘기면 공유 창에 「이미지 저장」이 빠지기도 해서 사진 파일만 넘긴다
-              <button
-                className="btn"
-                onClick={() => {
-                  navigator.share({ files: [shareFile] }).catch(() => {
-                    // 공유 창을 닫은 것(AbortError)은 그냥 둔다
-                  })
-                }}
-              >
-                사진 저장
-              </button>
-            ) : (
-              <a className={shareFile ? 'btn' : 'btn primary'} href={photo} download={photoName}>
-                사진 저장
-              </a>
-            )}
-            <button className="btn" onClick={closePhoto}>
-              닫기
-            </button>
-          </div>
-          {saveViaShare && <p className="photo-hint">공유 창에서 「이미지 저장」을 누르면 사진 앱에 들어가요.</p>}
-        </div>
-      </div>
-    )
+/** 찍은 기념사진과 공유·저장·닫기 버튼 */
+function PhotoModal({ trail, photo, photoName, shareFile }: { trail: Trail; photo: string; photoName: string; shareFile: File | null }) {
+  const closePhoto = useGame((s) => s.closePhoto)
+  const saveViaShare = IS_IOS && shareFile !== null
+
+  const share = () => {
+    if (!shareFile) return
+    const { mountain, summit, summitElevation } = trail.data
+    shareQuietly({ files: [shareFile], title: '방구석 등반대', text: `${mountain} ${summit} ${summitElevation}m 완등! ⛰️🚩 방구석 등반대에서 올랐어요` })
   }
 
-  if (mode !== 'summit') return null
+  return (
+    <div className="overlay">
+      <div className="panel modal photo-modal">
+        <div className="modal-brand">방구석 등반대 · 정상 기념사진</div>
+        <img src={photo} alt="정상 기념사진" />
+        <div className="actions">
+          {/* 폰에서는 카카오톡·인스타그램 등으로 바로 보내는 공유가 주 버튼이고, 공유를 못 하는 컴퓨터에서는 저장이 주 버튼이다 */}
+          {shareFile && (
+            <button className="btn primary" onClick={share}>
+              사진 공유
+            </button>
+          )}
+          {saveViaShare ? (
+            // 아이폰: 내려받으면 파일 앱에 들어가므로 공유 창을 열어 「이미지 저장」으로 사진 앱에 넣게 한다.
+            // 글을 같이 넘기면 공유 창에 「이미지 저장」이 빠지기도 해서 사진 파일만 넘긴다
+            <button className="btn" onClick={() => shareQuietly({ files: [shareFile] })}>
+              사진 저장
+            </button>
+          ) : (
+            <a className={shareFile ? 'btn' : 'btn primary'} href={photo} download={photoName}>
+              사진 저장
+            </a>
+          )}
+          <button className="btn" onClick={closePhoto}>
+            닫기
+          </button>
+        </div>
+        {saveViaShare && <p className="photo-hint">공유 창에서 「이미지 저장」을 누르면 사진 앱에 들어가요.</p>}
+      </div>
+    </div>
+  )
+}
+
+/** 초를 「1분 5초」나 「40초」처럼 읽기 쉽게 */
+function formatSeconds(sec: number) {
+  return sec >= 60 ? `${Math.floor(sec / 60)}분 ${sec % 60}초` : `${sec}초`
+}
+
+/** 정상 도착 창: 배지, 걸린 시간과 최고 기록, 완등 횟수, 기념사진·다시 오르기 버튼 */
+function SummitResult({ trail }: { trail: Trail }) {
+  const startedAt = useGame((s) => s.startedAt)
+  const finishedAt = useGame((s) => s.finishedAt)
+  const records = useGame((s) => s.records)
+  const takePhoto = useGame((s) => s.takePhoto)
+  const restart = useGame((s) => s.restart)
 
   const mine = records.filter((r) => r.trailId === trail.data.id)
-  const count = mine.length
   const duration = startedAt && finishedAt ? Math.round((finishedAt - startedAt) / 1000) : 0
-  // 방금 저장한 기록(맨 끝)을 뺀 예전 기록 가운데 가장 빠른 것과 비교한다. 첫 완등이면 비교하지 않는다
+  // 방금 저장한 기록(맨 끝)을 뺀 지난 기록 가운데 가장 빠른 것과 비교한다. 첫 완등이면 비교하지 않는다
   const before = mine.slice(0, -1).map((r) => r.durationSec)
   const prevBest = before.length ? Math.min(...before) : null
   const best = Math.min(duration, prevBest ?? duration)
@@ -513,12 +567,12 @@ export function SummitModal({ trail }: { trail: Trail }) {
           </div>
           <div>
             <dt>완등 횟수</dt>
-            <dd>{count}회</dd>
+            <dd>{mine.length}회</dd>
           </div>
         </dl>
         {faster > 0 && (
           <p className="summit-best" role="status">
-            🎉 새 최고 기록이에요! {faster >= 60 ? `${Math.floor(faster / 60)}분 ${faster % 60}초` : `${faster}초`} 빨라졌어요
+            🎉 새 최고 기록이에요! {formatSeconds(faster)} 빨라졌어요
           </p>
         )}
         <div className="actions">
@@ -556,10 +610,11 @@ function useShareFile(photo: string | null, fileName: string) {
       alive = false
     }
   }, [photo, fileName])
-  // 다시 찍어 사진이 바뀌면 예전 파일은 쓰지 않는다
+  // 다시 찍어 사진이 바뀌면 지난 파일은 쓰지 않는다
   return file && file.photo === photo ? file.file : null
 }
 
+/** 완등 인증 배지: 새벽 하늘 동그라미 안에 봉우리와 정상 이름·높이 */
 function Badge({ trail }: { trail: Trail }) {
   return (
     <svg className="badge" viewBox="0 0 120 120" role="img" aria-label="완등 인증 배지">

@@ -49,8 +49,12 @@ const MODES: Mode[] = ['lobby', 'hiking', 'summit', 'photo', 'photoResult']
 /** replaced 는 같은 브라우저의 다른 창이 같이하기를 넘겨받은 상태 (이 창은 다시 붙지 않는다) */
 type NetStatus = 'connecting' | 'online' | 'offline' | 'replaced'
 
+/** 내 상태를 보내는 간격(ms). 서버가 위치를 나눠 주는 간격(1초에 5번)과 같다 */
 const SEND_MS = 200
+/** 끊긴 뒤 다시 붙어 보는 간격(ms) */
 const RETRY_MS = 5000
+/** 이름표 글자 수 상한. 서버도 같은 길이로 자른다 */
+const NAME_MAX = 12
 const NAME_KEY = 'hiking-metaverse:nickname'
 const CLIENT_KEY = 'hiking-metaverse:client-id'
 /** 서버가 같은 브라우저 다른 창이 붙었다며 닫을 때 쓰는 코드 (server/index.mjs 의 REPLACED) */
@@ -69,15 +73,17 @@ export function othersClimbing(counts: Record<string, number>, course?: string) 
   return Math.max(0, all - mine)
 }
 
-// 처음 붙는 닉네임: 산 오르는 모습 + 산악회 역할. 둘을 합쳐 12자(NAME_MAX)를 넘지 않게 고른 말들이다
+// 처음 붙는 닉네임: 산 오르는 모습 + 산악회 역할. 둘을 합쳐 NAME_MAX 를 넘지 않게 고른 말들이다
 const MOODS = ['새벽', '숨찬', '느긋한', '씩씩한', '땀범벅', '쉬엄쉬엄', '성큼성큼', '헉헉대는', '앞서가는', '뒤처진', '길 잃은', '배고픈', '안개 속', '비 맞은', '신난', '졸린']
 const ROLES = ['산꾼', '등산객', '산악회장', '총무', '선두', '후미', '길잡이', '막내', '대장', '백패커', '종주꾼', '암벽꾼', '김밥 담당', '컵라면 담당', '막걸리 담당', '물통지기', '스틱 요정', '정상 사냥꾼']
 
+/** 「숨찬 총무」처럼 두 말을 골라 붙인 닉네임 */
 function randomName() {
   const pick = <T,>(a: T[]) => a[Math.floor(Math.random() * a.length)]
   return `${pick(MOODS)} ${pick(ROLES)}`
 }
 
+/** 저장된 닉네임. 없으면 새로 지어 저장한다 */
 function loadName() {
   const saved = readStored(NAME_KEY)
   if (saved) return saved
@@ -108,7 +114,7 @@ export const useNet = create<{
   setName: (name) => {
     // 제어 문자와 꺾쇠는 이름표에 그대로 찍히지 않게 뺀다
     // oxlint-disable-next-line no-control-regex
-    const clean = name.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, 12)
+    const clean = name.replace(/[\u0000-\u001f<>]/g, '').trim().slice(0, NAME_MAX)
     if (!clean) return
     writeStored(NAME_KEY, clean)
     set({ name: clean })
@@ -154,6 +160,7 @@ function serverUrl(): string | null {
 let socket: WebSocket | null = null
 let sendTimer: number | undefined
 let retryTimer: number | undefined
+/** startNet 을 이미 불렀는지 (두 번 불러도 한 번만 붙는다) */
 let started = false
 /** 마지막으로 보낸 내 상태. 같으면 다시 보내지 않는다 */
 let lastSent = ''
@@ -174,6 +181,7 @@ export function startNet() {
   connect(url)
 }
 
+/** 서버에 붙고 주고받기를 시작한다. 끊기면 replaced 가 아닌 한 RETRY_MS 뒤 다시 붙는다 */
 function connect(url: string) {
   useNet.setState({ status: 'connecting' })
   let ws: WebSocket
@@ -217,6 +225,7 @@ export function reclaimNet() {
   if (url && useNet.getState().status === 'replaced') connect(url)
 }
 
+/** 서버가 보내는 메시지. 자주 오는 것은 짧은 이름을 쓴다 (형식은 server/index.mjs 맨 위 설명) */
 type ServerMessage =
   | { type: 'welcome'; id: string }
   | { t: 'p'; c: string; p: [string, number, number, number, number, number][] }
@@ -224,6 +233,7 @@ type ServerMessage =
   | { t: 'e'; id: string; k: Emote }
   | { t: 'c'; c: Record<string, number> }
 
+/** 받은 메시지를 useNet 과 이름·감정 표현 목록에 반영한다 */
 function receive(msg: ServerMessage) {
   if ('type' in msg) {
     if (msg.type === 'welcome' && typeof msg.id === 'string') useNet.setState({ myId: msg.id })
@@ -266,19 +276,23 @@ function scheduleRetry() {
   if (url) retryTimer = window.setTimeout(() => connect(url), RETRY_MS)
 }
 
+/** 소수 둘째 자리까지 남긴다 (1cm·0.01rad 면 충분하고 메시지가 짧아진다) */
+const round2 = (v: number) => Math.round(v * 100) / 100
+
+/** SEND_MS 마다 내 상태를 보낸다. 코스가 정해지기 전에는 보내지 않는다 */
 function sendState() {
   if (!socket || socket.readyState !== WebSocket.OPEN || !localPlayer.course) return
-  const p = localPlayer
+  const me = localPlayer
   const state = JSON.stringify({
     type: 'state',
     name: useNet.getState().name,
-    avatar: p.avatar,
-    course: p.course,
-    distance: Math.round(p.distance * 100) / 100,
-    offset: Math.round(p.offset * 100) / 100,
-    facing: Math.round(p.facing * 100) / 100,
-    jump: Math.round(p.jump * 100) / 100,
-    mode: p.mode,
+    avatar: me.avatar,
+    course: me.course,
+    distance: round2(me.distance),
+    offset: round2(me.offset),
+    facing: round2(me.facing),
+    jump: round2(me.jump),
+    mode: me.mode,
   })
   // 멈춰 서 있으면 보내지 않는다 (서버는 마지막 상태를 들고 있다)
   if (state === lastSent) return

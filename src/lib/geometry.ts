@@ -2,17 +2,18 @@ import * as THREE from 'three'
 
 /**
  * 꼭짓점을 중심에서 [min, min + range] 배로 흔들어 울퉁불퉁하게 만든다 (나무 수관, 바위, 감자).
- * 같은 자리 꼭짓점(면 이음매에서 겹친 것)은 같은 비율로 밀어 틈이 생기지 않게 한다. 법선은 모양을 다 바꾼 뒤 부르는 쪽이 계산한다
+ * 같은 자리 꼭짓점(면 이음매에서 겹친 것)은 같은 비율로 밀어 틈이 생기지 않게 한다.
+ * 법선은 모양을 다 바꾼 뒤 부르는 쪽이 계산한다
  */
 export function jitterVertices(geo: THREE.BufferGeometry, rand: () => number, min: number, range: number) {
   const pos = geo.attributes.position as THREE.BufferAttribute
   const v = new THREE.Vector3()
-  const moved = new Map<string, number>()
+  const scaleAt = new Map<string, number>()
   for (let i = 0; i < pos.count; i++) {
     v.fromBufferAttribute(pos, i)
     const key = `${v.x.toFixed(3)},${v.y.toFixed(3)},${v.z.toFixed(3)}`
-    if (!moved.has(key)) moved.set(key, min + rand() * range)
-    v.multiplyScalar(moved.get(key)!)
+    if (!scaleAt.has(key)) scaleAt.set(key, min + rand() * range)
+    v.multiplyScalar(scaleAt.get(key)!)
     pos.setXYZ(i, v.x, v.y, v.z)
   }
   return geo

@@ -81,6 +81,7 @@ export class Trail {
     this.length = this.cumulative[this.cumulative.length - 1]
   }
 
+  /** distance 가 든 구간 번호 i (points[i]~points[i+1]) 와 그 안에서의 비율 t (0~1) */
   private segmentAt(distance: number) {
     const d = THREE.MathUtils.clamp(distance, 0, this.length)
     let lo = 0
@@ -94,6 +95,7 @@ export class Trail {
     return { i: lo, t: (d - this.cumulative[lo]) / span }
   }
 
+  /** 출발점에서 distance(m) 만큼 간 곳의 위치. 길 밖 값은 양 끝에 붙인다 */
   positionAt(distance: number, target = new THREE.Vector3()) {
     const { i, t } = this.segmentAt(distance)
     return target.lerpVectors(this.points[i], this.points[i + 1] ?? this.points[i], t)
@@ -216,10 +218,20 @@ export function standHeight(t: Terrain, x: number, z: number) {
   return y
 }
 
-/** 받은 만큼 onProgress(0~1)로 알려 주며 파일을 받는다. 크기를 모르면 다 받았을 때만 알린다 */
-async function fetchWithProgress(url: string, onProgress?: (p: number) => void): Promise<ArrayBuffer> {
+/** 파일을 받는다. 서버가 오류로 답하면 던진다 */
+async function fetchOk(url: string) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`${url} 을 받지 못했다 (${res.status})`)
+  return res
+}
+
+async function fetchJson<T>(url: string) {
+  return (await (await fetchOk(url)).json()) as T
+}
+
+/** 받은 만큼 onProgress(0~1)로 알려 주며 파일을 받는다. 크기를 모르면 다 받았을 때만 알린다 */
+async function fetchWithProgress(url: string, onProgress?: (p: number) => void): Promise<ArrayBuffer> {
+  const res = await fetchOk(url)
   const total = Number(res.headers.get('content-length')) || 0
   if (!res.body || !total || !onProgress) {
     const buf = await res.arrayBuffer()
@@ -252,15 +264,10 @@ export async function loadData(
   mountainId: string,
   onProgress?: (p: number) => void,
 ): Promise<{ terrain: Terrain; trails: Trail[] }> {
-  const json = async <T,>(url: string) => {
-    const r = await fetch(url)
-    if (!r.ok) throw new Error(`${url} 을 받지 못했다 (${r.status})`)
-    return (await r.json()) as T
-  }
   const [meta, buf, courses] = await Promise.all([
-    json<TerrainMeta>(`/data/${mountainId}/terrain.json`),
+    fetchJson<TerrainMeta>(`/data/${mountainId}/terrain.json`),
     fetchWithProgress(`/data/${mountainId}/terrain.bin`, onProgress),
-    json<TrailData[]>(`/data/${mountainId}/courses.json`),
+    fetchJson<TrailData[]>(`/data/${mountainId}/courses.json`),
   ])
   return { terrain: { ...meta, heights: decodeHeights(meta, buf) }, trails: courses.map((c) => new Trail(c)) }
 }
@@ -270,13 +277,13 @@ export function estimateMinutes(lengthM: number, gainM: number) {
   return Math.round((lengthM / 4000) * 60 + (gainM / 600) * 60)
 }
 
-/** 분을 「1시간 20분」·「40분」으로 */
 /** 앱에서 걸린 시간(초)을 「12분 05초」처럼 */
 export function formatDuration(sec: number) {
   const m = Math.floor(sec / 60)
   return `${m}분 ${String(sec % 60).padStart(2, '0')}초`
 }
 
+/** 분을 「1시간 20분」·「40분」으로 */
 export function formatMinutes(min: number) {
   const h = Math.floor(min / 60)
   return h ? `${h}시간 ${min % 60}분` : `${min}분`

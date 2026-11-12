@@ -2,11 +2,23 @@ import { useEffect, useState } from 'react'
 import { EMOTES, othersClimbing, reclaimNet, sendEmote, useNet } from '../lib/net'
 import type { Trail } from '../lib/data'
 
+type NetStatus = ReturnType<typeof useNet.getState>['status']
+
+/** 접속 상태 한 줄. 연결되면 이 코스와 다른 코스에 있는 사람 수(나 포함)를 보여 준다 */
+function statusText(status: NetStatus, sameCourse: number, total: number) {
+  if (status === 'connecting') return '연결하는 중…'
+  if (status === 'replaced') return '다른 창에서 같이하는 중'
+  if (status !== 'online') return '혼자 오르는 중'
+  const elsewhere = total - sameCourse
+  return `이 코스 ${sameCourse + 1}명${elsewhere > 0 ? ` · 다른 코스 ${elsewhere}명` : ''}`
+}
+
 /** 왼쪽 아래 같이하기 패널: 접속 상태, 같은 코스 인원, 내 닉네임, 감정 표현 버튼 */
 export function TogetherPanel({ trail }: { trail: Trail }) {
   const status = useNet((s) => s.status)
   const name = useNet((s) => s.name)
   const setName = useNet((s) => s.setName)
+  // 나를 뺀 사람 수: 같은 코스, 모든 코스
   const sameCourse = useNet((s) => s.peers.filter((p) => p.course === trail.data.id).length)
   const total = useNet((s) => Math.max(othersClimbing(s.counts), sameCourse))
   const [editing, setEditing] = useState(false)
@@ -28,13 +40,7 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
     <div className="panel together" aria-label="같이하기">
       <div className="together-status">
         <i className={`dot ${status}`} aria-hidden />
-        {status === 'online'
-          ? `이 코스 ${sameCourse + 1}명${total > sameCourse ? ` · 다른 코스 ${total - sameCourse}명` : ''}`
-          : status === 'connecting'
-            ? '연결하는 중…'
-            : status === 'replaced'
-              ? '다른 창에서 같이하는 중'
-              : '혼자 오르는 중'}
+        {statusText(status, sameCourse, total)}
         {status === 'replaced' && (
           <button type="button" className="together-reclaim" onClick={reclaimNet}>
             이 창에서
@@ -56,6 +62,7 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
             maxLength={12}
             aria-label="닉네임"
             onChange={(e) => setDraft(e.target.value)}
+            // 이름을 치는 동안 걷기·감정 표현 키가 먹지 않게 한다
             onKeyDown={(e) => e.stopPropagation()}
             onBlur={() => setEditing(false)}
           />
