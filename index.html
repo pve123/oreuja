@@ -114,7 +114,8 @@
       /* 링크 카드와 같은 검정 둥근 배지 */
       .splash-eyebrow {
         margin: 10px 0 0;
-        padding: 5px 12px;
+        /* 글자 사이 간격이 마지막 글자 뒤에도 붙으니 왼쪽에 그만큼 더 줘서 가운데를 맞춘다 */
+        padding: 5px 12px 5px calc(12px + 0.04em);
         border-radius: 999px;
         background: #141414;
         font-size: 12px;
@@ -128,6 +129,7 @@
         font-size: 44px;
         font-weight: 900;
         letter-spacing: 0.02em;
+        padding-left: 0.02em;
         text-shadow:
           2.0px 0.0px 0 #141414,
           1.8px 0.8px 0 #141414,
@@ -272,6 +274,10 @@
         animation: splash-glow 1.6s ease-in-out infinite;
       }
       /* JS 를 받는 동안: 진행률을 지어내지 않고 말줄임표만 움직여 멈추지 않았음을 보인다 */
+      /* 말줄임표 칸(1.2em)만큼 왼쪽도 비워 문구가 가운데에 오게 한다 */
+      #splash:not(.live) #splash-sub {
+        padding-left: 1.2em;
+      }
       #splash:not(.live) #splash-sub::after {
         content: '';
         display: inline-block;
@@ -307,8 +313,8 @@
       <div class="splash-mist m2" aria-hidden="true"></div>
 
       <div class="splash-center">
-        <!-- 앱 아이콘과 같은 선글라스 낀 산. 진행만큼 등산객이 왼쪽 능선을 따라 오르고 지나온 길이 채워진다 -->
-        <svg class="splash-climb" viewBox="0 0 320 200" aria-hidden="true">
+        <!-- 앱 아이콘과 같은 선글라스 낀 산. 산이 x 70~270 이라 viewBox 를 10 옮겨 가운데(170)를 맞춘다. 진행만큼 등산객이 왼쪽 능선을 따라 오르고 지나온 길이 채워진다 -->
+        <svg class="splash-climb" viewBox="10 0 320 200" aria-hidden="true">
           <defs>
             <radialGradient id="splash-halo">
               <stop offset="0" stop-color="#ffe9c4" stop-opacity="0.55" />
