@@ -1,6 +1,8 @@
-# 방구석 등반대 (MVP)
+# 오르자
 
 브라우저에서 산과 등산 코스를 골라 걸어 올라가는 웹 3D 앱이다. 지금은 북한산(코스 4개)과 도봉산(코스 3개), 관악산(코스 2개), 수락산(코스 3개)이 있고, 산을 하나씩 더해 갈 예정이다. 정상에 닿으면 머리 위에 「⛰️🚩 정상이다」가 뜨고 인증 배지를 받으며, 그 말풍선이 들어간 기념사진을 저장할 수 있다.
+
+운영 주소: https://www.oreuja.com
 
 ## 실행
 
@@ -91,7 +93,7 @@ cp .env.example .env.local   # VITE_VWORLD_KEY=... 를 채운다
 
 정적 파일만 올리는 배포라 혼자 오르기만 된다. Vercel 에는 웹소켓 서버를 둘 수 없어서 `VITE_MULTIPLAYER_URL` 을 비워 두면 배포본은 같이하기 서버를 찾지 않고 베이스캠프의 「같이」 아래에 「서버 없음」이 보인다.
 
-1. Vercel 대시보드에서 「Add New Project」를 누르고 GitHub 의 `pve123/trailverse` 저장소를 고른다. `vercel.json` 이 Vite 프리셋과 `npm run build`, `dist` 를 알려 주니 빌드 설정은 그대로 둔다.
+1. Vercel 대시보드에서 「Add New Project」를 누르고 GitHub 의 `pve123/oreuja` 저장소를 고른다. `vercel.json` 이 Vite 프리셋과 `npm run build`, `dist` 를 알려 주니 빌드 설정은 그대로 둔다.
 2. Environment Variables 에 `VITE_VWORLD_KEY`(운영 주소를 등록한 브이월드 인증키)와 `SITE_URL`(`https://www.oreuja.com`, 미리보기 카드의 주소)을 Production 으로 넣는다. 인증키를 비우면 위성사진 없이 고도 색으로 지형을 그린다.
 3. 「Deploy」를 누른다. 이후에는 main 에 올라갈 때마다 자동으로 다시 배포하고 PR 브랜치는 미리보기 주소를 받는다.
 
