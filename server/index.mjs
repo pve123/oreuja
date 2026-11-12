@@ -55,7 +55,7 @@ const TRUST_PROXY = process.env.TRUST_PROXY === '1'
 /**
  * 이 페이지에서 온 접속인지. 다른 사이트가 이 서버를 가져다 쓰지 못하게 브라우저가 붙이는 Origin 을 본다.
  * 운영 주소(ALLOWED_ORIGINS)와 Vercel 미리보기 주소, 개발용 localhost 를 받는다.
- * Vercel 프로젝트 이름이 아직 trailverse 라서 미리보기 주소는 trailverse-…-hsl-labs.vercel.app 꼴이다
+ * 미리보기 주소는 Vercel 프로젝트 이름을 앞에 붙인 oreuja-…-hsl-labs.vercel.app 꼴이다
  */
 function originAllowed(origin) {
   if (!origin) return false
@@ -63,7 +63,7 @@ function originAllowed(origin) {
   try {
     const { protocol, hostname } = new URL(origin)
     if (hostname === 'localhost' || hostname === '127.0.0.1') return true
-    return protocol === 'https:' && /^trailverse-[a-z0-9-]+-hsl-labs\.vercel\.app$/.test(hostname)
+    return protocol === 'https:' && /^oreuja-[a-z0-9-]+-hsl-labs\.vercel\.app$/.test(hostname)
   } catch {
     return false
   }

@@ -65,7 +65,7 @@ npm run dev      # 다른 터미널에서. 개발 서버가 /ws 를 같이하기
 
 밖에 올릴 때를 위해 다음도 막는다. `npm run test:server` 가 빈 포트에 서버를 따로 띄워 이 동작을 시험한다(CI 의 check 에서도 돈다).
 
-- 접속 출처: 브라우저가 붙이는 Origin 이 운영 주소(`ALLOWED_ORIGINS`, 기본 `https://www.oreuja.com`, `https://oreuja.com`), Vercel 미리보기 주소(`trailverse-…-hsl-labs.vercel.app`, Vercel 프로젝트 이름이 아직 `trailverse` 다), localhost 일 때만 받는다.
+- 접속 출처: 브라우저가 붙이는 Origin 이 운영 주소(`ALLOWED_ORIGINS`, 기본 `https://www.oreuja.com`, `https://oreuja.com`), Vercel 미리보기 주소(`oreuja-…-hsl-labs.vercel.app`), localhost 일 때만 받는다.
 - 같은 브라우저: 브라우저마다 정한 번호(`?cid=…`)로 알아보고, 창을 여러 개 열어도 마지막 창 하나만 붙는다. 이전 창 연결은 닫힘 코드 4001 로 끊고, 그 창에는 「다른 창에서 같이하는 중」과 「이 창에서」 버튼이 뜬다.
 - 같은 IP 접속 수: 여섯까지. 집·학교처럼 IP 하나를 나눠 쓰는 경우를 생각했다. 내 컴퓨터(localhost)에서 온 접속은 개발 중 창을 여러 개 띄울 수 있게 뺀다.
 - 끊긴 연결: 15초마다 ping 을 보내 답이 없으면 끊는다. 폰이 잠들거나 와이파이가 끊긴 사람이 남의 화면에 남지 않는다.
