@@ -42,9 +42,9 @@ export function composePhoto(source: HTMLCanvasElement, trail: TrailData, bubble
   ctx.fillText(subtitle, pad, subtitleY)
   const subtitleW = ctx.measureText(subtitle).width
 
-  // 서비스 이름: 산 모양 표시와 「방구석 등반대」. 둘째 줄 오른쪽에 두고, 좁은 폰 세로 사진처럼 자리가 모자라면
+  // 서비스 이름: 산 모양 표시와 「오르자」. 둘째 줄 오른쪽에 두고, 좁은 폰 세로 사진처럼 자리가 모자라면
   // 큰 제목 줄 오른쪽으로, 거기도 모자라면 사진 오른쪽 위로 옮겨 글자끼리 겹치지 않게 한다
-  const brand = '방구석 등반대'
+  const brand = '오르자'
   const size = Math.round(bar * 0.2)
   ctx.font = `800 ${size}px ${font}`
   const textW = ctx.measureText(brand).width

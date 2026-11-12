@@ -1,26 +1,23 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
-  <!-- 방구석 등반대 앱 아이콘: 밤 남색 하늘에 뜨는 해, 겹친 능선, 정상까지 오르는 등산로 (첫 화면과 같은 색) -->
+  <!-- 오르자 앱 아이콘: 정상에 깃발을 꽂고 선글라스를 낀 산. 굵은 검정 테두리의 스티커 느낌 -->
   <defs>
-    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c2c47"/>
-      <stop offset="0.62" stop-color="#3b4a74"/>
-      <stop offset="1" stop-color="#8e7a8c"/>
-    </linearGradient>
-    <radialGradient id="sun" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#fff1c2"/>
-      <stop offset="0.55" stop-color="#ffd58a"/>
-      <stop offset="1" stop-color="#ff8a5b"/>
-    </radialGradient>
     <clipPath id="round"><rect width="512" height="512" rx="112"/></clipPath>
   </defs>
-  <g clip-path="url(#round)">
-    <rect width="512" height="512" fill="url(#sky)"/>
-    <circle cx="332" cy="238" r="64" fill="url(#sun)"/>
-    <circle cx="332" cy="238" r="96" fill="#ffd58a" opacity="0.14"/>
-    <path fill="#4c5677" opacity="0.9" d="M-20 330 L90 262 L160 296 L250 214 L330 282 L420 236 L540 316 V560 H-20 Z"/>
-    <path fill="#2b3a52" d="M-20 400 L80 346 L170 372 L256 306 L350 384 L440 338 L540 388 V560 H-20 Z"/>
-    <path fill="none" stroke="#ffd58a" stroke-width="12" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="2 26" d="M120 470 L196 420 L166 392 L236 350 L222 324 L256 306"/>
-    <path d="M256 306 V266" stroke="#fdf6ec" stroke-width="8" stroke-linecap="round"/>
-    <path d="M256 266 L296 278 L256 292 Z" fill="#ff6b6b"/>
+  <g clip-path="url(#round)" stroke="#141414" stroke-width="12" stroke-linejoin="round" stroke-linecap="round">
+    <rect width="512" height="512" fill="#ff7eb6" stroke="none"/>
+    <!-- 해 -->
+    <circle cx="400" cy="110" r="46" fill="#ffe14d"/>
+    <!-- 산과 눈 덮인 꼭대기 -->
+    <path d="M40 470 L256 120 L472 470 Z" fill="#7be495"/>
+    <path d="M256 120 L300 192 L278 182 L256 200 L234 182 L212 192 Z" fill="#fff"/>
+    <!-- 선글라스: 다리, 두 알, 알에 비친 빛 -->
+    <path d="M168 300 H344" fill="none"/>
+    <path d="M170 296 h70 q0 50 -36 50 q-34 0 -34 -50 Z M272 296 h70 q0 50 -36 50 q-34 0 -34 -50 Z" fill="#141414" stroke="none"/>
+    <path d="M186 308 l18 -6 M288 308 l18 -6" stroke="#fff" stroke-width="7"/>
+    <!-- 씩 웃는 입 -->
+    <path d="M226 392 q30 22 64 -6" fill="none"/>
+    <!-- 정상 깃발 -->
+    <path d="M256 122 V52"/>
+    <path d="M256 52 L314 70 L256 90 Z" fill="#ff4d4d"/>
   </g>
 </svg>
