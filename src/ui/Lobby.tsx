@@ -149,8 +149,7 @@ function LobbyPanel({ trail, trails, mountains, mountain }: LobbyProps) {
       {/* 게임 로비처럼 모드와 캐릭터를 출발 버튼 곁에 둔다 (좁은 창에서도 스크롤 없이 보인다) */}
       <div className="lobby-actions">
         <AvatarStrip />
-        <ControlSwitch />
-        <SkySwitch />
+        <LobbySettings />
         <div className="lobby-buttons">
           {midway && (
             <button className="btn lobby-restart" onClick={() => start(true)}>
@@ -181,11 +180,25 @@ function doneIn(records: ClimbRecord[], m: Mountain) {
   return Math.min(ids.size, m.courses)
 }
 
-/** 산 탭: 이름과 높이, 오른 코스가 있으면 「2/5 완등」, 없으면 코스 수 */
+/** 산 탭: 이름과 높이, 오른 코스가 있으면 「2/5 완등」, 없으면 코스 수. 지금 그 산을 오르는 사람이 있으면 초록 숫자 */
 function MountainTab({ mountain, selected, done, onPick }: { mountain: Mountain; selected: boolean; done: number; onPick: () => void }) {
+  const climbing = useNet((s) =>
+    s.status === 'online'
+      ? Object.keys(s.counts)
+          .filter((course) => course.startsWith(`${mountain.id}-`))
+          .reduce((sum, course) => sum + othersClimbing(s.counts, course), 0)
+      : 0,
+  )
   return (
     <button role="tab" aria-selected={selected} className={selected ? 'mountain-tab selected' : 'mountain-tab'} onClick={onPick}>
-      <span className="mountain-tab-name">{mountain.name}</span>
+      <span className="mountain-tab-name">
+        {mountain.name}
+        {climbing > 0 && (
+          <span className="mountain-tab-live" aria-label={`${climbing}명 오르는 중`}>
+            ● {climbing}
+          </span>
+        )}
+      </span>
       <span className="mountain-tab-meta">
         {mountain.elevation}m · {done > 0 ? `${done}/${mountain.courses} 완등` : `코스 ${mountain.courses}개`}
       </span>
@@ -275,6 +288,35 @@ function Profile({ points }: { points: [number, number, number][] }) {
     <svg className="course-card-profile" viewBox={`0 0 ${PROFILE_W} ${PROFILE_H}`} preserveAspectRatio="none" aria-hidden>
       <path d={path} />
     </svg>
+  )
+}
+
+/**
+ * 조작 방식과 하늘. 컴퓨터에서는 둘 다 펼쳐 두고, 폰에서는 자주 바꾸지 않으니 「설정」 한 줄로 접어 코스 목록 자리를 넓힌다.
+ * 접힌 줄에는 지금 고른 값을 보여 준다 (index.css 의 .lobby-settings)
+ */
+function LobbySettings() {
+  const [open, setOpen] = useState(false)
+  const controlMode = useGame((s) => s.controlMode)
+  const preset = useSky((s) => s.preset)
+  const control = CONTROL_MODES.find(([m]) => m === controlMode)?.[1]
+  const sky = SKY_PRESETS.find((p) => p.kind === preset)?.label
+  return (
+    <div className={open ? 'lobby-settings open' : 'lobby-settings'}>
+      <button className="lobby-settings-toggle" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        <span className="lobby-settings-title">설정</span>
+        <span className="lobby-settings-summary">
+          {control} · 하늘 {sky}
+        </span>
+        <svg className="fold-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
+          <path d="M3 5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        </svg>
+      </button>
+      <div className="lobby-settings-body">
+        <ControlSwitch />
+        <SkySwitch />
+      </div>
+    </div>
   )
 }
 
