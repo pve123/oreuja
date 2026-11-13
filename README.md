@@ -59,7 +59,7 @@ npm run dev      # 다른 터미널에서. 개발 서버가 /ws 를 같이하기
 
 - 같은 PC에서는 브라우저 창을 여러 개 열어 확인한다.
 - 같은 와이파이의 다른 기기로 확인하려면 `npm run dev -- --host` 로 켜고 화면에 나온 네트워크 주소로 접속한다.
-- 밖에서 친구와 하려면 같이하기 서버를 올릴 곳(Render, Fly.io 등)이 필요하다. 올린 뒤 `.env.local` 의 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣는다.
+- 운영 서버는 Railway 에 올려 두었다(아래 「같이하기 서버 올리기」). 개발 중에 운영 서버로 붙어 보려면 `.env.local` 의 `VITE_MULTIPLAYER_URL` 에 그 `wss://` 주소를 넣는다. 운영 서버는 localhost 출처도 받는다.
 
 서버(`server/index.mjs`)는 닉네임, 아바타, 코스, 등산로 위 거리와 옆으로 비킨 거리, 보는 방향, 점프 높이, 지금 하는 일(베이스캠프·걷기·정상·사진), 감정 표현만 주고받고 아무것도 저장하지 않는다. 메시지 크기(512바이트)와 빈도(초당 30개), 접속 수(50명)를 제한하고, 받은 값은 범위를 잘라 쓴다. 로그인이 없어서 닉네임은 누구나 아무렇게나 정할 수 있다.
 
@@ -77,6 +77,27 @@ npm run dev      # 다른 터미널에서. 개발 서버가 /ws 를 같이하기
 | `ALLOWED_ORIGINS` | 접속을 받을 페이지 주소, 쉼표로 여럿 (기본 `https://www.oreuja.com,https://oreuja.com`). 운영 주소를 바꾸면 여기에 넣는다 |
 | `TRUST_PROXY` | `1` 이면 `X-Forwarded-For` 첫 주소를 접속한 사람 IP 로 본다. 호스팅 프록시 뒤에 둘 때(Railway, Fly.io, Render 모두 그렇다) 반드시 켠다. 안 켜면 모두가 프록시 IP 하나로 보여 전체가 여섯 명으로 막히고, 서버가 경고를 남긴다. 프록시 없이 켜면 누구나 머리글을 꾸며 IP 제한을 피한다 |
 
+## 같이하기 서버 올리기 (Railway)
+
+운영 같이하기 서버는 Railway 의 `wss://oreuja-production.up.railway.app` 이다. Railway 가 GitHub `pve123/oreuja` 저장소를 받아 `server/index.mjs` 만 띄운다.
+
+설정은 저장소의 `railway.json` 에 있다.
+
+- 시작 명령은 `npm run server`, 상태 확인 주소는 `/health` 다.
+- `server/` 와 `package.json`, `package-lock.json`, `railway.json` 이 바뀔 때만 다시 배포한다. 화면만 고친 PR 을 병합할 때마다 서버가 다시 켜져 같이하던 사람들 연결이 끊기지 않게 하려는 것이다.
+- 서버가 죽으면 열 번까지 다시 켠다.
+
+대시보드 Variables 에는 두 값을 넣는다. `railway.json` 으로는 환경변수를 넣을 수 없다.
+
+| 변수 | 값 | 이유 |
+|---|---|---|
+| `TRUST_PROXY` | `1` | Railway 프록시 뒤에 있어서 IP 제한이 제대로 돌게 한다 (위 표) |
+| `RAILPACK_NO_SPA` | `1` | 이게 없으면 Railway 가 저장소를 Vite 정적 사이트로 알아보고 `dist` 를 띄운다. 그러면 시작 명령이 무시되고 `/health` 에 웹사이트 HTML 이 나오며 웹소켓은 누구 출처든 받는 것처럼 보인다 |
+
+`PORT` 는 Railway 가 정해 주고 `ALLOWED_ORIGINS` 는 기본값이 운영 주소라 넣지 않는다. 공개 주소는 Settings 의 Networking 에서 「Generate Domain」으로 만든다.
+
+제대로 떴는지는 `https://oreuja-production.up.railway.app/health` 가 `{"ok":true,"players":…}` 를 돌려주는지로 본다. HTML 이 나오면 `RAILPACK_NO_SPA` 가 빠진 것이다. 주소를 바꾸면 Vercel 의 `VITE_MULTIPLAYER_URL` 도 바꾸고 다시 배포한다.
+
 ## 위성사진 (선택)
 
 `.env.example` 을 `.env.local` 로 복사하고 브이월드 인증키를 넣으면 지형에 항공사진(브이월드 영상지도)을 입힌다. 인증키가 없거나 타일을 받지 못하면 고도와 경사로 칠한 색을 쓴다. Vite는 서버를 켤 때 이 파일을 읽으니 바꾼 뒤에는 `npm run dev` 를 다시 실행한다.
@@ -91,13 +112,13 @@ cp .env.example .env.local   # VITE_VWORLD_KEY=... 를 채운다
 
 ## Vercel 에 올리기
 
-정적 파일만 올리는 배포라 혼자 오르기만 된다. Vercel 에는 웹소켓 서버를 둘 수 없어서 `VITE_MULTIPLAYER_URL` 을 비워 두면 배포본은 같이하기 서버를 찾지 않고 같이하기 패널에 「혼자 오르는 중」이 보인다.
+Vercel 은 정적 파일만 올린다. 웹소켓 서버를 둘 수 없어서 같이하기 서버는 Railway 에 따로 올렸다(위 「같이하기 서버 올리기」). `VITE_MULTIPLAYER_URL` 을 비워 두면 배포본은 같이하기 서버를 찾지 않고 같이하기 패널에 「혼자 오르는 중」이 보인다.
 
 1. Vercel 대시보드에서 「Add New Project」를 누르고 GitHub 의 `pve123/oreuja` 저장소를 고른다. `vercel.json` 이 Vite 프리셋과 `npm run build`, `dist` 를 알려 주니 빌드 설정은 그대로 둔다.
-2. Environment Variables 에 `VITE_VWORLD_KEY`(운영 주소를 등록한 브이월드 인증키)와 `SITE_URL`(`https://www.oreuja.com`, 미리보기 카드의 주소)을 Production 으로 넣는다. 인증키를 비우면 위성사진 없이 고도 색으로 지형을 그린다.
+2. Environment Variables 에 `VITE_VWORLD_KEY`(운영 주소를 등록한 브이월드 인증키)와 `SITE_URL`(`https://www.oreuja.com`, 미리보기 카드의 주소)을 Production 으로 넣는다. 인증키를 비우면 위성사진 없이 고도 색으로 지형을 그린다. `VITE_MULTIPLAYER_URL`(`wss://oreuja-production.up.railway.app`)은 Production 과 Preview 둘 다 넣는다. 셋 다 브라우저 코드에 들어가는 공개 값이라 Secret 이 아닌 일반 값으로 넣는다.
 3. 「Deploy」를 누른다. 이후에는 main 에 올라갈 때마다 자동으로 다시 배포하고 PR 브랜치는 미리보기 주소를 받는다.
 
-같이하기까지 열려면 `server/index.mjs` 를 Railway·Fly.io·Render 같은 곳에 올리고(시작 명령 `npm run server`, 상태 확인 `/health`, 환경변수 `TRUST_PROXY=1`) Vercel 환경변수 `VITE_MULTIPLAYER_URL` 에 `wss://` 주소를 넣은 뒤 다시 배포한다. 환경변수는 빌드할 때 들어가므로 넣은 뒤 꼭 다시 배포해야 한다.
+환경변수는 빌드할 때 들어가므로 바꾼 뒤에는 꼭 다시 배포해야 한다.
 
 링크를 카카오톡이나 슬랙에 붙였을 때 보이는 미리보기 그림은 `public/og-image.jpg`(1200x630)다. og:image 는 절대 주소여야 해서 빌드할 때 `vite.config.ts` 의 `socialMeta` 가 넣는다. Vercel 이 빌드 중에 알려 주는 운영 주소(`VERCEL_PROJECT_PRODUCTION_URL`)를 쓰고, 다른 주소를 쓰려면 Vercel 환경변수 `SITE_URL` 에 `https://` 로 시작하는 주소를 넣는다. 로컬 빌드에는 넣지 않는다.
 
