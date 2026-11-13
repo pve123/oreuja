@@ -913,6 +913,15 @@ kbd {
   color: var(--muted);
   font-size: 14px;
 }
+/* 다른 창이 같이하기를 넘겨받았다는 창: 제목이 길어 조금 작게 */
+.replaced-modal h2 {
+  font-size: 20px;
+  word-break: keep-all;
+}
+.replaced-modal .modal-sub {
+  line-height: 1.5;
+  word-break: keep-all;
+}
 .badge {
   width: 128px;
   height: 128px;
