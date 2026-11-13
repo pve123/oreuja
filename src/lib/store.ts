@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { loadAvatar, saveAvatar, type AvatarKind } from './avatars'
 import { IS_TOUCH } from './device'
+import { haptic } from './haptics'
 import { readStored, removeStored, writeStored } from './storage'
 
 /** lobby 는 출발 전 베이스캠프(산·코스·혼자/같이·캐릭터를 고르는 화면). 걷는 중에도 Esc 로 다시 연다 */
@@ -141,6 +142,7 @@ export const useGame = create<State>((set, get) => ({
     const records = [...get().records, record]
     writeStored(RECORDS_KEY, JSON.stringify(records))
     set({ mode: 'summit', finishedAt: Date.now(), records, autoWalk: false })
+    haptic('summit')
   },
   takePhoto: () => set({ mode: 'photo' }),
   setPhoto: (photo) => set({ photo, mode: 'photoResult' }),
