@@ -5,6 +5,7 @@ import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
+import { PeopleButton } from './PeopleSheet'
 import { TouchControls, TouchGuide } from './TouchControls'
 import { AvatarChips } from './AvatarChips'
 import { EmoteDial } from './EmoteDial'
@@ -132,6 +133,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       <RoamNotice />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
+      <PeopleButton trail={trail} />
       {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
       {/* 쉬운 조작은 조이스틱 대신 큰 「걷기」 버튼 하나로 등산로를 따라 걷는다 */}
       {controlMode === 'free' ? <TouchControls /> : <WalkButton />}

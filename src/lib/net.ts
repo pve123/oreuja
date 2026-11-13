@@ -219,6 +219,15 @@ function connect(url: string) {
   }
 }
 
+/** 같이하기 패널·시트의 접속 상태 한 줄. 연결되면 이 코스와 다른 코스에 있는 사람 수(나 포함)를 보여 준다 */
+export function statusText(status: NetStatus, sameCourse: number, total: number) {
+  if (status === 'connecting') return '연결하는 중…'
+  if (status === 'replaced') return '다른 창에서 같이하는 중'
+  if (status !== 'online') return '혼자 오르는 중'
+  const elsewhere = total - sameCourse
+  return `이 코스 ${sameCourse + 1}명${elsewhere > 0 ? ` · 다른 코스 ${elsewhere}명` : ''}`
+}
+
 /** 다른 창에 넘겨준 같이하기를 이 창으로 다시 가져온다 */
 export function reclaimNet() {
   const url = serverUrl()
