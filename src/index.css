@@ -1361,6 +1361,222 @@ kbd {
   width: 52px;
   height: 52px;
 }
+/* 터치 화면 같이하기 버튼: 소리 버튼 옆에 둔다. 태블릿·폰 가로는 왼쪽 아래 소리 버튼 오른쪽, 폰 세로는 오른쪽 위 소리 버튼 아래.
+   이 코스에 다른 사람이 있으면 인원 숫자, 없으면 접속 상태 점 (src/ui/PeopleSheet.tsx) */
+.people-button {
+  position: fixed;
+  left: calc(16px + 40px + 10px + var(--sal));
+  bottom: calc(24px + var(--sab));
+  z-index: 20;
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  box-shadow: 0 6px 20px rgba(8, 12, 24, 0.3);
+  color: var(--text);
+  cursor: pointer;
+}
+.people-button:active {
+  transform: scale(0.92);
+}
+.people-button .dot,
+.people-count {
+  position: absolute;
+  right: -2px;
+  top: -2px;
+}
+.people-button .dot {
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--navy);
+  box-sizing: content-box;
+}
+.people-count {
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: #2fa84f;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 0 2px var(--navy);
+}
+@media (hover: hover) and (pointer: fine) {
+  .people-button {
+    display: none;
+  }
+}
+@media (max-width: 760px) {
+  .people-button {
+    left: auto;
+    bottom: auto;
+    right: calc(16px + var(--sar));
+    top: calc(16px + 40px + 10px + var(--sat));
+  }
+}
+
+/* 아래에서 올라오는 시트: 바깥을 누르면 닫힌다 */
+.sheet-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  background: rgba(12, 18, 34, 0.45);
+}
+.sheet {
+  position: relative;
+  width: min(480px, 100%);
+  max-height: 80vh;
+  overflow-y: auto;
+  border-radius: 20px 20px 0 0;
+  border-bottom: 0;
+  padding: 8px 18px calc(18px + var(--sab));
+  background: rgba(22, 30, 52, 0.92);
+  animation: sheet-up 0.22s cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+@keyframes sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+}
+.sheet-handle {
+  width: 36px;
+  height: 4px;
+  margin: 0 auto 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.25);
+}
+.sheet-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sheet-head h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+.sheet-close {
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--muted);
+  font: inherit;
+  cursor: pointer;
+}
+.people-status {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 6px 0 12px;
+  color: var(--muted);
+  font-size: 14px;
+}
+.people-list {
+  display: grid;
+  gap: 4px;
+  margin: 0 0 16px;
+  padding: 0;
+  list-style: none;
+}
+.people-list li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 4px 10px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+}
+.people-list li.me {
+  background: rgba(255, 138, 91, 0.12);
+}
+.people-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.1);
+}
+.people-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.people-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.people-tag,
+.people-where {
+  font-size: 12px;
+  color: var(--muted);
+}
+.people-tag {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255, 138, 91, 0.25);
+  color: var(--accent-2);
+  font-weight: 800;
+}
+.people-list li.people-empty {
+  justify-content: center;
+  color: var(--muted);
+  font-size: 14px;
+}
+.people-rename label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.people-rename-row {
+  display: flex;
+  gap: 8px;
+}
+/* 아이폰은 16px 보다 작은 입력칸에 손대면 화면을 확대한다 */
+.people-rename input {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+}
+.people-rename .btn {
+  flex: 0 0 auto;
+  padding: 10px 16px;
+}
+.people-rename .btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}
 /* 터치 기기: 닉네임·감정 표현 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다 (감정 표현은 💬 버튼으로 보낸다) */
 @media (hover: none), (pointer: coarse), (pointer: none) {
   .together {
