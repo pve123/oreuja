@@ -2242,6 +2242,73 @@ kbd {
     backdrop-filter: none;
   }
 }
+/* 베이스캠프 설정(조작·하늘): 컴퓨터에서는 접는 줄 없이 두 패널이 그대로 lobby-actions 의 칸이 된다 */
+.lobby-settings,
+.lobby-settings-body {
+  display: contents;
+}
+.lobby-settings-toggle {
+  display: none;
+}
+.mountain-tab-live {
+  margin-left: 6px;
+  color: #9fe39a;
+  font-size: 12px;
+  font-weight: 800;
+}
+/* 폰: 「설정 · 쉬운 조작 · 하늘 지금 ⌄」 한 줄로 접고, 누르면 펼친다 */
+@media (max-width: 760px) {
+  .lobby-settings {
+    display: block;
+  }
+  .lobby-settings-toggle {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    min-height: 44px;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1.5px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--text);
+    font: inherit;
+    cursor: pointer;
+  }
+  .lobby-settings-title {
+    font-size: 13px;
+    font-weight: 800;
+  }
+  .lobby-settings-summary {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    color: var(--muted);
+    font-size: 13px;
+    text-align: left;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .lobby-settings .fold-icon {
+    transform: rotate(-90deg);
+    transition: transform 0.2s ease;
+  }
+  .lobby-settings.open .fold-icon {
+    transform: none;
+  }
+  .lobby-settings-body {
+    display: none;
+  }
+  .lobby-settings.open .lobby-settings-body {
+    display: grid;
+    gap: 10px;
+    margin-top: 10px;
+  }
+  /* 설정을 접은 만큼 코스 목록을 더 보인다 */
+  .lobby-panel {
+    max-height: 50vh;
+  }
+}
 @media (prefers-reduced-motion: reduce) {
   .lobby,
   .lobby-panel,
