@@ -33,14 +33,15 @@ export function loadMountain(): Mountain {
 
 /**
  * 산을 바꾼다. 지형·물리·코스가 모두 바뀌므로 페이지를 새로 불러 첫 화면부터 다시 그린다.
- * courseId 를 주면 그 코스를 고른 채로, 베이스캠프를 건너뛰고 바로 출발한다.
+ * courseId 를 주면 그 코스를 고른 채로 연다. autostart 면 베이스캠프를 건너뛰고 바로 출발한다
+ * (친구 부르기 링크로 온 사람은 캐릭터를 고를 수 있게 베이스캠프에서 시작한다).
  */
-export function switchMountain(mountain: Mountain, courseId?: string) {
+export function switchMountain(mountain: Mountain, courseId?: string, autostart = true) {
   // 저장소를 못 쓰는 환경이면 바꿀 수 없다 (새로 불러도 기본 산이 뜬다)
   if (!writeStored(MOUNTAIN_KEY, JSON.stringify(mountain))) return
   if (courseId) {
     saveCourse(courseId)
-    writeStored(AUTOSTART_STORAGE_KEY, '1', 'session')
+    if (autostart) writeStored(AUTOSTART_STORAGE_KEY, '1', 'session')
   }
   location.reload()
 }
