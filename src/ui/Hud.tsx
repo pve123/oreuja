@@ -5,6 +5,7 @@ import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
+import { JoinToast } from './JoinToast'
 import { TouchControls, TouchGuide } from './TouchControls'
 import { AvatarChips } from './AvatarChips'
 import { EmoteDial } from './EmoteDial'
@@ -130,6 +131,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 
       <ArrivalTitle trail={trail} />
       <RoamNotice />
+      <JoinToast trail={trail} />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
       {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
