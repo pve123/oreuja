@@ -1141,16 +1141,20 @@ kbd {
 .emote-button:hover {
   background: rgba(255, 255, 255, 0.16);
 }
+/* 다른 사람 이름표. 크기와 흐림은 src/scene/Peers.tsx 가 거리에 맞춰 매 프레임 바꾼다 (아래쪽 끝 기준으로 줄어든다) */
 .peer-label {
   position: relative;
-  padding: 2px 8px;
+  padding: 3px 9px;
   border-radius: 999px;
-  background: rgba(22, 30, 52, 0.82);
+  background: rgba(22, 30, 52, 0.78);
+  border: 1px solid rgba(255, 255, 255, 0.16);
   color: #fff;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 700;
   white-space: nowrap;
   pointer-events: none;
+  transform-origin: 50% 100%;
+  transition: opacity 0.2s ease;
 }
 .emote-bubble {
   position: absolute;
