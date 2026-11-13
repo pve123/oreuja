@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { readStored, writeStored } from './storage'
+import { haptic } from './haptics'
 import type { AvatarKind } from './avatars'
 import type { Mode } from './store'
 
@@ -271,6 +272,8 @@ function receive(msg: ServerMessage) {
   } else if (msg.t === 'e') {
     const emote = { kind: msg.k, at: Date.now() }
     emotes.set(msg.id, emote)
+    // 감정 표현은 같은 코스 사람에게만 온다 (server/index.mjs)
+    haptic('receive')
     useNet.setState((s) => ({
       peers: s.peers.map((p) => (p.id === msg.id ? { ...p, emote } : p)),
     }))
@@ -311,6 +314,7 @@ function sendState() {
 
 /** 감정 표현을 보내고 내 머리 위에도 띄운다 */
 export function sendEmote(kind: Emote) {
+  haptic('send')
   useNet.setState({ myEmote: { kind, at: Date.now() } })
   if (socket?.readyState === WebSocket.OPEN) socket.send(JSON.stringify({ type: 'emote', kind }))
 }
