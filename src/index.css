@@ -589,16 +589,20 @@ kbd {
   background: var(--accent);
   border-color: transparent;
 }
-/* 세로 화면은 💬 위쪽으로 두 칸씩 펼친다. 왼쪽으로 펼치면 쉬운 조작의 「걷기」 버튼을 덮는다 */
+/* 💬 위에 한 줄로 펼치는 빠른 막대. 엄지가 닿는 아래쪽에 그림만 크게 두고, 말은 보내면 말풍선에 뜬다.
+   폰 세로는 위쪽에 오른쪽 맞춤으로 펼친다. 왼쪽으로 펼치면 쉬운 조작의 「걷기」 버튼을 덮는다 */
 .emote-dial-menu {
   position: absolute;
   right: 0;
   bottom: calc(100% + 10px);
   display: grid;
-  grid-template-columns: repeat(2, 66px);
-  gap: 6px;
-  padding: 8px;
-  border-radius: 18px;
+  grid-auto-flow: column;
+  /* 좁은 폰(아이폰 SE)에서는 화면 왼쪽 16px 안쪽까지만 펼치고 칸을 조금 줄인다 */
+  grid-auto-columns: minmax(36px, 44px);
+  gap: 4px;
+  max-width: calc(100vw - 32px - 16px - var(--sal) - var(--sar));
+  padding: 6px;
+  border-radius: 999px;
   background: rgba(22, 30, 52, 0.86);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
@@ -607,28 +611,35 @@ kbd {
   transform-origin: right bottom;
 }
 .emote-dial-item {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 56px;
+  display: grid;
+  place-items: center;
+  aspect-ratio: 1;
   padding: 0;
   border: 0;
-  border-radius: 12px;
+  border-radius: 50%;
   background: rgba(255, 255, 255, 0.08);
-  color: #fdf6ec;
-  font-size: 10.5px;
-  font-weight: 700;
-  white-space: nowrap;
   cursor: pointer;
+  /* 오른쪽(💬 쪽)부터 하나씩 튀어나온다 (src/ui/EmoteDial.tsx 가 --i 에 순서를 넣는다) */
+  animation: emote-item-in 0.22s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+  animation-delay: calc(var(--i) * 18ms);
+  transition: transform 0.1s ease;
 }
 .emote-dial-item:active {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.22);
+  transform: scale(1.18);
 }
+/* 「⛰️🚩」처럼 그림 두 개짜리도 한 칸에 겹쳐 들어가게 줄바꿈 없이 붙인다 */
 .emote-dial-icon {
   font-size: 20px;
   line-height: 1;
+  letter-spacing: -6px;
+  white-space: nowrap;
+}
+@keyframes emote-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.6);
+  }
 }
 @keyframes emote-dial-in {
   from {
@@ -641,12 +652,11 @@ kbd {
     bottom: calc(34px + 76px + 14px + var(--sab));
   }
 }
-/* 가로로 눕힌 폰은 위쪽 공간이 모자라 왼쪽으로 네 칸씩 펼친다 (걷기 버튼과는 화면 반대편이라 겹치지 않는다) */
+/* 가로로 눕힌 폰은 위쪽 공간이 모자라 💬 왼쪽으로 한 줄을 펼친다 (걷기 버튼과는 화면 반대편이라 겹치지 않는다) */
 @media (max-height: 500px) {
   .emote-dial-menu {
     right: calc(100% + 10px);
-    bottom: 0;
-    grid-template-columns: repeat(4, 58px);
+    bottom: 4px;
   }
 }
 @media (hover: hover) and (pointer: fine) {
@@ -655,7 +665,8 @@ kbd {
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .emote-dial-menu {
+  .emote-dial-menu,
+  .emote-dial-item {
     animation: none;
   }
 }
