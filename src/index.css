@@ -1695,6 +1695,67 @@ kbd {
   pointer-events: none;
 }
 
+/* 다른 사람이 내 코스에 들어왔다는 알림: 아래쪽 가운데에 쌓였다가 사라진다 (src/ui/JoinToast.tsx) */
+.join-toasts {
+  position: fixed;
+  left: 50%;
+  bottom: calc(172px + var(--sab));
+  transform: translateX(-50%);
+  z-index: 24;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+.join-toast {
+  max-width: calc(100vw - 32px);
+  padding: 8px 16px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--panel-border);
+  background: var(--panel-bg);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  animation: join-toast 3.2s ease both;
+}
+@keyframes join-toast {
+  0% {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  10%,
+  85% {
+    opacity: 1;
+    transform: none;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+/* 폰 세로: 아래쪽은 걷기·점프 버튼 자리라 그 위로 올린다 */
+@media (max-width: 760px) {
+  .join-toasts {
+    bottom: calc(200px + var(--sab));
+  }
+}
+/* 폰 가로: 아래쪽 가운데 진행 패널 위 */
+@media (max-height: 500px) {
+  .join-toasts {
+    bottom: calc(140px + var(--sab));
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .join-toast {
+    animation: none;
+  }
+}
+
 /*
  * 첫 화면이 걷힐 때와 베이스캠프를 닫을 때 패널들이 차례로 들어온다 (src/lib/splash.ts playHudEnter 가 body 에 hud-enter 를 잠깐 붙인다).
  * 게임처럼 장면이 먼저 드러나고 패널이 뒤따른다. 패널마다 이미 쓰는 transform 과 겹치지 않게 translate 속성으로 움직인다.
