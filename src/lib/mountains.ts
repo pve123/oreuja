@@ -46,6 +46,9 @@ export function switchMountain(mountain: Mountain, courseId?: string, autostart 
   location.reload()
 }
 
+/** 코스 id 는 「산 id-코스」 꼴이다 (예: bukhansan-baegundae). 앞부분이 산 id */
+export const mountainOf = (courseId: string) => courseId.split('-')[0]
+
 /** 고를 수 있는 산 목록 */
 export async function loadMountains(): Promise<Mountain[]> {
   const res = await fetch('/data/mountains.json')

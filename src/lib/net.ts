@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { readStored, writeStored } from './storage'
 import { haptic } from './haptics'
+import { mountainOf } from './mountains'
 import type { AvatarKind } from './avatars'
 import type { Mode } from './store'
 
@@ -55,7 +56,7 @@ const SEND_MS = 200
 /** 끊긴 뒤 다시 붙어 보는 간격(ms) */
 const RETRY_MS = 5000
 /** 이름표 글자 수 상한. 서버도 같은 길이로 자른다 */
-const NAME_MAX = 12
+export const NAME_MAX = 12
 const NAME_KEY = 'hiking-metaverse:nickname'
 const CLIENT_KEY = 'hiking-metaverse:client-id'
 /** 서버가 같은 브라우저 다른 창이 붙었다며 닫을 때 쓰는 코드 (server/index.mjs 의 REPLACED) */
@@ -63,6 +64,12 @@ const REPLACED = 4001
 
 /** 산길 위에 그릴 사람인지. 베이스캠프에 있는 사람은 빼고 센다 */
 export const isClimbing = (p: Pick<Peer, 'mode'>) => p.mode !== 'lobby'
+
+/** 이 코스를 오르는 다른 사람들 (베이스캠프에 있는 사람은 뺀다) */
+export const climbersOn = (peers: Peer[], courseId: string) => peers.filter((p) => p.course === courseId && isClimbing(p))
+
+/** 정상에 있는 사람인지. 정상 도착 창을 보거나 기념사진을 찍는 중이면 정상이다 */
+export const isAtSummit = (p: Pick<Peer, 'mode'>) => p.mode === 'summit' || p.mode === 'photo' || p.mode === 'photoResult'
 
 /**
  * 나를 뺀, 산을 오르는 사람 수. course 를 주면 그 코스만 센다.
@@ -72,6 +79,13 @@ export function othersClimbing(counts: Record<string, number>, course?: string) 
   const all = course === undefined ? Object.values(counts).reduce((a, b) => a + b, 0) : (counts[course] ?? 0)
   const mine = isClimbing(localPlayer) && (course === undefined || course === localPlayer.course) ? 1 : 0
   return Math.max(0, all - mine)
+}
+
+/** 나를 뺀, 그 산의 모든 코스를 오르는 사람 수 (베이스캠프 산 탭) */
+export function othersClimbingOnMountain(counts: Record<string, number>, mountainId: string) {
+  return Object.keys(counts)
+    .filter((course) => mountainOf(course) === mountainId)
+    .reduce((sum, course) => sum + othersClimbing(counts, course), 0)
 }
 
 // 처음 붙는 닉네임: 산 오르는 모습 + 산악회 역할. 둘을 합쳐 NAME_MAX 를 넘지 않게 고른 말들이다

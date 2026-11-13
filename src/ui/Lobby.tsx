@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { estimateMinutes, formatDuration, formatMinutes, type Trail, type TrailData } from '../lib/data'
 import { useGame, type ClimbRecord, type ControlMode } from '../lib/store'
-import { loadCourses, switchMountain, type Mountain } from '../lib/mountains'
-import { othersClimbing, useNet } from '../lib/net'
+import { loadCourses, mountainOf, switchMountain, type Mountain } from '../lib/mountains'
+import { othersClimbing, othersClimbingOnMountain, useNet } from '../lib/net'
 import { AVATARS } from '../lib/avatars'
 import { AvatarChips } from './AvatarChips'
+import { FoldIcon } from './FoldIcon'
 import { playHudEnter } from '../lib/splash'
 import { SKY_PRESETS, currentPhase, useSky, type Phase } from '../lib/daylight'
 
@@ -174,21 +175,15 @@ function bestOf(records: ClimbRecord[], courseId: string) {
   return times.length ? Math.min(...times) : null
 }
 
-/** 그 산에서 한 번이라도 오른 코스 수. 코스 id 가 「산 id-」로 시작한다 (예: bukhansan-baegundae) */
+/** 그 산에서 한 번이라도 오른 코스 수 */
 function doneIn(records: ClimbRecord[], m: Mountain) {
-  const ids = new Set(records.filter((r) => r.trailId.startsWith(`${m.id}-`)).map((r) => r.trailId))
+  const ids = new Set(records.filter((r) => mountainOf(r.trailId) === m.id).map((r) => r.trailId))
   return Math.min(ids.size, m.courses)
 }
 
 /** 산 탭: 이름과 높이, 오른 코스가 있으면 「2/5 완등」, 없으면 코스 수. 지금 그 산을 오르는 사람이 있으면 초록 숫자 */
 function MountainTab({ mountain, selected, done, onPick }: { mountain: Mountain; selected: boolean; done: number; onPick: () => void }) {
-  const climbing = useNet((s) =>
-    s.status === 'online'
-      ? Object.keys(s.counts)
-          .filter((course) => course.startsWith(`${mountain.id}-`))
-          .reduce((sum, course) => sum + othersClimbing(s.counts, course), 0)
-      : 0,
-  )
+  const climbing = useNet((s) => (s.status === 'online' ? othersClimbingOnMountain(s.counts, mountain.id) : 0))
   return (
     <button role="tab" aria-selected={selected} className={selected ? 'mountain-tab selected' : 'mountain-tab'} onClick={onPick}>
       <span className="mountain-tab-name">
@@ -308,9 +303,7 @@ function LobbySettings() {
         <span className="lobby-settings-summary">
           {control} · 하늘 {sky}
         </span>
-        <svg className="fold-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-          <path d="M3 5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <FoldIcon />
       </button>
       <div className="lobby-settings-body">
         <ControlSwitch />

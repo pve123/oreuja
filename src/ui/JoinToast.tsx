@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { isClimbing, useNet } from '../lib/net'
+import { climbersOn, useNet } from '../lib/net'
 import type { Trail } from '../lib/data'
 
 /** 알림 하나가 떠 있는 시간(ms). CSS 의 join-toast 애니메이션 길이와 같게 */
@@ -26,7 +26,7 @@ export function JoinToast({ trail }: { trail: Trail }) {
     /** 이미 알렸거나 처음부터 있던 사람 */
     const known = new Set<string>()
     let onlineSince = useNet.getState().status === 'online' ? 0 : Infinity
-    const climbers = () => useNet.getState().peers.filter((p) => p.course === course && isClimbing(p))
+    const climbers = () => climbersOn(useNet.getState().peers, course)
     for (const p of climbers()) known.add(p.id)
 
     return useNet.subscribe((s, prev) => {

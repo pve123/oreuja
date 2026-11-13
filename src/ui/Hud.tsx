@@ -7,6 +7,8 @@ import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
 import { JoinToast } from './JoinToast'
 import { PeopleButton } from './PeopleSheet'
+import { ReplacedModal } from './ReplacedModal'
+import { FoldIcon } from './FoldIcon'
 import { TouchControls, TouchGuide } from './TouchControls'
 import { AvatarChips } from './AvatarChips'
 import { EmoteDial } from './EmoteDial'
@@ -136,6 +138,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
       <PeopleButton trail={trail} />
+      <ReplacedModal />
       {/* 터치 화면: 왼쪽 아래 조이스틱으로 걷고 오른쪽 아래 버튼으로 뛴다. 마우스 기기에서는 CSS 가 숨긴다 */}
       {/* 쉬운 조작은 조이스틱 대신 큰 「걷기」 버튼 하나로 등산로를 따라 걷는다 */}
       {controlMode === 'free' ? <TouchControls /> : <WalkButton />}
@@ -253,15 +256,6 @@ function ProgressPanel({ trail, distance, next }: { trail: Trail; distance: numb
         <span>실제로는 약 {formatMinutes(leftMinutes)}</span>
       </div>
     </div>
-  )
-}
-
-/** 접기·펼치기 화살표. 펼치면 아래, 접으면 CSS 가 돌려 오른쪽을 본다 */
-function FoldIcon() {
-  return (
-    <svg className="fold-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden>
-      <path d="M3 5l4 4 4-4" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
   )
 }
 
