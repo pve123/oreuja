@@ -1610,19 +1610,65 @@ kbd {
 }
 /* 폰: 위쪽에 코스와 진행만 쌓고, 아래는 조이스틱과 점프 버튼 자리로 비운다 */
 @media (max-width: 760px) {
+  /* 코스와 진행을 붙여 카드 한 장처럼 보이게 해 3D 화면을 넓게 남긴다 */
   .hud-top {
     right: calc(64px + var(--sar));
     flex-direction: column;
     align-items: stretch;
-    gap: 8px;
+    gap: 0;
   }
   /* 캐릭터는 베이스캠프에서 고른다. 걷는 동안에는 3D 화면을 넓게 */
   .side-stack {
     display: none;
   }
+  /* 코스 이름 한 줄: 「백운대 코스 · 산·코스 바꾸기 · 접기」. 산 이름과 난이도는 펼치면 보인다 */
   .course {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 10px;
     width: auto;
     max-height: 34vh;
+    padding: 10px 12px 6px 14px;
+    border-bottom: 0;
+    border-radius: 16px 16px 0 0;
+  }
+  .course > * {
+    grid-column: 1 / -1;
+  }
+  .course-head {
+    display: contents;
+  }
+  .course-head .eyebrow {
+    display: none;
+  }
+  /* 펼치면 코스 이름 아래에 산 이름과 난이도를 보인다 */
+  .course:has(.fold-button[aria-expanded='true']) .course-head .eyebrow {
+    display: block;
+    grid-row: 2;
+    grid-column: 1 / -1;
+    margin-top: 4px;
+  }
+  .course h1 {
+    grid-row: 1;
+    grid-column: 1;
+    margin: 0;
+    overflow: hidden;
+    font-size: 16px;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .course-head .link-button {
+    grid-row: 1;
+    grid-column: 2;
+    font-size: 12px;
+  }
+  .course-head .fold-button {
+    grid-row: 1;
+    grid-column: 3;
+  }
+  .course .course-meta {
+    margin-top: 6px;
   }
   .hud-top .progress {
     position: relative;
@@ -1630,19 +1676,30 @@ kbd {
     bottom: auto;
     transform: none;
     width: auto;
-    padding: 10px 14px;
+    padding: 4px 14px 10px;
+    border-top: 0;
+    border-radius: 0 0 16px 16px;
   }
   .progress-main {
-    margin-bottom: 8px;
+    align-items: center;
+    margin-bottom: 6px;
+  }
+  /* 해발과 다음 이정표를 한 줄로: 「해발 300m」, 「다음 하루재 675m」 */
+  .progress-main > div:first-child,
+  .progress-next {
+    display: flex;
+    align-items: baseline;
+    gap: 6px;
+    min-width: 0;
   }
   .progress-alt {
-    font-size: 20px;
+    font-size: 18px;
   }
   .progress-next-name {
-    font-size: 15px;
+    font-size: 14px;
   }
   .progress-row {
-    margin-top: 6px;
+    margin-top: 5px;
     font-size: 10px;
   }
   .sound-toggle {
