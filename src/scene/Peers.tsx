@@ -4,7 +4,7 @@ import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import type { Terrain, Trail } from '../lib/data'
 import { groundAt, stoneSteps } from '../lib/steps'
-import { emoteBubble, isClimbing, EMOTE_MS, useNet, type Peer } from '../lib/net'
+import { climbersOn, emoteBubble, EMOTE_MS, useNet, type Peer } from '../lib/net'
 import { occlusionUniforms } from '../lib/occlusion'
 import { Avatar } from './Avatar'
 import type { HikerHandle } from './Hiker'
@@ -30,8 +30,7 @@ const OVERLAP_RANGE = 2
 export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
   // 사람이 들고 나거나 아바타를 바꿀 때만 다시 그린다 (위치는 매 프레임 직접 읽는다)
   const key = useNet((s) =>
-    s.peers
-      .filter((p) => p.course === trail.data.id && isClimbing(p))
+    climbersOn(s.peers, trail.data.id)
       .map((p) => `${p.id}:${p.avatar}`)
       .join(','),
   )

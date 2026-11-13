@@ -561,7 +561,7 @@ kbd {
   }
 }
 
-/* 터치 화면 감정 표현: 점프 버튼 위 💬 버튼과 왼쪽으로 펼쳐지는 일곱 가지 */
+/* 터치 화면 감정 표현: 점프 버튼 위 💬 버튼과 한 줄로 펼쳐지는 일곱 가지 (src/ui/EmoteDial.tsx) */
 .emote-dial {
   position: fixed;
   right: calc(32px + var(--sar));
@@ -1611,7 +1611,7 @@ kbd {
     animation: none;
   }
 }
-/* 터치 기기: 닉네임·감정 표현 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다 (감정 표현은 💬 버튼으로 보낸다) */
+/* 터치 기기: 같이하기 패널은 조이스틱·걷기 버튼 자리와 겹쳐 감춘다. 인원·닉네임·친구 부르기는 사람 버튼 시트가, 감정 표현은 💬 버튼이 맡는다 */
 @media (hover: none), (pointer: coarse), (pointer: none) {
   .together {
     display: none;

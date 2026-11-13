@@ -4,7 +4,7 @@ import { IS_TOUCH } from './device'
 /**
  * 친구 부르기: 지금 코스로 바로 들어오는 링크(예: https://www.oreuja.com/?c=bukhansan-baegundae)를 공유하고,
  * 그 링크로 들어온 사람은 베이스캠프에서 그 산과 코스가 골라진 채로 시작한다 (src/App.tsx).
- * 코스 id 는 「산 id-코스」 꼴이라 앞부분으로 산을 안다.
+ * 코스 id 앞부분으로 산을 안다 (src/lib/mountains.ts 의 mountainOf).
  */
 
 /** 링크에 코스를 싣는 주소 이름. 짧게 둔다 */
@@ -12,14 +12,11 @@ const PARAM = 'c'
 const COURSE_ID = /^[a-z0-9]+-[a-z0-9-]+$/
 
 /** 이 코스로 들어오는 링크 */
-export function inviteUrl(courseId: string) {
+function inviteUrl(courseId: string) {
   const url = new URL('/', location.origin)
   url.searchParams.set(PARAM, courseId)
   return url.toString()
 }
-
-/** 초대 코스 id 에서 산 id */
-export const mountainOf = (courseId: string) => courseId.split('-')[0]
 
 /**
  * 주소에 실려 온 초대 코스를 꺼내고 주소에서 지운다. 새로 고치거나 산을 바꿔 다시 불러도 또 적용되지 않게 한다.

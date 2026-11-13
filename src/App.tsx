@@ -4,8 +4,8 @@ import { Canvas } from '@react-three/fiber'
 import * as THREE from 'three'
 import { loadData, type Terrain, type Trail } from './lib/data'
 import { IS_TOUCH } from './lib/device'
-import { DEFAULT_MOUNTAIN, loadMountain, loadMountains, switchMountain, type Mountain } from './lib/mountains'
-import { mountainOf, takeInvitedCourse } from './lib/invite'
+import { DEFAULT_MOUNTAIN, loadMountain, loadMountains, mountainOf, switchMountain, type Mountain } from './lib/mountains'
+import { takeInvitedCourse } from './lib/invite'
 import { startNet } from './lib/net'
 import { VWORLD_KEY } from './lib/satellite'
 import { failSplash, hideSplash, setSplash } from './lib/splash'
@@ -35,6 +35,26 @@ const DPR_MAX_FLIPS = 4
 
 /** 첫 화면 동안 받아 오는 것: 지형, 코스, 산 목록, 지금 고른 산 */
 type LoadedData = { terrain: Terrain; trails: Trail[]; mountains: Mountain[]; mountain: Mountain }
+
+/**
+ * 친구 부르기 링크(?c=코스)로 왔으면 그 코스를 베이스캠프에 골라 둔다 (src/lib/invite.ts).
+ * 다른 산의 코스면 그 산으로 페이지를 새로 불러오고 'reloading' 을 돌려준다
+ */
+function openInvitedCourse(d: LoadedData): 'reloading' | 'ready' {
+  const invited = takeInvitedCourse()
+  if (!invited) return 'ready'
+  const invitedMountain = d.mountains.find((m) => m.id === mountainOf(invited))
+  if (invitedMountain && invitedMountain.id !== d.mountain.id) {
+    switchMountain(invitedMountain, invited, false)
+    return 'reloading'
+  }
+  // setCourse 는 바로 걷기로 넘기니, 베이스캠프에 머문 채 코스만 바꾼다
+  if (d.trails.some((t) => t.data.id === invited)) {
+    saveCourse(invited)
+    useGame.setState({ courseId: invited })
+  }
+  return 'ready'
+}
 
 export default function App() {
   const [data, setData] = useState<LoadedData | null>(null)
@@ -75,20 +95,8 @@ export default function App() {
     loadMountainData(saved)
       .catch((e) => (saved.id === DEFAULT_MOUNTAIN.id ? Promise.reject(e) : loadMountainData(DEFAULT_MOUNTAIN)))
       .then((d) => {
-        // 친구 부르기 링크로 왔으면 그 코스를 골라 둔다. 다른 산이면 그 산으로 새로 불러온다
-        const invited = takeInvitedCourse()
-        if (invited) {
-          const invitedMountain = d.mountains.find((m) => m.id === mountainOf(invited))
-          if (invitedMountain && invitedMountain.id !== d.mountain.id) {
-            switchMountain(invitedMountain, invited, false)
-            return
-          }
-          // setCourse 는 바로 걷기로 넘기니, 베이스캠프에 머문 채 코스만 바꾼다
-          if (d.trails.some((t) => t.data.id === invited)) {
-            saveCourse(invited)
-            useGame.setState({ courseId: invited })
-          }
-        }
+        // 친구 부르기 링크로 온 코스가 다른 산이면 그 산으로 새로 불러온다
+        if (openInvitedCourse(d) === 'reloading') return
         // 개발용 코스 지정이면 베이스캠프를 건너뛰고 바로 걷는다
         if (debugCourse && d.trails.some((t) => t.data.id === debugCourse)) useGame.setState({ courseId: debugCourse, mode: 'hiking' })
         setSplash('숲과 길을 그리는 중', DATA_END)
