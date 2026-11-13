@@ -5,6 +5,7 @@ import { AVATARS, useAvatarThumbs } from '../lib/avatars'
 import { LANDMARK_ICON, landmarkKind } from '../lib/landmarks'
 import { MiniMap } from './MiniMap'
 import { TogetherPanel } from './TogetherPanel'
+import { JoinToast } from './JoinToast'
 import { PeopleButton } from './PeopleSheet'
 import { TouchControls, TouchGuide } from './TouchControls'
 import { AvatarChips } from './AvatarChips'
@@ -131,6 +132,7 @@ export function Hud({ trail, trails }: { trail: Trail; trails: Trail[] }) {
 
       <ArrivalTitle trail={trail} />
       <RoamNotice />
+      <JoinToast trail={trail} />
       <MiniMap trail={trail} trails={trails} />
       <TogetherPanel trail={trail} />
       <PeopleButton trail={trail} />
