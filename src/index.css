@@ -1050,6 +1050,15 @@ kbd {
     display: none;
   }
 }
+/* 폰 가로: 오른쪽 아래는 점프·감정 표현 버튼 자리라 미니맵이 그 밑에 깔린다. 비어 있는 오른쪽 위로 올리고 조금 줄인다 */
+@media (max-height: 500px) and (pointer: coarse) {
+  .minimap {
+    top: calc(16px + var(--sat));
+    bottom: auto;
+    width: 104px;
+    height: 104px;
+  }
+}
 /* 중간 폭 컴퓨터 창: 가운데 진행 패널이 왼쪽 아래 닉네임·감정 표현 패널과 겹치므로, 그 패널 오른쪽에서 시작해 미니맵 앞까지만 쓴다 */
 @media (min-width: 761px) and (max-width: 960px) and (hover: hover) and (pointer: fine) {
   .hud-top .progress {
