@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { EMOTES, othersClimbing, reclaimNet, sendEmote, statusText, useNet } from '../lib/net'
 import { releaseInput, useGame } from '../lib/store'
 import type { Trail } from '../lib/data'
+import { InviteButton } from './InviteButton'
 
 /** 왼쪽 아래 같이하기 패널: 접속 상태, 같은 코스 인원, 내 닉네임, 감정 표현 버튼 */
 export function TogetherPanel({ trail }: { trail: Trail }) {
@@ -78,6 +79,7 @@ export function TogetherPanel({ trail }: { trail: Trail }) {
             </button>
           ))}
         </div>
+        <InviteButton trail={trail} className="together-invite link-button" />
       </div>
     </>
   )

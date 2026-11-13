@@ -1106,6 +1106,12 @@ kbd {
   font: inherit;
   cursor: pointer;
 }
+/* 컴퓨터 같이하기 패널 맨 아래 친구 부르기 */
+.together-invite {
+  justify-self: start;
+  margin-top: 8px;
+  font-size: 13px;
+}
 .together-name {
   justify-self: start;
   font-size: 14px;
@@ -1554,6 +1560,10 @@ kbd {
   justify-content: center;
   color: var(--muted);
   font-size: 14px;
+}
+.people-invite {
+  width: 100%;
+  margin-bottom: 16px;
 }
 .people-rename label {
   display: block;

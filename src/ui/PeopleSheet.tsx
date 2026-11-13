@@ -3,6 +3,7 @@ import { isClimbing, othersClimbing, reclaimNet, statusText, useNet } from '../l
 import { useAvatarThumbs } from '../lib/avatars'
 import { useGame } from '../lib/store'
 import type { Trail } from '../lib/data'
+import { InviteButton } from './InviteButton'
 
 /**
  * 터치 화면용 같이하기: 오른쪽 위 사람 버튼과 누르면 아래에서 올라오는 시트.
@@ -94,6 +95,8 @@ function PeopleSheet({ trail, onClose }: { trail: Trail; onClose: () => void }) 
             {here.length === 0 && <li className="people-empty">아직 이 코스에는 나 혼자예요</li>}
           </ul>
         )}
+
+        <InviteButton trail={trail} className="btn primary people-invite" />
 
         <form
           className="people-rename"
