@@ -20,6 +20,11 @@ const BLEND_MS = 240
 const SNAP = 40
 /** 이 거리(m) 안의 사람만 이름표를 띄운다. 멀리 있는 이름표가 화면을 덮지 않게 한다 */
 const LABEL_RANGE = 120
+/** 이름표 크기: 카메라에서 이 거리(m)일 때 원래 크기(1)이고, 멀어질수록 줄어 LABEL_MIN_SCALE 까지 작아진다. 가까워도 1 보다 커지지 않는다 */
+const LABEL_FULL_SIZE_AT = 9
+const LABEL_MIN_SCALE = 0.6
+/** 다른 사람이 내 캐릭터와 이 거리(m) 안에 겹쳐 서 있으면 이름표를 흐리게 해 내 캐릭터를 가리지 않게 한다 */
+const OVERLAP_RANGE = 2
 
 /** 같은 코스를 오르는 다른 사람들 */
 export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
@@ -46,6 +51,7 @@ export function Peers({ terrain, trail }: { terrain: Terrain; trail: Trail }) {
 function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail: Trail }) {
   const hiker = useRef<HikerHandle>(null!)
   const label = useRef<THREE.Group>(null!)
+  const labelBox = useRef<HTMLDivElement>(null)
   /** 화면에 그리는 위치와 방향 (받은 값을 부드럽게 따라간다) */
   const shown = useRef<{ distance: number; offset: number; facing: number } | null>(null)
   /** 지난 위치(from)에서 받은 위치(to)로 채워 가는 구간. at 은 구간을 시작한 시각 */
@@ -56,7 +62,7 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
   /** 마지막으로 본 감정 표현의 at 과, 그것을 이 화면에서 처음 본 시각 */
   const emoteSeen = useRef<{ at: number; localAt: number } | null>(null)
 
-  useFrame((_, rawDt) => {
+  useFrame(({ camera }, rawDt) => {
     const dt = Math.min(rawDt, 0.1)
     const p = useNet.getState().peers.find((q) => q.id === id)
     if (!p || !hiker.current) return
@@ -99,7 +105,14 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
     // 말풍선은 이 화면에서 감정 표현을 처음 본 때부터 EMOTE_MS 동안 띄운다
     if (p.emote && p.emote.at !== emoteSeen.current?.at) emoteSeen.current = { at: p.emote.at, localAt: Date.now() }
     const bubble = emoteSeen.current && Date.now() - emoteSeen.current.localAt < EMOTE_MS ? emoteBubble(p.emote!.kind) : null
-    const near = pos.distanceTo(occlusionUniforms.uOccTarget.value) < LABEL_RANGE
+    const fromMe = pos.distanceTo(occlusionUniforms.uOccTarget.value)
+    const near = fromMe < LABEL_RANGE
+    // 크기와 흐림은 React 를 거치지 않고 매 프레임 직접 바꾼다
+    if (labelBox.current) {
+      const scale = THREE.MathUtils.clamp(LABEL_FULL_SIZE_AT / camera.position.distanceTo(pos), LABEL_MIN_SCALE, 1)
+      labelBox.current.style.transform = `scale(${scale.toFixed(3)})`
+      labelBox.current.style.opacity = fromMe < OVERLAP_RANGE ? '0.35' : '1'
+    }
     // 이름표와 말풍선은 바뀔 때만 다시 그린다
     if (p.name !== view.name || bubble !== view.emote || near !== view.near) setView({ name: p.name, emote: bubble, near })
   })
@@ -109,8 +122,8 @@ function PeerHiker({ id, terrain, trail }: { id: string; terrain: Terrain; trail
       <Avatar ref={hiker} kind={peer.avatar} />
       <group ref={label}>
         {view.near && (
-          <Html position={[0, 2.6, 0]} center distanceFactor={14} zIndexRange={[10, 0]}>
-            <div className="peer-label">
+          <Html position={[0, 2.6, 0]} center zIndexRange={[10, 0]}>
+            <div ref={labelBox} className="peer-label">
               {view.emote && <div className="emote-bubble">{view.emote}</div>}
               {view.name}
             </div>
